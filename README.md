@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Timely
 
-## Getting Started
+Security-focused workforce intelligence starter on Next.js (App Router) with role-based auth, immutable audit logs, compliance controls, user settings, and local-first timer resilience.
 
-First, run the development server:
+## Registration safety
+- `ALLOW_SELF_REGISTRATION=false` (default) = invite-only access.
+- `ALLOW_BOOTSTRAP_OWNER=true` allows controlled first-owner bootstrap when workspace has zero users.
+- Magic links are one-time, expiring, and replay-protected.
+- Session cookies are signed + HTTP-only.
 
+## Manageability of tags, projects, goals
+Yes — you can now **create, update, and delete** all of them via API:
+- Projects: `GET`, `POST`, `PATCH`, `DELETE /api/projects`
+- Goals: `GET`, `POST`, `PATCH`, `DELETE /api/goals`
+- Tags: `GET`, `PATCH` (rename), `DELETE /api/tags`
+
+When a project/goal is deleted, linked time entries are cleaned by unsetting the corresponding foreign reference in the runtime model.
+
+## Added in this update
+- User settings API with timezone management and preferred tags.
+- Project and Goal APIs for time allocation context.
+- Optional `projectId`, `goalId`, and `tags` on time entries.
+- Tags API for workspace-level tag discovery + rename/remove.
+- CSV export includes project/goal/tag fields.
+
+## Vercel + Neon + Upstash readiness
+- `GET /api/deployment/readiness` checks env wiring for Vercel deployment with Neon + Upstash.
+- SQL migration for Postgres remains included at `db/migrations/0001_init.sql`.
+
+## Current persistence note
+This branch currently uses an in-memory runtime store for API state so it remains compile-safe in restricted CI environments. SQL-first schema is included and adapter wiring to Neon can be done behind current API contracts.
+
+## Quick start
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Required environment variables
+```bash
+NEXT_PUBLIC_APP_URL=https://timely.tkoresearch.com
+AUTH_SHARED_KEY=replace_with_internal_service_key
+AUTH_COOKIE_SECRET=replace_with_long_random_secret_min_24_chars
+AUDIT_SIGNING_SECRET=replace_with_long_random_secret
+RESEND_API_KEY=re_xxx
+RESEND_LOGIN_FROM=logins@kevinbytes.com
+DATABASE_URL=postgres://...
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+EXCHANGE_RATE_API_URL=https://api.exchangerate.host/latest
+ALLOW_SELF_REGISTRATION=false
+ALLOW_BOOTSTRAP_OWNER=true
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API surface
+- Auth
+  - `POST /api/auth/request-link`
+  - `GET /api/auth/verify?token=...`
+  - `GET /api/auth/me`
+  - `POST /api/auth/logout`
+  - `POST /api/auth/invite`
+- User settings
+  - `GET /api/user/settings`
+  - `PATCH /api/user/settings`
+- Projects / Goals / Tags
+  - `GET /api/projects`
+  - `POST /api/projects`
+  - `PATCH /api/projects`
+  - `DELETE /api/projects?projectId=...`
+  - `GET /api/goals`
+  - `POST /api/goals`
+  - `PATCH /api/goals`
+  - `DELETE /api/goals?goalId=...`
+  - `GET /api/tags`
+  - `PATCH /api/tags`
+  - `DELETE /api/tags?tag=...`
+- Timers
+  - `POST /api/timer/start`
+  - `POST /api/timer/stop`
+  - `PATCH /api/timer/edit`
+  - `POST /api/timer/approve`
+  - `POST /api/timer/invoice`
+- Compliance/Finance/Integrations
+  - `POST /api/compliance/daily-check`
+  - `GET /api/currency/rates`
+  - `POST /api/expenses/attach`
+  - `GET /api/export/csv`
+  - `POST /api/integrations/calendar/import`
+  - `GET /api/cron/unfinished-timers`
+- Deployment
+  - `GET /api/deployment/readiness`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Docs
+- Architecture: [`docs/architecture.md`](docs/architecture.md)

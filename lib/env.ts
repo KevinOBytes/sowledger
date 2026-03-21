@@ -1,0 +1,15 @@
+export const env = {
+  NODE_ENV: process.env.NODE_ENV ?? "development",
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  AUTH_SHARED_KEY: process.env.AUTH_SHARED_KEY,
+  AUTH_COOKIE_SECRET: process.env.AUTH_COOKIE_SECRET,
+  AUDIT_SIGNING_SECRET: process.env.AUDIT_SIGNING_SECRET,
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  RESEND_LOGIN_FROM: process.env.RESEND_LOGIN_FROM ?? "logins@kevinbytes.com",
+  DATABASE_URL: process.env.DATABASE_URL,
+  UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+  UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+  EXCHANGE_RATE_API_URL: process.env.EXCHANGE_RATE_API_URL ?? "https://api.exchangerate.host/latest",
+  ALLOW_SELF_REGISTRATION: process.env.ALLOW_SELF_REGISTRATION === "true",
+  ALLOW_BOOTSTRAP_OWNER: process.env.ALLOW_BOOTSTRAP_OWNER !== "false",
+};
