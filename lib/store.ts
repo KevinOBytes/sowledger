@@ -1,4 +1,4 @@
-export type WorkspaceRole = "member" | "manager" | "owner";
+export type WorkspaceRole = "client" | "member" | "manager" | "owner";
 
 export type User = {
   id: string;
@@ -144,6 +144,14 @@ export type Notification = {
   createdAt: string;
 };
 
+export type WebhookIntegration = {
+  id: string;
+  workspaceId: string;
+  url: string;
+  events: string[];
+  createdAt: string;
+};
+
 type InMemoryDB = {
   users: Map<string, User>;
   usersByEmail: Map<string, string>;
@@ -163,6 +171,7 @@ type InMemoryDB = {
   tasks: Map<string, ProjectTask>;
   notifications: Map<string, Notification>;
   invoices: Map<string, Invoice>;
+  webhooks: Map<string, WebhookIntegration>;
 };
 
 declare global {
@@ -189,6 +198,7 @@ function init(): InMemoryDB {
     tasks: new Map(),
     notifications: new Map(),
     invoices: new Map(),
+    webhooks: new Map(),
   };
 }
 

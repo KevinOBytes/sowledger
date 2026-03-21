@@ -212,6 +212,6 @@ export async function requireSession() {
 export { isAdminEmail } from "./admin";
 
 export function requireRole(role: WorkspaceRole, actualRole: WorkspaceRole) {
-  const weights: Record<WorkspaceRole, number> = { member: 1, manager: 2, owner: 3 };
+  const weights: Record<WorkspaceRole, number> = { client: 0, member: 1, manager: 2, owner: 3 };
   if (weights[actualRole] < weights[role]) throw new ForbiddenError(`Requires ${role} role`);
 }

@@ -4,6 +4,22 @@ import { env } from "./env";
 import { UnauthorizedError } from "./auth";
 import { store, type TimeEntry } from "./store";
 
+export async function dispatchWebhook(workspaceId: string, eventType: string, payload: unknown) {
+  const webhooks = Array.from(store.webhooks.values()).filter(
+    (w) => w.workspaceId === workspaceId && (w.events.includes(eventType) || w.events.includes("*"))
+  );
+  if (webhooks.length === 0) return;
+
+  for (const hook of webhooks) {
+    // Fire-and-forget
+    fetch(hook.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: eventType, data: payload, timestamp: new Date().toISOString() }),
+    }).catch((e) => console.error("Webhook failed:", e));
+  }
+}
+
 export async function enforceAuthKey(req: NextRequest) {
   if (!env.AUTH_SHARED_KEY) return;
   const key = req.headers.get("x-auth-key");
@@ -82,6 +98,9 @@ export async function appendAuditLog(params: {
     signature: signAudit(serializedDiff, params.eventType),
     createdAt: new Date().toISOString(),
   });
+
+  // Fire Webhooks async without blocking the main thread
+  dispatchWebhook(params.workspaceId, params.eventType, params.diff).catch(() => {});
 }
 
 export function createTimeEntry(input: Omit<TimeEntry, "id">) {

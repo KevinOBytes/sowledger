@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock, FolderKanban, CalendarDays, Settings, LogOut, Bell, Users, BarChart3, CheckSquare, Receipt } from "lucide-react";
+import { Clock, FolderKanban, CalendarDays, Settings, LogOut, Bell, Users, BarChart3, CheckSquare, Receipt, Webhook } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -37,7 +37,8 @@ export function Sidebar() {
     { name: "Invoices", href: "/invoices", icon: Receipt },
     { name: "Calendar", href: "/calendar", icon: CalendarDays },
     { name: "Notifications", href: "/notifications", icon: Bell },
-    { name: "Settings", href: "/settings/actions", icon: Settings },
+    { name: "Billing Actions", href: "/settings/actions", icon: Settings },
+    { name: "Webhooks", href: "/settings/webhooks", icon: Webhook },
   ];
 
   return (

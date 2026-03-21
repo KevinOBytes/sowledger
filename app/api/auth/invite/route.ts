@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     requireRole("manager", session.role);
 
-    const body = await req.json() as { email?: string; role?: "member" | "manager" };
+    const body = await req.json() as { email?: string; role?: "client" | "member" | "manager" };
     if (!body.email) return NextResponse.json({ error: "email is required" }, { status: 400 });
 
     const invitation = inviteUser({

@@ -5,7 +5,10 @@ import { redirect } from "next/navigation";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Ensure the user is actually authenticated before rendering the shell
   try {
-    await requireSession();
+    const session = await requireSession();
+    if (session.role === "client") {
+      redirect("/client");
+    }
   } catch {
     redirect("/login");
   }
