@@ -15,17 +15,16 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    async function fetchNotifications() {
+      const res = await fetch("/api/notifications");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+      }
+      setLoading(false);
+    }
     fetchNotifications();
   }, []);
-
-  async function fetchNotifications() {
-    const res = await fetch("/api/notifications");
-    if (res.ok) {
-      const data = await res.json();
-      setNotifications(data.notifications || []);
-    }
-    setLoading(false);
-  }
 
   async function markAllAsRead() {
     const res = await fetch("/api/notifications", {

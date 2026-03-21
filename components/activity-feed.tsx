@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Activity, Clock, Edit2, Play, Square, Trash2 } from "lucide-react";
 
-type Diff = Record<string, { before: any; after: any }>;
+type Diff = Record<string, { before: unknown; after: unknown }>;
 
 type AuditActivity = {
   id: string;

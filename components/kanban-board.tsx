@@ -48,7 +48,6 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
       status,
       // eslint-disable-next-line react-hooks/purity
       position: Date.now(),
-      // eslint-disable-next-line react-hooks/purity
       createdAt: new Date().toISOString()
     };
     
