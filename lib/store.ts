@@ -74,6 +74,8 @@ export type TimeEntry = {
   stoppedAt: string | null;
   durationSeconds: number | null;
   description?: string;
+  action?: string;
+  hourlyRate?: number;
   status: "draft" | "submitted" | "approved" | "invoiced";
   source: "web" | "calendar" | "manual";
   collaborators: string[];
@@ -93,6 +95,14 @@ export type AuditItem = {
 
 export type LockPeriod = { workspaceId: string; periodStart: string; periodEnd: string; reason: string; lockedByUserId: string };
 
+export type UserAction = {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  name: string;
+  hourlyRate?: number;
+};
+
 type InMemoryDB = {
   users: Map<string, User>;
   usersByEmail: Map<string, string>;
@@ -108,6 +118,7 @@ type InMemoryDB = {
   locks: LockPeriod[];
   dailySubmissions: Set<string>;
   timerStopCounters: Map<string, { windowStart: number; count: number }>;
+  userActions: Map<string, UserAction>;
 };
 
 declare global {
@@ -130,6 +141,7 @@ function init(): InMemoryDB {
     locks: [],
     dailySubmissions: new Set(),
     timerStopCounters: new Map(),
+    userActions: new Map(),
   };
 }
 
@@ -229,4 +241,12 @@ export function listWorkspaceTags(workspaceId: string) {
     }
   }
   return [...tags].sort();
+}
+
+export function calculateEffectiveRate(userId: string, workspaceId: string, actionId: string): number | undefined {
+  const action = store.userActions.get(actionId);
+  if (action && action.workspaceId === workspaceId && action.userId === userId) {
+    return action.hourlyRate;
+  }
+  return undefined;
 }
