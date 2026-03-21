@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole, requireSession } from "@/lib/auth";
+import { ForbiddenError, requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
 import { listWorkspaceTags, store } from "@/lib/store";
 import { normalizeTags } from "@/lib/validators";
 
@@ -11,7 +11,8 @@ export async function GET() {
     const tags = listWorkspaceTags(session.workspaceId);
     return NextResponse.json({ ok: true, tags });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
+    return NextResponse.json({ error: (error as Error).message }, { status });
   }
 }
 
@@ -38,13 +39,18 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    const workspaceUserIds = new Set(
+      store.memberships.filter((m) => m.workspaceId === session.workspaceId).map((m) => m.userId),
+    );
     for (const user of store.users.values()) {
+      if (!workspaceUserIds.has(user.id)) continue;
       user.preferredTags = normalizeTags(user.preferredTags.map((tag) => (tag === from ? to : tag)));
     }
 
     return NextResponse.json({ ok: true, fromTag: from, toTag: to, changedEntries });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
+    return NextResponse.json({ error: (error as Error).message }, { status });
   }
 }
 
@@ -65,12 +71,17 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
+    const workspaceUserIds = new Set(
+      store.memberships.filter((m) => m.workspaceId === session.workspaceId).map((m) => m.userId),
+    );
     for (const user of store.users.values()) {
+      if (!workspaceUserIds.has(user.id)) continue;
       user.preferredTags = user.preferredTags.filter((existing) => existing !== tag);
     }
 
     return NextResponse.json({ ok: true, removedTag: tag, changedEntries });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
+    return NextResponse.json({ error: (error as Error).message }, { status });
   }
 }

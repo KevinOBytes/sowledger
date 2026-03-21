@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TYPE entry_status AS ENUM ('draft', 'submitted', 'approved', 'invoiced');
 CREATE TYPE project_billing_model AS ENUM ('hourly', 'fixed_fee', 'hybrid');
 

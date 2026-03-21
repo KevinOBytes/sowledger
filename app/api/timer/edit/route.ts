@@ -47,9 +47,15 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const nextStartedAt = body.startedAt ? new Date(body.startedAt) : new Date(entry.startedAt);
-    const nextStoppedAt = body.stoppedAt ? new Date(body.stoppedAt) : entry.stoppedAt ? new Date(entry.stoppedAt) : null;
-    if (!nextStoppedAt) return NextResponse.json({ error: "Cannot edit open timer with this endpoint" }, { status: 400 });
+    const rawStartedAt = body.startedAt ?? entry.startedAt;
+    const rawStoppedAt = body.stoppedAt ?? entry.stoppedAt;
+    if (!rawStoppedAt) return NextResponse.json({ error: "Cannot edit open timer with this endpoint" }, { status: 400 });
+
+    const nextStartedAt = new Date(rawStartedAt);
+    const nextStoppedAt = new Date(rawStoppedAt);
+    if (isNaN(nextStartedAt.getTime())) return NextResponse.json({ error: "Invalid startedAt date" }, { status: 400 });
+    if (isNaN(nextStoppedAt.getTime())) return NextResponse.json({ error: "Invalid stoppedAt date" }, { status: 400 });
+    if (nextStoppedAt <= nextStartedAt) return NextResponse.json({ error: "stoppedAt must be after startedAt" }, { status: 400 });
 
     await ensurePeriodUnlocked(session.workspaceId, nextStartedAt, nextStoppedAt);
     const nextDurationSeconds = Math.max(1, Math.floor((nextStoppedAt.getTime() - nextStartedAt.getTime()) / 1000));

@@ -12,6 +12,22 @@ import {
   type WorkspaceRole,
 } from "./store";
 
+export class UnauthorizedError extends Error {
+  readonly status = 401;
+  constructor(message: string) {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+export class ForbiddenError extends Error {
+  readonly status = 403;
+  constructor(message: string) {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
 const AUTH_COOKIE_NAME = "timely_session";
 
 type SessionPayload = {
@@ -39,16 +55,20 @@ function encode(payload: SessionPayload) {
 
 function decode(token: string): SessionPayload {
   const [raw, mac] = token.split(".");
-  if (!raw || !mac) throw new Error("Malformed token");
+  if (!raw || !mac) throw new UnauthorizedError("Malformed token");
 
   const expected = sign(raw);
-  if (!timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) throw new Error("Invalid token signature");
+  const macBuf = Buffer.from(mac, "hex");
+  const expectedBuf = Buffer.from(expected, "hex");
+  if (macBuf.length !== expectedBuf.length || !timingSafeEqual(macBuf, expectedBuf)) {
+    throw new UnauthorizedError("Invalid token signature");
+  }
 
   const payload = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as SessionPayload;
-  if (payload.exp < Date.now()) throw new Error("Expired token");
+  if (payload.exp < Date.now()) throw new UnauthorizedError("Expired token");
 
   const membership = getMembership(payload.sub, payload.workspaceId);
-  if (!membership) throw new Error("Membership revoked");
+  if (!membership) throw new UnauthorizedError("Membership revoked");
 
   return { ...payload, role: membership.role };
 }
@@ -92,7 +112,11 @@ export function consumeMagicLink(token: string) {
   if (record.expiresAt < Date.now()) throw new Error("Magic link expired");
 
   const computed = hashMagic(parsed.sec);
-  if (!timingSafeEqual(Buffer.from(record.tokenHash), Buffer.from(computed))) throw new Error("Magic link validation failed");
+  const hashBuf = Buffer.from(record.tokenHash, "hex");
+  const computedBuf = Buffer.from(computed, "hex");
+  if (hashBuf.length !== computedBuf.length || !timingSafeEqual(hashBuf, computedBuf)) {
+    throw new UnauthorizedError("Magic link validation failed");
+  }
 
   record.usedAt = Date.now();
   store.magicLinks.set(record.tokenId, record);
@@ -151,11 +175,11 @@ export async function clearSessionCookie() {
 export async function requireSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
-  if (!token) throw new Error("Not authenticated");
+  if (!token) throw new UnauthorizedError("Not authenticated");
   return decode(token);
 }
 
 export function requireRole(role: WorkspaceRole, actualRole: WorkspaceRole) {
   const weights: Record<WorkspaceRole, number> = { member: 1, manager: 2, owner: 3 };
-  if (weights[actualRole] < weights[role]) throw new Error(`Requires ${role} role`);
+  if (weights[actualRole] < weights[role]) throw new ForbiddenError(`Requires ${role} role`);
 }
