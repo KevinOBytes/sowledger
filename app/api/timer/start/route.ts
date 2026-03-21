@@ -54,14 +54,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, entry });
   } catch (error) {
-    const err: any = error;
+    const err = error as Record<string, unknown>;
     const status =
       typeof err?.status === "number"
         ? err.status
         : typeof err?.statusCode === "number"
         ? err.statusCode
         : 500;
-    const message = err?.message || "Internal Server Error";
+    const message = typeof err?.message === "string" ? err.message : "Internal Server Error";
     return NextResponse.json({ error: message }, { status });
   }
 }

@@ -5,7 +5,7 @@ import { store } from "@/lib/store";
 export async function GET(req: NextRequest) {
   try {
     await enforceAuthKey(req);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Unauthorized" },
       { status: 401 }

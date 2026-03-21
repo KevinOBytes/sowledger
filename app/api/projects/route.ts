@@ -3,9 +3,9 @@ import { requireRole, requireSession } from "@/lib/auth";
 import { store } from "@/lib/store";
 
 function getAuthStatus(error: unknown): number {
-  const err = error as any;
+  const err: unknown = error;
 
-  if (err && (err.code === "FORBIDDEN" || err.status === 403 || err.message === "Forbidden")) {
+  if (err && ((err as Record<string, unknown>).code === "FORBIDDEN" || (err as Record<string, unknown>).status === 403 || (err as Record<string, unknown>).message === "Forbidden")) {
     return 403;
   }
 
