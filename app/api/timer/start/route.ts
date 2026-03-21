@@ -54,6 +54,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, entry });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 403 });
+    const err: any = error;
+    const status =
+      typeof err?.status === "number"
+        ? err.status
+        : typeof err?.statusCode === "number"
+        ? err.statusCode
+        : 500;
+    const message = err?.message || "Internal Server Error";
+    return NextResponse.json({ error: message }, { status });
   }
 }
