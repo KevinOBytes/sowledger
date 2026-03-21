@@ -20,6 +20,15 @@ export async function POST(req: NextRequest) {
 
     const endedAt = body.endedAt ? new Date(body.endedAt) : new Date();
     const startedAt = new Date(entry.startedAt);
+
+    if (Number.isNaN(endedAt.getTime())) {
+      return NextResponse.json({ error: "endedAt must be a valid date" }, { status: 400 });
+    }
+
+    if (endedAt.getTime() < startedAt.getTime()) {
+      return NextResponse.json({ error: "endedAt must be greater than or equal to startedAt" }, { status: 400 });
+    }
+
     const durationSeconds = Math.max(1, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
 
     await ensurePeriodUnlocked(session.workspaceId, startedAt, endedAt);
