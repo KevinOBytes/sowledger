@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
 import { store } from "@/lib/store";
 
+function getAuthStatus(error: unknown): number {
+  const err = error as any;
+
+  if (err && (err.code === "FORBIDDEN" || err.status === 403 || err.message === "Forbidden")) {
+    return 403;
+  }
+
+  return 401;
+}
+
 export async function GET() {
   try {
     const session = await requireSession();
@@ -10,7 +20,7 @@ export async function GET() {
     const projects = [...store.projects.values()].filter((item) => item.workspaceId === session.workspaceId);
     return NextResponse.json({ ok: true, projects });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
   }
 }
 
@@ -39,7 +49,7 @@ export async function POST(req: NextRequest) {
     store.projects.set(project.id, project);
     return NextResponse.json({ ok: true, project });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
   }
 }
 
@@ -101,6 +111,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true, deletedProjectId: projectId });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
   }
 }
