@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock, FolderKanban, CalendarDays, Settings, LogOut, Bell } from "lucide-react";
+import { Clock, FolderKanban, CalendarDays, Settings, LogOut, Bell, Users } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -31,6 +31,7 @@ export function Sidebar() {
   const navItems = [
     { name: "Timer", href: "/", icon: Clock },
     { name: "Projects", href: "/projects", icon: FolderKanban },
+    { name: "Planner", href: "/planner", icon: Users },
     { name: "Calendar", href: "/calendar", icon: CalendarDays },
     { name: "Notifications", href: "/notifications", icon: Bell },
     { name: "Settings", href: "/settings/actions", icon: Settings },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, DragEvent } from "react";
-import { Plus, GripVertical, CheckCircle2, Circle, HelpCircle } from "lucide-react";
+import { Plus, GripVertical, CheckCircle2, Circle, HelpCircle, Lock } from "lucide-react";
 import { ProjectTask, KanbanColumn } from "@/lib/store";
 
 const COLUMNS: { id: KanbanColumn; title: string, color: string }[] = [
@@ -48,7 +48,8 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
       status,
       // eslint-disable-next-line react-hooks/purity
       position: Date.now(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      blockedByTaskIds: []
     };
     
     setTasks((prev) => [...prev, tempTask]);
@@ -79,12 +80,26 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     e.dataTransfer.dropEffect = "move";
   };
 
+  const isBlocked = (taskT: ProjectTask) => {
+    if (!taskT.blockedByTaskIds || taskT.blockedByTaskIds.length === 0) return false;
+    return taskT.blockedByTaskIds.some(blockerId => {
+      const blocker = tasks.find(x => x.id === blockerId);
+      return blocker && blocker.status !== "done";
+    });
+  };
+
   const handleDrop = async (e: DragEvent, targetStatus: KanbanColumn) => {
     e.preventDefault();
     if (!draggedTaskId) return;
 
     const task = tasks.find(t => t.id === draggedTaskId);
     if (!task || task.status === targetStatus) {
+      setDraggedTaskId(null);
+      return;
+    }
+
+    if ((targetStatus === "done" || targetStatus === "review") && isBlocked(task)) {
+      alert("This task is blocked by incomplete dependencies. You cannot move it to Review or Done until all blockers are complete.");
       setDraggedTaskId(null);
       return;
     }
@@ -147,10 +162,15 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                     >
                         <div className="flex items-start justify-between">
                             <p className="text-sm font-medium text-slate-200">{t.title}</p>
-                            <button onClick={() => deleteBtn(t.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400">
-                                <HelpCircle className="h-4 w-4 hidden" />
-                                <span className="text-xs">✕</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {isBlocked(t) && (
+                                   <Lock className="h-3 w-3 text-rose-500" />
+                                )}
+                                <button onClick={() => deleteBtn(t.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400">
+                                    <HelpCircle className="h-4 w-4 hidden" />
+                                    <span className="text-xs">✕</span>
+                                </button>
+                            </div>
                         </div>
                         {t.description && (
                             <p className="mt-2 text-xs text-slate-400 line-clamp-2">{t.description}</p>

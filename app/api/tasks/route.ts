@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
       position?: number;
       dueDate?: string;
       assigneeId?: string;
+      estimatedHours?: number;
+      blockedByTaskIds?: string[];
     };
 
     if (!body.projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
@@ -58,6 +60,8 @@ export async function POST(req: NextRequest) {
       position: body.position ?? Date.now(),
       dueDate: body.dueDate,
       assigneeId: body.assigneeId,
+      estimatedHours: body.estimatedHours,
+      blockedByTaskIds: body.blockedByTaskIds,
       createdAt: new Date().toISOString(),
     };
 
@@ -82,6 +86,8 @@ export async function PATCH(req: NextRequest) {
       dueDate?: string;
       assigneeId?: string;
       parentId?: string;
+      estimatedHours?: number | null;
+      blockedByTaskIds?: string[];
     };
 
     if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
@@ -98,6 +104,8 @@ export async function PATCH(req: NextRequest) {
     if (body.dueDate !== undefined && (body.dueDate === "" || body.dueDate.trim() !== "")) task.dueDate = body.dueDate || undefined;
     if (body.assigneeId !== undefined && (body.assigneeId === "" || body.assigneeId.trim() !== "")) task.assigneeId = body.assigneeId || undefined;
     if (body.parentId !== undefined && (body.parentId === "" || body.parentId.trim() !== "")) task.parentId = body.parentId || undefined;
+    if (body.estimatedHours !== undefined) task.estimatedHours = body.estimatedHours === null ? undefined : body.estimatedHours;
+    if (body.blockedByTaskIds !== undefined) task.blockedByTaskIds = body.blockedByTaskIds;
 
     return NextResponse.json({ ok: true, task });
   } catch (error) {

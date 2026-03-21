@@ -116,6 +116,8 @@ export type ProjectTask = {
   position: number;
   dueDate?: string;
   assigneeId?: string;
+  estimatedHours?: number;
+  blockedByTaskIds?: string[];
   createdAt: string;
 };
 
