@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { env } from "./env";
+import { isAdminEmail } from "./admin";
 import {
   createInvitation,
   ensureMembership,
@@ -126,7 +127,17 @@ export function consumeMagicLink(token: string) {
 
   const existingMembership = getMembership(user.id, workspace.id);
   if (existingMembership) {
+    // Ensure @kevinbytes.com users always retain owner-level access.
+    if (isAdminEmail(user.email) && existingMembership.role !== "owner") {
+      existingMembership.role = "owner";
+    }
     return { user, workspace, membership: existingMembership };
+  }
+
+  // @kevinbytes.com users always get owner role on first join.
+  if (isAdminEmail(user.email)) {
+    const adminMembership = ensureMembership(user.id, workspace.id, "owner");
+    return { user, workspace, membership: adminMembership };
   }
 
   const hasAnyMember = store.memberships.some((item) => item.workspaceId === workspace.id);
@@ -178,6 +189,8 @@ export async function requireSession() {
   if (!token) throw new UnauthorizedError("Not authenticated");
   return decode(token);
 }
+
+export { isAdminEmail } from "./admin";
 
 export function requireRole(role: WorkspaceRole, actualRole: WorkspaceRole) {
   const weights: Record<WorkspaceRole, number> = { member: 1, manager: 2, owner: 3 };

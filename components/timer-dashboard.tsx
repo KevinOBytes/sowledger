@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/client/local-db";
+import { isAdminEmail } from "@/lib/admin";
+import { ProfileMenu } from "@/components/profile-menu";
 
 type CurrencyPayload = { payload?: { rates?: Record<string, number> } };
 type SessionState = { email: string; role: string; workspaceId: string } | null;
@@ -47,6 +49,12 @@ export function TimerDashboard() {
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [isRunning]);
+
+  // Load session on mount so the profile menu is populated immediately.
+  useEffect(() => {
+    refreshSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function refreshSession() {
     const response = await fetch("/api/auth/me");
@@ -249,8 +257,19 @@ export function TimerDashboard() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950 p-6 text-slate-100">
-      <h1 className="text-2xl font-semibold">Timely Workforce Intelligence</h1>
-      <p className="text-sm text-slate-300">Manage timezone, projects, goals, and tags directly from the platform.</p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Timely Workforce Intelligence</h1>
+          <p className="text-sm text-slate-400">Compliance-first time tracking with full auditability.</p>
+        </div>
+        {session && (
+          <ProfileMenu
+            email={session.email}
+            isAdmin={isAdminEmail(session.email)}
+          />
+        )}
+      </div>
 
       <div className="grid gap-3 md:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm">Workspace Slug<input className="rounded bg-slate-900 p-2" value={workspaceSlug} onChange={(e) => setWorkspaceSlug(e.target.value)} /></label>
