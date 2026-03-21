@@ -1,0 +1,138 @@
+"use client";
+
+import { useState } from "react";
+
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [workspaceSlug, setWorkspaceSlug] = useState("default-workspace");
+  const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setVerifyUrl(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/request-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, workspaceSlug }),
+      });
+      const data = await res.json() as { ok?: boolean; verifyUrl?: string; error?: string; delivery?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong. Please try again.");
+      } else {
+        setVerifyUrl(data.verifyUrl ?? null);
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 px-4">
+      <div className="w-full max-w-sm">
+        {/* Logo / branding */}
+        <div className="mb-8 text-center">
+          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-600 text-white shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8">
+              <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Timely</h1>
+          <p className="mt-1 text-sm text-slate-400">Workforce Intelligence Platform</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+          <h2 className="mb-1 text-lg font-semibold text-white">Sign in to your workspace</h2>
+          <p className="mb-6 text-sm text-slate-400">
+            Enter your email address to receive a secure sign-in link.
+          </p>
+
+          {verifyUrl ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-emerald-700/40 bg-emerald-900/20 p-4">
+                <p className="text-sm font-medium text-emerald-400">Magic link created!</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  In production this would be emailed. Click the link below to sign in:
+                </p>
+              </div>
+              <a
+                href={verifyUrl}
+                className="block w-full rounded-lg bg-cyan-600 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              >
+                Click here to sign in →
+              </a>
+              <button
+                type="button"
+                className="w-full text-center text-xs text-slate-500 hover:text-slate-400"
+                onClick={() => { setVerifyUrl(null); setEmail(""); }}
+              >
+                Use a different email
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-300">
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="workspace" className="mb-1 block text-sm font-medium text-slate-300">
+                  Workspace
+                </label>
+                <input
+                  id="workspace"
+                  type="text"
+                  required
+                  placeholder="your-workspace"
+                  value={workspaceSlug}
+                  onChange={(e) => setWorkspaceSlug(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  A new workspace will be created if it doesn&apos;t exist yet.
+                </p>
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-rose-700/40 bg-rose-900/20 px-3 py-2 text-sm text-rose-400">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-lg bg-cyan-600 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+              >
+                {loading ? "Sending…" : "Send sign-in link"}
+              </button>
+            </form>
+          )}
+        </div>
+
+        <p className="mt-6 text-center text-xs text-slate-600">
+          Secure passwordless authentication · Timely &copy; {new Date().getFullYear()}
+        </p>
+      </div>
+    </div>
+  );
+}
