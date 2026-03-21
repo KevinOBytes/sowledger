@@ -4,12 +4,12 @@ import { env } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { email?: string; workspaceSlug?: string };
-    if (!body.email || !body.workspaceSlug) {
-      return NextResponse.json({ error: "email and workspaceSlug are required" }, { status: 400 });
+    const body = await req.json() as { email?: string };
+    if (!body.email) {
+      return NextResponse.json({ error: "email is required" }, { status: 400 });
     }
 
-    const token = createMagicLink(body.email, body.workspaceSlug);
+    const token = createMagicLink(body.email);
     const baseUrl = env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
     const verifyUrl = `${baseUrl}/api/auth/verify?token=${encodeURIComponent(token)}`;
 

@@ -78,15 +78,34 @@ function hashMagic(tokenSecret: string) {
   return createHash("sha256").update(`${tokenSecret}:${secret()}`).digest("hex");
 }
 
-export function createMagicLink(email: string, workspaceSlug: string) {
+export function createMagicLink(email: string) {
+  const normEmail = email.trim().toLowerCase();
+  
+  // Find their existing workspace if they have one
+  const userId = store.usersByEmail.get(normEmail);
+  let resolvedSlug = "";
+  if (userId) {
+    const mem = store.memberships.find(m => m.userId === userId);
+    if (mem) {
+       const ws = store.workspaces.get(mem.workspaceId);
+       if (ws) resolvedSlug = ws.slug;
+    }
+  }
+  
+  // If no existing workspace, dynamically generate one
+  if (!resolvedSlug) {
+      resolvedSlug = normEmail.split("@")[0].replace(/[^a-z0-9-]/g, "") + "-workspace";
+  }
+
   const tokenId = crypto.randomUUID();
   const tokenSecret = randomBytes(24).toString("base64url");
   const tokenHash = hashMagic(tokenSecret);
   store.magicLinks.set(tokenId, {
     tokenId,
     tokenHash,
-    email: email.toLowerCase(),
-    workspaceSlug: workspaceSlug.toLowerCase(),
+    email: normEmail,
+    workspaceSlug: resolvedSlug,
+    // expires in 20 minutes
     expiresAt: Date.now() + 1000 * 60 * 20,
     usedAt: null,
   });
