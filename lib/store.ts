@@ -119,6 +119,16 @@ export type ProjectTask = {
   createdAt: string;
 };
 
+export type Notification = {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  message: string;
+  read: boolean;
+  relatedEntityId?: string;
+  createdAt: string;
+};
+
 type InMemoryDB = {
   users: Map<string, User>;
   usersByEmail: Map<string, string>;
@@ -136,6 +146,7 @@ type InMemoryDB = {
   timerStopCounters: Map<string, { windowStart: number; count: number }>;
   userActions: Map<string, UserAction>;
   tasks: Map<string, ProjectTask>;
+  notifications: Map<string, Notification>;
 };
 
 declare global {
@@ -160,6 +171,7 @@ function init(): InMemoryDB {
     timerStopCounters: new Map(),
     userActions: new Map(),
     tasks: new Map(),
+    notifications: new Map(),
   };
 }
 
@@ -267,4 +279,15 @@ export function calculateEffectiveRate(userId: string, workspaceId: string, acti
     return action.hourlyRate;
   }
   return undefined;
+}
+
+export function createNotification(input: Omit<Notification, "id" | "createdAt" | "read">) {
+  const notification: Notification = {
+    id: crypto.randomUUID(),
+    read: false,
+    createdAt: new Date().toISOString(),
+    ...input,
+  };
+  store.notifications.set(notification.id, notification);
+  return notification;
 }

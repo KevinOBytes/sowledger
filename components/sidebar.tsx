@@ -1,16 +1,36 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock, FolderKanban, CalendarDays, Settings, LogOut } from "lucide-react";
+import { Clock, FolderKanban, CalendarDays, Settings, LogOut, Bell } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
+
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    async function fetchNotifications() {
+      try {
+        const res = await fetch("/api/notifications");
+        if (res.ok) {
+          const data = await res.json();
+          const unread = data.notifications?.filter((n: any) => !n.read).length || 0;
+          setUnreadCount(unread);
+        }
+      } catch (e) {}
+    }
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const navItems = [
     { name: "Timer", href: "/", icon: Clock },
     { name: "Projects", href: "/projects", icon: FolderKanban },
     { name: "Calendar", href: "/calendar", icon: CalendarDays },
+    { name: "Notifications", href: "/notifications", icon: Bell },
     { name: "Settings", href: "/settings/actions", icon: Settings },
   ];
 
@@ -31,14 +51,21 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+              className={`group flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all ${
                 isActive
                   ? "bg-cyan-500/10 text-cyan-400"
                   : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
               }`}
             >
-              <Icon className={`h-4 w-4 ${isActive ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-300"}`} />
-              {item.name}
+              <div className="flex items-center gap-3">
+                <Icon className={`h-4 w-4 ${isActive ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-300"}`} />
+                {item.name}
+              </div>
+              {item.name === "Notifications" && unreadCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-[#050914]">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
           );
         })}
