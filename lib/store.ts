@@ -103,6 +103,22 @@ export type UserAction = {
   hourlyRate?: number;
 };
 
+export type KanbanColumn = "todo" | "in_progress" | "review" | "done";
+
+export type ProjectTask = {
+  id: string;
+  workspaceId: string;
+  projectId: string;
+  parentId?: string;
+  title: string;
+  description?: string;
+  status: KanbanColumn;
+  position: number;
+  dueDate?: string;
+  assigneeId?: string;
+  createdAt: string;
+};
+
 type InMemoryDB = {
   users: Map<string, User>;
   usersByEmail: Map<string, string>;
@@ -119,6 +135,7 @@ type InMemoryDB = {
   dailySubmissions: Set<string>;
   timerStopCounters: Map<string, { windowStart: number; count: number }>;
   userActions: Map<string, UserAction>;
+  tasks: Map<string, ProjectTask>;
 };
 
 declare global {
@@ -142,6 +159,7 @@ function init(): InMemoryDB {
     dailySubmissions: new Set(),
     timerStopCounters: new Map(),
     userActions: new Map(),
+    tasks: new Map(),
   };
 }
 
