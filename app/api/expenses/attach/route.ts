@@ -17,9 +17,15 @@ export async function POST(req: NextRequest) {
       r2Key?: string;
     };
 
-    if (!body.entryId || !body.label || !body.amount || !body.r2Key) {
+    if (!body.entryId || !body.label || body.amount === undefined || !body.r2Key) {
       return NextResponse.json({ error: "entryId, label, amount, r2Key required" }, { status: 400 });
     }
+
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json({ error: "amount must be a positive, finite number" }, { status: 400 });
+    }
+
     if (!/^receipts\/.+\.(pdf|png|jpg|jpeg)$/i.test(body.r2Key)) {
       return NextResponse.json({ error: "r2Key must be in receipts/ and be a supported file extension" }, { status: 400 });
     }
@@ -35,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     const expense = {
       label: body.label,
-      amount: Number(body.amount),
+      amount: amount,
       currency: (body.currency ?? "USD").toUpperCase(),
       r2Key: body.r2Key,
     };
