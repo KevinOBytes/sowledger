@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession, requireRole } from "@/lib/auth";
+import { ForbiddenError, requireSession, requireRole, UnauthorizedError } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { isValidTimezone, normalizeTags } from "@/lib/validators";
 
@@ -22,7 +22,8 @@ export async function GET() {
       },
     });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
+    return NextResponse.json({ error: (error as Error).message }, { status });
   }
 }
 
@@ -46,6 +47,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, user });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
+    return NextResponse.json({ error: (error as Error).message }, { status });
   }
 }

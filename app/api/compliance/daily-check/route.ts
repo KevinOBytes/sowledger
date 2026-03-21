@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession, requireRole } from "@/lib/auth";
+import { ForbiddenError, requireSession, requireRole, UnauthorizedError } from "@/lib/auth";
 import { enforceAuthKey } from "@/lib/security";
 import { store } from "@/lib/store";
 
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, businessDate: businessDate.toISOString(), submitted: body.submitted ?? true });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
+    return NextResponse.json({ error: (error as Error).message }, { status });
   }
 }

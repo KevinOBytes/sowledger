@@ -1,12 +1,13 @@
 import { createHmac } from "node:crypto";
 import { NextRequest } from "next/server";
 import { env } from "./env";
+import { UnauthorizedError } from "./auth";
 import { store, type TimeEntry } from "./store";
 
 export async function enforceAuthKey(req: NextRequest) {
   if (!env.AUTH_SHARED_KEY) return;
   const key = req.headers.get("x-auth-key");
-  if (!key || key !== env.AUTH_SHARED_KEY) throw new Error("Invalid auth key");
+  if (!key || key !== env.AUTH_SHARED_KEY) throw new UnauthorizedError("Invalid auth key");
 }
 
 export async function enforceStopRateLimit(identity: string) {
@@ -26,7 +27,7 @@ export async function ensurePeriodUnlocked(workspaceId: string, startedAt: Date,
     if (lock.workspaceId !== workspaceId) continue;
     const lockStart = new Date(lock.periodStart);
     const lockEnd = new Date(lock.periodEnd);
-    if (lockStart <= startedAt && lockEnd >= stoppedAt) {
+    if (startedAt < lockEnd && stoppedAt > lockStart) {
       throw new Error(`Period is locked: ${lock.reason}`);
     }
   }
@@ -53,7 +54,13 @@ export async function enforceDailyHoursLimit(userId: string, businessDate: Date,
 }
 
 function signAudit(diff: string, eventType: string) {
-  const secret = env.AUDIT_SIGNING_SECRET ?? env.AUTH_COOKIE_SECRET ?? "dev-only-secret";
+  const secret = env.AUDIT_SIGNING_SECRET ?? env.AUTH_COOKIE_SECRET;
+  if (!secret) {
+    if (env.NODE_ENV === "production") {
+      throw new Error("AUDIT_SIGNING_SECRET (or AUTH_COOKIE_SECRET) must be set in production");
+    }
+    return createHmac("sha256", "dev-only-secret").update(`${eventType}:${diff}`).digest("hex");
+  }
   return createHmac("sha256", secret).update(`${eventType}:${diff}`).digest("hex");
 }
 
@@ -88,10 +95,11 @@ export function toCsv(rows: Array<Record<string, unknown>>) {
   const columns = Object.keys(rows[0]);
   const escape = (value: unknown) => {
     const text = String(value ?? "");
-    if (text.includes(",") || text.includes("\n") || text.includes('"')) {
-      return `"${text.replaceAll('"', '""')}"`;
+    const sanitized = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+    if (sanitized.includes(",") || sanitized.includes("\n") || sanitized.includes('"')) {
+      return `"${sanitized.replaceAll('"', '""')}"`;
     }
-    return text;
+    return sanitized;
   };
 
   return [
