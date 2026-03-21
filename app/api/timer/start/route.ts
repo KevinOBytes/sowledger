@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
       projectId?: string;
       goalId?: string;
       tags?: string[];
+      actionId?: string;
     };
 
     if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
@@ -35,6 +36,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let actionName: string | undefined;
+    let hourlyRate: number | undefined;
+
+    if (body.actionId) {
+      const uAction = store.userActions.get(body.actionId);
+      if (!uAction || uAction.workspaceId !== session.workspaceId || uAction.userId !== session.sub) {
+        return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
+      }
+      actionName = uAction.name;
+      hourlyRate = uAction.hourlyRate;
+    }
+
     const entry = createTimeEntry({
       workspaceId: session.workspaceId,
       userId: session.sub,
@@ -50,6 +63,8 @@ export async function POST(req: NextRequest) {
       source: "web",
       collaborators: body.collaborators ?? [],
       expenses: [],
+      action: actionName,
+      hourlyRate: hourlyRate,
     });
 
     return NextResponse.json({ ok: true, entry });

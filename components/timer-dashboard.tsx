@@ -9,6 +9,7 @@ type CurrencyPayload = { payload?: { rates?: Record<string, number> } };
 type SessionState = { email: string; role: string; workspaceId: string } | null;
 type Project = { id: string; name: string };
 type Goal = { id: string; name: string };
+type Action = { id: string; name: string; hourlyRate?: number };
 
 /** Format seconds as HH:MM:SS */
 function fmt(seconds: number) {
@@ -60,9 +61,11 @@ export function TimerDashboard() {
   const [session, setSession] = useState<SessionState>(null);
   const [projectId, setProjectId] = useState("");
   const [goalId, setGoalId] = useState("");
+  const [actionId, setActionId] = useState("");
   const [tags, setTags] = useState("focus");
   const [projects, setProjects] = useState<Project[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [actions, setActions] = useState<Action[]>([]);
   const [workspaceTags, setWorkspaceTags] = useState<string[]>([]);
   const [showConfig, setShowConfig] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -85,13 +88,15 @@ export function TimerDashboard() {
   }
 
   async function loadProjectsAndGoals() {
-    const [pr, gr, tr] = await Promise.all([fetch("/api/projects"), fetch("/api/goals"), fetch("/api/tags")]);
+    const [pr, gr, tr, ar] = await Promise.all([fetch("/api/projects"), fetch("/api/goals"), fetch("/api/tags"), fetch("/api/user/actions")]);
     const pd = await pr.json();
     const gd = await gr.json();
     const td = await tr.json();
+    const ad = await ar.json();
     if (pr.ok) setProjects(pd.projects ?? []);
     if (gr.ok) setGoals(gd.goals ?? []);
     if (tr.ok) setWorkspaceTags(td.tags ?? []);
+    if (ar.ok) setActions(ad.actions ?? []);
   }
 
   // Tick
@@ -176,6 +181,7 @@ export function TimerDashboard() {
         description: "Focus block",
         projectId: projectId || undefined,
         goalId: goalId || undefined,
+        actionId: actionId || undefined,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       }),
     });
@@ -220,6 +226,7 @@ export function TimerDashboard() {
 
   const selectedProject = projects.find((p) => p.id === projectId);
   const selectedGoal = goals.find((g) => g.id === goalId);
+  const selectedAction = actions.find((a) => a.id === actionId);
   const activeTags = tags.split(",").map((t) => t.trim()).filter(Boolean);
 
   return (
@@ -292,6 +299,11 @@ export function TimerDashboard() {
             {selectedGoal && (
               <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300">
                 {selectedGoal.name}
+              </span>
+            )}
+            {selectedAction && (
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+                {selectedAction.name} {selectedAction.hourlyRate !== undefined && `($${selectedAction.hourlyRate}/hr)`}
               </span>
             )}
             {activeTags.map((tag) => (
@@ -400,6 +412,17 @@ export function TimerDashboard() {
               >
                 <option value="">— No goal —</option>
                 {goals.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-400">Action</label>
+              <select
+                value={actionId}
+                onChange={(e) => setActionId(e.target.value)}
+                className="w-full rounded-lg border border-white/8 bg-slate-900 px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+              >
+                <option value="">— No action —</option>
+                {actions.map((a) => <option key={a.id} value={a.id}>{a.name} {a.hourlyRate !== undefined ? `($${a.hourlyRate}/hr)` : ""}</option>)}
               </select>
             </div>
           </div>

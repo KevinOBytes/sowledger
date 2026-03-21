@@ -16,6 +16,7 @@ export async function PATCH(req: NextRequest) {
       projectId?: string;
       goalId?: string;
       tags?: string[];
+      actionId?: string;
     };
 
     if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
@@ -47,6 +48,23 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    let nextActionName = entry.action;
+    let nextHourlyRate = entry.hourlyRate;
+
+    if (body.actionId !== undefined) {
+      if (body.actionId === "") {
+        nextActionName = undefined;
+        nextHourlyRate = undefined;
+      } else {
+        const uAction = store.userActions.get(body.actionId);
+        if (!uAction || uAction.workspaceId !== session.workspaceId || uAction.userId !== entry.userId) {
+          return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
+        }
+        nextActionName = uAction.name;
+        nextHourlyRate = uAction.hourlyRate;
+      }
+    }
+
     const rawStartedAt = body.startedAt ?? entry.startedAt;
     const rawStoppedAt = body.stoppedAt ?? entry.stoppedAt;
     if (!rawStoppedAt) return NextResponse.json({ error: "Cannot edit open timer with this endpoint" }, { status: 400 });
@@ -69,6 +87,8 @@ export async function PATCH(req: NextRequest) {
     entry.projectId = body.projectId ?? entry.projectId;
     entry.goalId = body.goalId ?? entry.goalId;
     entry.tags = body.tags ? normalizeTags(body.tags) : entry.tags;
+    entry.action = nextActionName;
+    entry.hourlyRate = nextHourlyRate;
 
     await appendAuditLog({
       workspaceId: session.workspaceId,
@@ -83,6 +103,8 @@ export async function PATCH(req: NextRequest) {
         projectId: { before: previous.projectId ?? null, after: entry.projectId ?? null },
         goalId: { before: previous.goalId ?? null, after: entry.goalId ?? null },
         tags: { before: previous.tags, after: entry.tags },
+        action: { before: previous.action ?? null, after: entry.action ?? null },
+        hourlyRate: { before: previous.hourlyRate ?? null, after: entry.hourlyRate ?? null },
       },
     });
 
