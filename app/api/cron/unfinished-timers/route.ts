@@ -3,7 +3,14 @@ import { enforceAuthKey } from "@/lib/security";
 import { store } from "@/lib/store";
 
 export async function GET(req: NextRequest) {
-  await enforceAuthKey(req);
+  try {
+    await enforceAuthKey(req);
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
 
   const threshold = Date.now() - 1000 * 60 * 60 * 8;
   const stale = [...store.entries.values()]
