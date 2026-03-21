@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       assigneeId?: string;
       estimatedHours?: number;
       blockedByTaskIds?: string[];
+      attachments?: { name: string; url: string; size?: number }[];
     };
 
     if (!body.projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
       assigneeId: body.assigneeId,
       estimatedHours: body.estimatedHours,
       blockedByTaskIds: body.blockedByTaskIds,
+      attachments: body.attachments,
       createdAt: new Date().toISOString(),
     };
 
@@ -88,6 +90,7 @@ export async function PATCH(req: NextRequest) {
       parentId?: string;
       estimatedHours?: number | null;
       blockedByTaskIds?: string[];
+      attachments?: { name: string; url: string; size?: number }[];
     };
 
     if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
@@ -106,6 +109,7 @@ export async function PATCH(req: NextRequest) {
     if (body.parentId !== undefined && (body.parentId === "" || body.parentId.trim() !== "")) task.parentId = body.parentId || undefined;
     if (body.estimatedHours !== undefined) task.estimatedHours = body.estimatedHours === null ? undefined : body.estimatedHours;
     if (body.blockedByTaskIds !== undefined) task.blockedByTaskIds = body.blockedByTaskIds;
+    if (body.attachments !== undefined) task.attachments = body.attachments;
 
     return NextResponse.json({ ok: true, task });
   } catch (error) {

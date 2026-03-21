@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, DragEvent } from "react";
-import { Plus, GripVertical, CheckCircle2, Circle, HelpCircle, Lock } from "lucide-react";
+import { Plus, GripVertical, CheckCircle2, Circle, HelpCircle, Lock, Paperclip, X, Link as LinkIcon, ExternalLink } from "lucide-react";
 import { ProjectTask, KanbanColumn } from "@/lib/store";
 
 const COLUMNS: { id: KanbanColumn; title: string, color: string }[] = [
@@ -19,6 +19,11 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
   // New task inline state
   const [addingToCol, setAddingToCol] = useState<KanbanColumn | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+
+  const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
+  const [newAttachmentName, setNewAttachmentName] = useState("");
+  const [newAttachmentUrl, setNewAttachmentUrl] = useState("");
+  const [isPatching, setIsPatching] = useState(false);
 
   useEffect(() => {
     async function fetchTasks() {
@@ -116,9 +121,55 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     });
   };
 
-  const deleteBtn = async (id: string) => {
+  const deleteBtn = async (id: string, e?: React.MouseEvent) => {
+     if (e) e.stopPropagation();
      setTasks(prev => prev.filter(t => t.id !== id));
      await fetch(`/api/tasks?taskId=${id}`, { method: "DELETE" });
+  };
+
+  const handleAddAttachment = async () => {
+    if (!selectedTask || !newAttachmentName.trim() || !newAttachmentUrl.trim()) return;
+    setIsPatching(true);
+    const newAttachment = { name: newAttachmentName.trim(), url: newAttachmentUrl.trim() };
+    const updatedAttachments = [...(selectedTask.attachments || []), newAttachment];
+    
+    // optimistically update local state
+    const updatedTask = { ...selectedTask, attachments: updatedAttachments };
+    setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
+    setSelectedTask(updatedTask);
+    
+    setNewAttachmentName("");
+    setNewAttachmentUrl("");
+
+    await fetch("/api/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        taskId: selectedTask.id,
+        attachments: updatedAttachments
+      })
+    });
+    setIsPatching(false);
+  };
+
+  const handleRemoveAttachment = async (index: number) => {
+    if (!selectedTask) return;
+    setIsPatching(true);
+    const updatedAttachments = selectedTask.attachments?.filter((_, i) => i !== index) || [];
+    
+    const updatedTask = { ...selectedTask, attachments: updatedAttachments };
+    setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
+    setSelectedTask(updatedTask);
+
+    await fetch("/api/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        taskId: selectedTask.id,
+        attachments: updatedAttachments
+      })
+    });
+    setIsPatching(false);
   };
 
   if (loading) return <div className="p-8 text-slate-500 animate-pulse">Loading board...</div>;
@@ -158,6 +209,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                         key={t.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, t.id)}
+                        onClick={() => setSelectedTask(t)}
                         className={`group cursor-grab active:cursor-grabbing rounded-xl border border-white/5 bg-slate-800/80 p-4 shadow-sm hover:border-cyan-500/30 hover:bg-slate-800 transition-all ${draggedTaskId === t.id ? 'opacity-50 border-cyan-500' : ''}`}
                     >
                         <div className="flex items-start justify-between">
@@ -174,6 +226,12 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                         </div>
                         {t.description && (
                             <p className="mt-2 text-xs text-slate-400 line-clamp-2">{t.description}</p>
+                        )}
+                        {t.attachments && t.attachments.length > 0 && (
+                            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                                <Paperclip className="h-3.5 w-3.5" />
+                                {t.attachments.length} attachment{t.attachments.length !== 1 && 's'}
+                            </div>
                         )}
                         <div className="mt-4 flex items-center justify-between pt-2 border-t border-white/5">
                              <div className="flex items-center gap-1.5 opacity-60">
@@ -209,6 +267,113 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
           </div>
         );
       })}
+
+      {selectedTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/50 p-6">
+              <h2 className="text-xl font-bold text-white">{selectedTask.title}</h2>
+              <button onClick={() => setSelectedTask(null)} className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="flex-1 space-y-8 overflow-y-auto p-6">
+              {/* Info Section */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Status</p>
+                   <p className="font-semibold text-white uppercase tracking-wider text-sm">{selectedTask.status.replace("_", " ")}</p>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Estimated Hours</p>
+                   <p className="font-semibold text-white">{selectedTask.estimatedHours ? `${selectedTask.estimatedHours} hrs` : "--"}</p>
+                </div>
+              </div>
+
+              {selectedTask.description && (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-300">Description</h3>
+                  <p className="text-sm text-slate-400 whitespace-pre-wrap leading-relaxed">{selectedTask.description}</p>
+                </div>
+              )}
+
+              {/* Attachments Section */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
+                  <Paperclip className="h-4 w-4 text-cyan-400" />
+                  Project Assets & Attachments
+                </h3>
+                
+                <div className="mb-5 space-y-2">
+                  {!selectedTask.attachments || selectedTask.attachments.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-700 p-6 text-center text-slate-500">
+                      <p className="text-sm">No assets attached to this task yet.</p>
+                    </div>
+                  ) : (
+                    selectedTask.attachments.map((att, idx) => (
+                      <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 p-3 transition hover:border-cyan-500/30">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-950/30 text-cyan-500">
+                            <LinkIcon className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-white">{att.name}</p>
+                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate text-xs text-cyan-400 hover:text-cyan-300">
+                              {att.url} <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleRemoveAttachment(idx)}
+                          disabled={isPatching}
+                          className="shrink-0 p-2 text-slate-500 hover:text-rose-400 disabled:opacity-50"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add new attachment form */}
+                <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-950/50 p-4 sm:flex-row sm:items-end">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Asset Name</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Figma UI Mockup"
+                      value={newAttachmentName}
+                      onChange={e => setNewAttachmentName(e.target.value)}
+                      className="w-full rounded bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Public URL</label>
+                    <input 
+                      type="url" 
+                      placeholder="https://"
+                      value={newAttachmentUrl}
+                      onChange={e => setNewAttachmentUrl(e.target.value)}
+                      className="w-full rounded bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-cyan-500"
+                      onKeyDown={e => {
+                        if (e.key === "Enter") handleAddAttachment();
+                      }}
+                    />
+                  </div>
+                  <button 
+                    onClick={handleAddAttachment}
+                    disabled={!newAttachmentName.trim() || !newAttachmentUrl.trim() || isPatching}
+                    className="h-9 shrink-0 rounded bg-cyan-600 px-4 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-50 sm:h-[38px]"
+                  >
+                    Attach Asset
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

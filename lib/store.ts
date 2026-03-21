@@ -103,6 +103,18 @@ export type UserAction = {
   hourlyRate?: number;
 };
 
+export type Invoice = {
+  id: string;
+  workspaceId: string;
+  projectId?: string;
+  number: string;
+  amount: number;
+  status: "draft" | "sent" | "paid";
+  dueDate?: string;
+  timeEntryIds: string[];
+  createdAt: string;
+};
+
 export type KanbanColumn = "todo" | "in_progress" | "review" | "done";
 
 export type ProjectTask = {
@@ -118,6 +130,7 @@ export type ProjectTask = {
   assigneeId?: string;
   estimatedHours?: number;
   blockedByTaskIds?: string[];
+  attachments?: { name: string; url: string; size?: number }[];
   createdAt: string;
 };
 
@@ -149,6 +162,7 @@ type InMemoryDB = {
   userActions: Map<string, UserAction>;
   tasks: Map<string, ProjectTask>;
   notifications: Map<string, Notification>;
+  invoices: Map<string, Invoice>;
 };
 
 declare global {
@@ -174,6 +188,7 @@ function init(): InMemoryDB {
     userActions: new Map(),
     tasks: new Map(),
     notifications: new Map(),
+    invoices: new Map(),
   };
 }
 
