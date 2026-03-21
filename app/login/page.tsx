@@ -4,6 +4,7 @@ import { useState } from "react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [workspaceSlug, setWorkspaceSlug] = useState("");
   const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +19,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/request-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, workspaceSlug }),
       });
       const data = await res.json() as { ok?: boolean; verifyUrl?: string; error?: string; delivery?: string };
       if (!res.ok) {
@@ -77,6 +78,20 @@ export default function LoginPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="workspaceSlug" className="mb-1 block text-sm font-medium text-slate-300">
+                  Workspace
+                </label>
+                <input
+                  id="workspaceSlug"
+                  type="text"
+                  required
+                  placeholder="e.g. acme-corp"
+                  value={workspaceSlug}
+                  onChange={(e) => setWorkspaceSlug(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
               <div>
                 <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-300">
                   Email address
