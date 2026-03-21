@@ -15,6 +15,13 @@ export async function POST(req: NextRequest) {
     const entry = store.entries.get(body.entryId);
     if (!entry || entry.workspaceId !== session.workspaceId) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
 
+    if (!entry.stoppedAt) {
+      return NextResponse.json(
+        { error: "Cannot invoice a running entry. Stop the timer first." },
+        { status: 400 },
+      );
+    }
+
     const before = entry.status;
     entry.status = "invoiced";
 
