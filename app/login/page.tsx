@@ -5,6 +5,7 @@ import { useState } from "react";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -12,6 +13,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setVerifyUrl(null);
+    setSuccess(false);
     setLoading(true);
 
     try {
@@ -24,7 +26,11 @@ export default function LoginPage() {
       if (!res.ok) {
         setError(data.error ?? "Something went wrong. Please try again.");
       } else {
-        setVerifyUrl(data.verifyUrl ?? null);
+        if (data.verifyUrl) {
+          setVerifyUrl(data.verifyUrl);
+        } else {
+          setSuccess(true);
+        }
       }
     } catch {
       setError("Network error. Please try again.");
@@ -53,7 +59,24 @@ export default function LoginPage() {
             Enter your email address to receive a secure sign-in link.
           </p>
 
-          {verifyUrl ? (
+          {success ? (
+            <div className="rounded-lg border border-emerald-700/40 bg-emerald-900/20 p-6 text-center shadow-inner">
+              <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-emerald-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <h3 className="mb-2 text-lg font-semibold text-emerald-400">Check your inbox</h3>
+              <p className="text-sm text-emerald-200/70">
+                We've sent a secure sign-in link to <strong className="text-emerald-300">{email}</strong>. Please check your spam folder if you don't see it.
+              </p>
+              <button
+                type="button"
+                className="mt-6 text-sm font-medium text-cyan-500 hover:text-cyan-400"
+                onClick={() => { setSuccess(false); setEmail(""); }}
+              >
+                ← Use a different email
+              </button>
+            </div>
+          ) : verifyUrl ? (
             <div className="space-y-4">
               <div className="rounded-lg border border-emerald-700/40 bg-emerald-900/20 p-4">
                 <p className="text-sm font-medium text-emerald-400">Magic link created!</p>
