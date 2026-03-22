@@ -83,7 +83,7 @@ export default function MarketingPage() {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="mb-6 inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-sm font-medium text-cyan-300"
             >
-              Introducing Timed Pro
+              Introducing Billabled Pro
             </motion.div>
             <motion.h1
               initial={{ y: 20, opacity: 0 }}
@@ -114,7 +114,7 @@ export default function MarketingPage() {
                 href="/login"
                 className="rounded-full bg-white px-8 py-4 text-base font-semibold text-black transition-transform hover:scale-105"
               >
-                Get Started Free
+                Sign up for free
               </Link>
             </motion.div>
           </motion.div>
@@ -181,7 +181,7 @@ export default function MarketingPage() {
               href="/login"
               className="inline-flex rounded-full bg-cyan-600 px-8 py-4 text-lg font-bold text-white transition-all hover:scale-105 hover:bg-cyan-500 shadow-[0_0_40px_-10px_rgba(6,182,212,0.5)]"
             >
-              Start tracking for free
+              Sign up for free
             </Link>
           </div>
         </section>

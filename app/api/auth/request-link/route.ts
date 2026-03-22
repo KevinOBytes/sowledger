@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       await resend.emails.send({
         from: env.RESEND_LOGIN_FROM,
         to: body.email,
-        subject: "Sign in to Timed",
+        subject: "Sign in to Billabled",
         html: `<p>Click the link below to sign in:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
       });
       return NextResponse.json({ ok: true, delivery: "configured-resend" });

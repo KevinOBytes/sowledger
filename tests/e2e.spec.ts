@@ -40,7 +40,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
   test('Test 5: dashboard renders app layout', async ({ page }) => {
     await page.goto('/dashboard');
     // Basic structural check inside the app shell
-    await expect(page.locator('text=Timed').first()).toBeVisible();
+    await expect(page.locator('text=Billabled').first()).toBeVisible();
   });
 
   test('Test 6: sidebar navigation works', async ({ page }) => {

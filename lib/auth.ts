@@ -31,7 +31,7 @@ export class ForbiddenError extends Error {
   }
 }
 
-const AUTH_COOKIE_NAME = "timed_session";
+const AUTH_COOKIE_NAME = "billabled_session";
 
 type SessionPayload = {
   sub: string;

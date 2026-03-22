@@ -19,8 +19,8 @@ export default async function ClientLayout({ children }: { children: React.React
     <div className="min-h-screen bg-[#050914] text-slate-200 flex flex-col font-sans">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 bg-slate-900/50 px-6 backdrop-blur sticky top-0 z-50">
         <div className="flex items-center gap-2 text-cyan-500">
-          <Image src="/logo.png" alt="Timed" width={24} height={24} className="rounded-md" unoptimized />
-          <span className="text-lg font-bold tracking-wider text-white">Timed <span className="text-cyan-500 font-medium">Client</span></span>
+          <Image src="/logo.png" alt="Billabled" width={24} height={24} className="rounded-md" unoptimized />
+          <span className="text-lg font-bold tracking-wider text-white">Billabled <span className="text-cyan-500 font-medium">Client</span></span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm font-medium text-slate-400 hidden sm:block">{session.email}</span>

@@ -7,7 +7,7 @@ import { sql } from "drizzle-orm";
 import Link from "next/link";
 import Image from "next/image";
 
-export const metadata = { title: "Admin Dashboard – Timed" };
+export const metadata = { title: "Admin Dashboard – Billabled" };
 
 export default async function AdminPage() {
   let session;
@@ -59,7 +59,7 @@ export default async function AdminPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#050914] shadow-md border border-slate-800 overflow-hidden">
-              <Image src="/logo.png" alt="Timed Logo" width={48} height={48} unoptimized />
+              <Image src="/logo.png" alt="Billabled Logo" width={48} height={48} unoptimized />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>

@@ -45,9 +45,9 @@ export default function LoginPage() {
         {/* Logo / branding */}
         <div className="mb-8 text-center">
           <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#050914] shadow-lg overflow-hidden">
-            <Image src="/logo.png" alt="Timed Logo" width={56} height={56} unoptimized />
+            <Image src="/logo.png" alt="Billabled Logo" width={56} height={56} unoptimized />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Timed</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Billabled</h1>
           <p className="mt-1 text-sm text-slate-400">Workforce Intelligence Platform</p>
         </div>
 
@@ -132,7 +132,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-600">
-          Secure passwordless authentication · Timed &copy; {new Date().getFullYear()}
+          Secure passwordless authentication · Billabled &copy; {new Date().getFullYear()}
         </p>
       </div>
     </div>

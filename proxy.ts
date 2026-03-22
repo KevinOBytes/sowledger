@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const AUTH_COOKIE_NAME = "timed_session";
+const AUTH_COOKIE_NAME = "billabled_session";
 
 const PUBLIC_PREFIXES = ["/login", "/api/auth/", "/_next/", "/favicon.ico", "/api/test/"];
 
@@ -8,7 +8,7 @@ export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Allow public paths without a session.
-  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (pathname === "/" || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.next();
   }
 

@@ -11,7 +11,7 @@ import { ChevronLeft, Activity, LayoutDashboard } from "lucide-react";
 export async function generateMetadata({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  return { title: project ? `${project.name} Workspace – Timed` : "Workspace – Timed" };
+  return { title: project ? `${project.name} Workspace – Billabled` : "Workspace – Billabled" };
 }
 
 export default async function ProjectBoardPage({ 

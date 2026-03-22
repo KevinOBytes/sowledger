@@ -1,4 +1,4 @@
-# Timed
+# Billabled
 
 Security-focused workforce intelligence starter on Next.js (App Router) with role-based auth, immutable audit logs, compliance controls, user settings, and local-first timer resilience.
 
@@ -38,7 +38,7 @@ npm run dev
 
 ## Required environment variables
 ```bash
-NEXT_PUBLIC_APP_URL=https://timed.tkoresearch.com
+NEXT_PUBLIC_APP_URL=https://billabled.tkoresearch.com
 AUTH_SHARED_KEY=replace_with_internal_service_key
 AUTH_COOKIE_SECRET=replace_with_long_random_secret_min_24_chars
 AUDIT_SIGNING_SECRET=replace_with_long_random_secret

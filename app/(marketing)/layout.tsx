@@ -8,25 +8,25 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
       <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-white/5 bg-[#050914]/60 px-6 backdrop-blur-xl">
         <Link href="/" className="flex items-center gap-2 transition hover:opacity-80">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#050914] shadow overflow-hidden">
-            <Image src="/logo.png" alt="Timed" width={32} height={32} unoptimized />
+            <Image src="/logo.png" alt="Billabled" width={32} height={32} unoptimized />
           </div>
-          <span className="text-lg font-bold tracking-tight">Timed</span>
+          <span className="text-lg font-bold tracking-tight">Billabled</span>
         </Link>
         <div className="flex items-center gap-4">
           <Link href="/login" className="text-sm font-medium text-slate-300 transition hover:text-white">
-            Sign in
+            Log in
           </Link>
           <Link
             href="/login"
             className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-black transition hover:bg-slate-200"
           >
-            Start tracking
+            Sign up
           </Link>
         </div>
       </header>
       <main className="flex-1">{children}</main>
       <footer className="border-t border-white/5 bg-[#050914] py-12 text-center text-sm text-slate-500">
-        <p>&copy; {new Date().getFullYear()} Timed Inc. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Billabled Inc. All rights reserved.</p>
       </footer>
     </div>
   );
