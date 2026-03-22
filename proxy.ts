@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const AUTH_COOKIE_NAME = "billabled_session";
 
-const PUBLIC_PREFIXES = ["/login", "/api/auth/", "/_next/", "/favicon.ico", "/api/test/"];
+const PUBLIC_PREFIXES = ["/login", "/logo.png", "/api/auth/", "/_next/", "/favicon.ico", "/api/test/"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -24,5 +24,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

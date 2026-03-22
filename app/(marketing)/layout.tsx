@@ -7,7 +7,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
     <div className="relative flex min-h-screen flex-col bg-[#050914] text-white selection:bg-cyan-500/30">
       <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-white/5 bg-[#050914]/60 px-6 backdrop-blur-xl">
         <Link href="/" className="flex items-center gap-2 transition hover:opacity-80">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#050914] shadow overflow-hidden">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow overflow-hidden">
             <Image src="/logo.png" alt="Billabled" width={32} height={32} unoptimized />
           </div>
           <span className="text-lg font-bold tracking-tight">Billabled</span>

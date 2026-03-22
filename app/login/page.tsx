@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo / branding */}
         <div className="mb-8 text-center">
-          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#050914] shadow-lg overflow-hidden">
+          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg overflow-hidden">
             <Image src="/logo.png" alt="Billabled Logo" width={56} height={56} unoptimized />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Billabled</h1>
