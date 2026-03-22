@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, real, text, timestamp, varchar, primaryKey, bigint } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, real, text, timestamp, varchar, primaryKey, bigint } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey(),

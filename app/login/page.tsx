@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import Image from "next/image";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
@@ -44,10 +44,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo / branding */}
         <div className="mb-8 text-center">
-          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-600 text-white shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8">
-              <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z" clipRule="evenodd" />
-            </svg>
+          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#050914] shadow-lg overflow-hidden">
+            <Image src="/logo.png" alt="Timely Logo" width={56} height={56} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Timely</h1>
           <p className="mt-1 text-sm text-slate-400">Workforce Intelligence Platform</p>

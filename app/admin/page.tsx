@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { users as usersTable, workspaces as workspacesTable, memberships as membershipsTable, timeEntries as timeEntriesTable } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
 import Link from "next/link";
+import Image from "next/image";
 
 export const metadata = { title: "Admin Dashboard – Timely" };
 
@@ -56,11 +57,16 @@ export default async function AdminPage() {
       <div className="mx-auto max-w-6xl space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Signed in as <span className="text-cyan-400">{session.email}</span>
-            </p>
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#050914] shadow-md border border-slate-800 overflow-hidden">
+              <Image src="/logo.png" alt="Timely Logo" width={48} height={48} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+              <p className="mt-1 text-sm text-slate-400">
+                Signed in as <span className="text-cyan-400">{session.email}</span>
+              </p>
+            </div>
           </div>
           <Link
             href="/"

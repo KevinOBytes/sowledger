@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Clock, FolderKanban, CalendarDays, Settings, LogOut, Bell, Users, BarChart3, CheckSquare, Receipt, Webhook } from "lucide-react";
@@ -29,7 +30,7 @@ export function Sidebar() {
   }, []);
 
   const navItems = [
-    { name: "Timer", href: "/", icon: Clock },
+    { name: "Timer", href: "/dashboard", icon: Clock },
     { name: "Projects", href: "/projects", icon: FolderKanban },
     { name: "Planner", href: "/planner", icon: Users },
     { name: "Reports", href: "/reports", icon: BarChart3 },
@@ -47,6 +48,7 @@ export function Sidebar() {
       <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-64 flex-col border-r border-slate-800 bg-[#050914]">
         {/* Brand */}
         <div className="flex h-16 shrink-0 items-center px-6">
+          <Image src="/logo.png" alt="Timely" width={24} height={24} className="mr-2 rounded-md" />
           <span className="text-xl font-bold tracking-tight text-white">Timely</span>
           <span className="ml-2 rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-cyan-400 uppercase">Pro</span>
         </div>

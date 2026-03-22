@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       role: membership.role,
     });
 
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
