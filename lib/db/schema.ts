@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, real, text, timestamp, varchar, primaryKey } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, real, text, timestamp, varchar, primaryKey, bigint } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -51,8 +51,8 @@ export const invitations = pgTable("invitations", {
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   role: varchar("role", { enum: ["client", "member", "manager", "owner"] }).notNull(),
   invitedByUserId: varchar("invited_by_user_id", { length: 255 }).notNull(),
-  expiresAt: integer("expires_at").notNull(),
-  acceptedAt: integer("accepted_at"),
+  expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
+  acceptedAt: bigint("accepted_at", { mode: "number" }),
 });
 
 export const magicLinks = pgTable("magic_links", {
@@ -60,8 +60,8 @@ export const magicLinks = pgTable("magic_links", {
   tokenHash: varchar("token_hash", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull(),
   workspaceSlug: varchar("workspace_slug", { length: 255 }).notNull(),
-  expiresAt: integer("expires_at").notNull(),
-  usedAt: integer("used_at"),
+  expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
+  usedAt: bigint("used_at", { mode: "number" }),
 });
 
 export const timeEntries = pgTable("time_entries", {
