@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireSession, ForbiddenError, UnauthorizedError } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin";
 import { db } from "@/lib/db";
-import { users as usersTable, workspaces as workspacesTable, memberships as membershipsTable, timeEntries as timeEntriesTable } from "@/lib/db/schema";
+import { users as usersTable, workspaces as workspacesTable, memberships as membershipsTable, timeEntries as timeEntriesTable, projects as projectsTable, invoices as invoicesTable } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
 import Link from "next/link";
 import Image from "next/image";
@@ -26,6 +26,8 @@ export default async function AdminPage() {
   const allMemberships = await db.select().from(membershipsTable);
   const allWorkspaces = await db.select().from(workspacesTable);
   const [{ count: entriesCount }] = await db.select({ count: sql<number>`cast(count(*) as int)` }).from(timeEntriesTable);
+  const allProjects = await db.select().from(projectsTable);
+  const allInvoices = await db.select().from(invoicesTable);
 
   const users = allUsers.map((u) => ({
     id: u.id,
@@ -50,6 +52,11 @@ export default async function AdminPage() {
     totalWorkspaces: allWorkspaces.length,
     totalEntries: entriesCount,
     totalMemberships: allMemberships.length,
+    totalProjects: allProjects.length,
+    activeProjects: allProjects.filter(p => p.status === "active").length,
+    archivedProjects: allProjects.filter(p => p.status === "archived").length,
+    totalInvoiced: allInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0),
+    totalPaid: allInvoices.filter(i => i.status === "paid").reduce((sum, inv) => sum + (inv.amount || 0), 0),
   };
 
   return (
@@ -77,16 +84,19 @@ export default async function AdminPage() {
         </div>
 
         {/* Stats cards */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6 mb-8">
           {[
             { label: "Total Users", value: stats.totalUsers },
             { label: "Workspaces", value: stats.totalWorkspaces },
             { label: "Time Entries", value: stats.totalEntries },
             { label: "Memberships", value: stats.totalMemberships },
+            { label: "Projects", value: stats.totalProjects, subtext: `${stats.activeProjects} Active` },
+            { label: "Invoice Vol", value: `$${stats.totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, subtext: `$${stats.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} Paid` },
           ].map((card) => (
             <div key={card.label} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</p>
               <p className="mt-2 text-3xl font-bold text-white">{card.value}</p>
+              {card.subtext && <p className="mt-1 text-xs font-medium text-emerald-400">{card.subtext}</p>}
             </div>
           ))}
         </div>

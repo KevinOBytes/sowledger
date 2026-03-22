@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { projects as projectsTable, projectTasks as tasksTable } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
-import { FolderKanban } from "lucide-react";
+import { FolderKanban, Archive } from "lucide-react";
 import { CreateProjectButton } from "@/components/create-project-button";
 
 export const metadata = { title: "Projects – Billabled" };
@@ -43,10 +43,13 @@ export default async function ProjectsPage() {
               <Link 
                 key={proj.id} 
                 href={`/projects/${proj.id}`} 
-                className="group relative flex flex-col rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent p-6 shadow-xl transition-all hover:bg-white/[0.05] hover:border-cyan-500/30"
+                className={`group relative flex flex-col rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent p-6 shadow-xl transition-all hover:bg-white/[0.05] hover:border-cyan-500/30 ${proj.status === 'archived' ? 'opacity-50 grayscale hover:opacity-80 hover:grayscale-0' : ''}`}
               >
                 <div className="flex items-start justify-between">
-                    <h3 className="text-lg font-semibold text-white group-hover:text-cyan-400 transition-colors">{proj.name}</h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-white group-hover:text-cyan-400 transition-colors">{proj.name}</h3>
+                        {proj.status === "archived" && <Archive className="h-4 w-4 text-slate-500" />}
+                    </div>
                     <div className="rounded-full bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-300">
                         {proj.billingModel}
                     </div>

@@ -35,6 +35,7 @@ export const projects = pgTable("projects", {
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   billingModel: varchar("billing_model", { enum: ["hourly", "fixed_fee", "hybrid"] }).notNull().default("hourly"),
+  status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
   percentComplete: real("percent_complete").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -162,4 +163,11 @@ export const webhooks = pgTable("webhooks", {
   url: varchar("url", { length: 1024 }).notNull(),
   events: jsonb("events").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const workspaceTags = pgTable("workspace_tags", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  color: varchar("color", { length: 50 }).notNull().default("#3b82f6"),
 });

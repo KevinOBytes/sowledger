@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock, FolderKanban, CalendarDays, Settings, LogOut, Bell, Users, BarChart3, CheckSquare, Receipt, Webhook } from "lucide-react";
+import { Clock, FolderKanban, CalendarDays, Settings, LogOut, Bell, Users, BarChart3, CheckSquare, Receipt, Webhook, Tag } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -40,6 +40,7 @@ export function Sidebar() {
     { name: "Notifications", href: "/notifications", icon: Bell },
     { name: "Settings", href: "/settings", icon: Settings },
     { name: "Billing", href: "/settings/billing", icon: Receipt },
+    { name: "Tags", href: "/settings/tags", icon: Tag },
     { name: "Webhooks", href: "/settings/webhooks", icon: Webhook },
   ];
 

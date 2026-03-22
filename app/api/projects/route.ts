@@ -67,6 +67,7 @@ export async function PATCH(req: NextRequest) {
       projectId?: string;
       name?: string;
       billingModel?: "hourly" | "fixed_fee" | "hybrid";
+      status?: "active" | "archived";
       percentComplete?: number;
     };
 
@@ -80,6 +81,7 @@ export async function PATCH(req: NextRequest) {
     const updates: Partial<typeof projects.$inferInsert> = {};
     if (body.name !== undefined) updates.name = body.name;
     if (body.billingModel !== undefined) updates.billingModel = body.billingModel;
+    if (body.status !== undefined) updates.status = body.status;
     if (body.percentComplete !== undefined) updates.percentComplete = Math.max(0, Math.min(100, body.percentComplete));
 
     const [project] = await db.update(projects).set(updates).where(eq(projects.id, body.projectId)).returning();

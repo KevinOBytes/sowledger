@@ -7,8 +7,8 @@ import { desc, eq, and, isNotNull } from "drizzle-orm";
 export async function GET() {
   try {
     const session = await requireSession();
-    // Only managers/owners can view invoices
-    requireRole("manager", session.role);
+    // Members can view invoices
+    requireRole("member", session.role);
 
     const { checkWorkspaceLimits } = await import("@/lib/billing");
     const limits = await checkWorkspaceLimits(session.workspaceId, "invoices");
@@ -65,7 +65,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
-    requireRole("manager", session.role);
+    // Members can create invoices 
+    requireRole("member", session.role);
     
     const { checkWorkspaceLimits } = await import("@/lib/billing");
     const limits = await checkWorkspaceLimits(session.workspaceId, "invoices");
