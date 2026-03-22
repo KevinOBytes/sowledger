@@ -2,15 +2,21 @@ import { createHmac } from "node:crypto";
 import { NextRequest } from "next/server";
 import { env } from "./env";
 import { UnauthorizedError } from "./auth";
-import { store, type TimeEntry } from "./store";
+import { db } from "./db";
+import { webhooks, lockPeriods, timeEntries, auditLogs } from "./db/schema";
+import { eq, and, gt, lt } from "drizzle-orm";
+
+const timerStopCounters = new Map<string, { windowStart: number; count: number }>();
 
 export async function dispatchWebhook(workspaceId: string, eventType: string, payload: unknown) {
-  const webhooks = Array.from(store.webhooks.values()).filter(
-    (w) => w.workspaceId === workspaceId && (w.events.includes(eventType) || w.events.includes("*"))
+  const hooks = await db.select().from(webhooks).where(eq(webhooks.workspaceId, workspaceId));
+  const activeHooks = hooks.filter(
+    (w) => w.events.includes(eventType) || w.events.includes("*")
   );
-  if (webhooks.length === 0) return;
+  
+  if (activeHooks.length === 0) return;
 
-  for (const hook of webhooks) {
+  for (const hook of activeHooks) {
     // Fire-and-forget
     fetch(hook.url, {
       method: "POST",
@@ -28,19 +34,19 @@ export async function enforceAuthKey(req: NextRequest) {
 
 export async function enforceStopRateLimit(identity: string) {
   const now = Date.now();
-  const entry = store.timerStopCounters.get(identity);
+  const entry = timerStopCounters.get(identity);
   if (!entry || now - entry.windowStart > 30_000) {
-    store.timerStopCounters.set(identity, { windowStart: now, count: 1 });
+    timerStopCounters.set(identity, { windowStart: now, count: 1 });
     return;
   }
 
   if (entry.count >= 10) throw new Error("Rate limit exceeded on timer stop endpoint");
-  store.timerStopCounters.set(identity, { ...entry, count: entry.count + 1 });
+  timerStopCounters.set(identity, { ...entry, count: entry.count + 1 });
 }
 
 export async function ensurePeriodUnlocked(workspaceId: string, startedAt: Date, stoppedAt: Date) {
-  for (const lock of store.locks) {
-    if (lock.workspaceId !== workspaceId) continue;
+  const locks = await db.select().from(lockPeriods).where(eq(lockPeriods.workspaceId, workspaceId));
+  for (const lock of locks) {
     const lockStart = new Date(lock.periodStart);
     const lockEnd = new Date(lock.periodEnd);
     if (startedAt < lockEnd && stoppedAt > lockStart) {
@@ -50,20 +56,27 @@ export async function ensurePeriodUnlocked(workspaceId: string, startedAt: Date,
 }
 
 export async function enforceDailyHoursLimit(userId: string, businessDate: Date, nextSeconds: number, excludeEntryId?: string) {
-  const dayStart = Date.UTC(
+  const dayStart = new Date(Date.UTC(
     businessDate.getUTCFullYear(),
     businessDate.getUTCMonth(),
     businessDate.getUTCDate(),
     0,
     0,
     0,
-  );
-  const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+  ));
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  const total = [...store.entries.values()].reduce((acc, entry) => {
-    if (entry.userId !== userId || !entry.durationSeconds || entry.id === excludeEntryId) return acc;
-    const started = new Date(entry.startedAt).getTime();
-    return started >= dayStart && started < dayEnd ? acc + entry.durationSeconds : acc;
+  const query = db.select().from(timeEntries).where(and(
+    eq(timeEntries.userId, userId),
+    gt(timeEntries.startedAt, dayStart),
+    lt(timeEntries.startedAt, dayEnd)
+  ));
+
+  const entries = await query;
+  
+  const total = entries.reduce((acc, entry) => {
+    if (!entry.durationSeconds || entry.id === excludeEntryId) return acc;
+    return acc + entry.durationSeconds;
   }, 0);
 
   if (total + nextSeconds > 86400) throw new Error("Impossible time: cannot exceed 24 hours in a day");
@@ -88,7 +101,7 @@ export async function appendAuditLog(params: {
   diff: Record<string, { before: unknown; after: unknown }>;
 }) {
   const serializedDiff = JSON.stringify(params.diff);
-  store.audits.push({
+  await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
     workspaceId: params.workspaceId,
     timeEntryId: params.timeEntryId,
@@ -96,17 +109,16 @@ export async function appendAuditLog(params: {
     eventType: params.eventType,
     diff: params.diff,
     signature: signAudit(serializedDiff, params.eventType),
-    createdAt: new Date().toISOString(),
   });
 
   // Fire Webhooks async without blocking the main thread
   dispatchWebhook(params.workspaceId, params.eventType, params.diff).catch(() => {});
 }
 
-export function createTimeEntry(input: Omit<TimeEntry, "id">) {
-  const entry: TimeEntry = { ...input, id: crypto.randomUUID() };
-  store.entries.set(entry.id, entry);
-  return entry;
+export async function createTimeEntry(input: Omit<typeof timeEntries.$inferInsert, "id" | "createdAt">) {
+  const entry = { ...input, id: crypto.randomUUID() };
+  const [res] = await db.insert(timeEntries).values(entry).returning();
+  return res;
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>) {

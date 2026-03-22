@@ -53,8 +53,14 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
       status,
       // eslint-disable-next-line react-hooks/purity
       position: Date.now(),
-      createdAt: new Date().toISOString(),
-      blockedByTaskIds: []
+      createdAt: new Date(),
+      blockedByTaskIds: [],
+      parentId: null,
+      description: null,
+      dueDate: null,
+      assigneeId: null,
+      attachments: null,
+      estimatedHours: null,
     };
     
     setTasks((prev) => [...prev, tempTask]);

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { store, UserAction } from "@/lib/store";
+import { db } from "@/lib/db";
+import { userActions } from "@/lib/db/schema";
+import { eq, and, ne } from "drizzle-orm";
 
 function getAuthStatus(error: unknown): number {
   const err: unknown = error;
-  if (err && (err as Record<string, unknown>).code === "FORBIDDEN" || (err as Record<string, unknown>).status === 403 || (err as Record<string, unknown>).message === "Forbidden") {
+  if (err && ((err as Record<string, unknown>).code === "FORBIDDEN" || (err as Record<string, unknown>).status === 403 || (err as Record<string, unknown>).message === "Forbidden")) {
     return 403;
   }
   return 401;
@@ -15,9 +17,8 @@ export async function GET() {
     const session = await requireSession();
     requireRole("member", session.role);
 
-    const actions = [...store.userActions.values()].filter(
-      (item) => item.workspaceId === session.workspaceId && item.userId === session.sub
-    );
+    const actions = await db.select().from(userActions)
+      .where(and(eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, session.sub)));
     return NextResponse.json({ ok: true, actions });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
@@ -36,23 +37,22 @@ export async function POST(req: NextRequest) {
 
     if (!body.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
-    const existingNames = [...store.userActions.values()]
-      .filter((a) => a.workspaceId === session.workspaceId && a.userId === session.sub)
-      .map(a => a.name.toLowerCase());
-
-    if (existingNames.includes(body.name.toLowerCase())) {
+    const existingNames = await db.select({ name: userActions.name }).from(userActions)
+      .where(and(eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, session.sub)));
+    
+    if (existingNames.some(a => a.name.toLowerCase() === body.name!.toLowerCase())) {
         return NextResponse.json({ error: "An action with this name already exists" }, { status: 400 });
     }
 
-    const action: UserAction = {
+    const newAction = {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
       userId: session.sub,
       name: body.name,
-      hourlyRate: body.hourlyRate,
+      hourlyRate: body.hourlyRate || null,
     };
 
-    store.userActions.set(action.id, action);
+    const [action] = await db.insert(userActions).values(newAction).returning();
     return NextResponse.json({ ok: true, action });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
@@ -67,31 +67,36 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json() as {
       actionId?: string;
       name?: string;
-      hourlyRate?: number;
+      hourlyRate?: number | null;
     };
 
     if (!body.actionId) return NextResponse.json({ error: "actionId is required" }, { status: 400 });
 
-    const action = store.userActions.get(body.actionId);
+    const [action] = await db.select().from(userActions).where(eq(userActions.id, body.actionId));
     if (!action || action.workspaceId !== session.workspaceId || action.userId !== session.sub) {
       return NextResponse.json({ error: "Action not found" }, { status: 404 });
     }
 
-    if (body.name) {
-       const existingNames = [...store.userActions.values()]
-      .filter((a) => a.workspaceId === session.workspaceId && a.userId === session.sub && a.id !== body.actionId)
-      .map(a => a.name.toLowerCase());
+    const updates: Partial<typeof userActions.$inferInsert> = {};
 
-      if (existingNames.includes(body.name.toLowerCase())) {
+    if (body.name) {
+       const existingNames = await db.select({ name: userActions.name }).from(userActions)
+         .where(and(
+           eq(userActions.workspaceId, session.workspaceId),
+           eq(userActions.userId, session.sub),
+           ne(userActions.id, body.actionId)
+         ));
+
+      if (existingNames.some(a => a.name.toLowerCase() === body.name!.toLowerCase())) {
           return NextResponse.json({ error: "An action with this name already exists" }, { status: 400 });
       }
-      action.name = body.name;
+      updates.name = body.name;
     }
     
-    if (body.hourlyRate !== undefined) action.hourlyRate = body.hourlyRate;
-    // to unset rate, could pass null, but we don't handle null gracefully here yet, so keeping it simple.
+    if (body.hourlyRate !== undefined) updates.hourlyRate = body.hourlyRate;
 
-    return NextResponse.json({ ok: true, action });
+    const [updatedAction] = await db.update(userActions).set(updates).where(eq(userActions.id, body.actionId)).returning();
+    return NextResponse.json({ ok: true, action: updatedAction });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 401 });
   }
@@ -105,12 +110,12 @@ export async function DELETE(req: NextRequest) {
     const actionId = req.nextUrl.searchParams.get("actionId");
     if (!actionId) return NextResponse.json({ error: "actionId is required" }, { status: 400 });
 
-    const action = store.userActions.get(actionId);
+    const [action] = await db.select().from(userActions).where(eq(userActions.id, actionId));
     if (!action || action.workspaceId !== session.workspaceId || action.userId !== session.sub) {
       return NextResponse.json({ error: "Action not found" }, { status: 404 });
     }
 
-    store.userActions.delete(actionId);
+    await db.delete(userActions).where(eq(userActions.id, actionId));
 
     return NextResponse.json({ ok: true, deletedActionId: actionId });
   } catch (error) {

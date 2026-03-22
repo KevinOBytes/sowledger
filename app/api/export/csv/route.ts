@@ -2,29 +2,31 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { toCsv } from "@/lib/security";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { timeEntries } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
 
-    const rows = [...store.entries.values()]
-      .filter((entry) => entry.workspaceId === session.workspaceId)
-      .map((entry) => ({
-        id: entry.id,
-        userId: entry.userId,
-        taskId: entry.taskId,
-        projectId: entry.projectId ?? "",
-        goalId: entry.goalId ?? "",
-        tags: entry.tags.join("|"),
-        startedAtUtc: entry.startedAt,
-        stoppedAtUtc: entry.stoppedAt ?? "",
-        durationSeconds: entry.durationSeconds ?? 0,
-        status: entry.status,
-        source: entry.source,
-        expenses: JSON.stringify(entry.expenses),
-      }));
+    const entries = await db.select().from(timeEntries).where(eq(timeEntries.workspaceId, session.workspaceId));
+
+    const rows = entries.map((entry) => ({
+      id: entry.id,
+      userId: entry.userId,
+      taskId: entry.taskId,
+      projectId: entry.projectId ?? "",
+      goalId: entry.goalId ?? "",
+      tags: entry.tags.join("|"),
+      startedAtUtc: entry.startedAt.toISOString(),
+      stoppedAtUtc: entry.stoppedAt ? entry.stoppedAt.toISOString() : "",
+      durationSeconds: entry.durationSeconds ?? 0,
+      status: entry.status,
+      source: entry.source,
+      expenses: JSON.stringify(entry.expenses),
+    }));
 
     const csv = toCsv(rows);
     const digest = createHash("sha256").update(csv).digest("hex");

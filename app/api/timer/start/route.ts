@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { createTimeEntry, enforceAuthKey } from "@/lib/security";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { projects, goals, userActions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
@@ -23,14 +25,14 @@ export async function POST(req: NextRequest) {
     if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
 
     if (body.projectId) {
-      const project = store.projects.get(body.projectId);
+      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
       if (!project || project.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
     }
 
     if (body.goalId) {
-      const goal = store.goals.get(body.goalId);
+      const [goal] = await db.select().from(goals).where(eq(goals.id, body.goalId));
       if (!goal || goal.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: "Invalid goalId" }, { status: 400 });
       }
@@ -40,31 +42,31 @@ export async function POST(req: NextRequest) {
     let hourlyRate: number | undefined;
 
     if (body.actionId) {
-      const uAction = store.userActions.get(body.actionId);
+      const [uAction] = await db.select().from(userActions).where(eq(userActions.id, body.actionId));
       if (!uAction || uAction.workspaceId !== session.workspaceId || uAction.userId !== session.sub) {
         return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
       }
       actionName = uAction.name;
-      hourlyRate = uAction.hourlyRate;
+      hourlyRate = uAction.hourlyRate || undefined;
     }
 
-    const entry = createTimeEntry({
+    const entry = await createTimeEntry({
       workspaceId: session.workspaceId,
       userId: session.sub,
       taskId: body.taskId,
-      projectId: body.projectId,
-      goalId: body.goalId,
+      projectId: body.projectId || null,
+      goalId: body.goalId || null,
       tags: normalizeTags(body.tags),
-      startedAt: new Date().toISOString(),
+      startedAt: new Date(),
       stoppedAt: null,
       durationSeconds: null,
-      description: body.description,
+      description: body.description || null,
       status: "draft",
       source: "web",
       collaborators: body.collaborators ?? [],
       expenses: [],
-      action: actionName,
-      hourlyRate: hourlyRate,
+      action: actionName || null,
+      hourlyRate: hourlyRate || null,
     });
 
     return NextResponse.json({ ok: true, entry });

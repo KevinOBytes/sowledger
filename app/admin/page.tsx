@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { requireSession, ForbiddenError, UnauthorizedError } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { users as usersTable, workspaces as workspacesTable, memberships as membershipsTable, timeEntries as timeEntriesTable } from "@/lib/db/schema";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 
 export const metadata = { title: "Admin Dashboard – Timely" };
@@ -19,29 +21,34 @@ export default async function AdminPage() {
     throw new ForbiddenError("Admin access requires a @kevinbytes.com email address.");
   }
 
-  const users = [...store.users.values()].map((u) => ({
+  const allUsers = await db.select().from(usersTable);
+  const allMemberships = await db.select().from(membershipsTable);
+  const allWorkspaces = await db.select().from(workspacesTable);
+  const [{ count: entriesCount }] = await db.select({ count: sql<number>`cast(count(*) as int)` }).from(timeEntriesTable);
+
+  const users = allUsers.map((u) => ({
     id: u.id,
     email: u.email,
     displayName: u.displayName ?? null,
     timezone: u.timezone,
     createdAt: u.createdAt,
-    role: store.memberships.find((m) => m.userId === u.id)?.role ?? "—",
+    role: allMemberships.find((m) => m.userId === u.id)?.role ?? "—",
   }));
 
-  const workspaces = [...store.workspaces.values()].map((w) => ({
+  const workspaces = allWorkspaces.map((w) => ({
     id: w.id,
     slug: w.slug,
     name: w.name,
     baseCurrency: w.baseCurrency,
     createdAt: w.createdAt,
-    memberCount: store.memberships.filter((m) => m.workspaceId === w.id).length,
+    memberCount: allMemberships.filter((m) => m.workspaceId === w.id).length,
   }));
 
   const stats = {
-    totalUsers: store.users.size,
-    totalWorkspaces: store.workspaces.size,
-    totalEntries: store.entries.size,
-    totalMemberships: store.memberships.length,
+    totalUsers: allUsers.length,
+    totalWorkspaces: allWorkspaces.length,
+    totalEntries: entriesCount,
+    totalMemberships: allMemberships.length,
   };
 
   return (

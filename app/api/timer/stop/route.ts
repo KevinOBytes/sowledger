@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { appendAuditLog, enforceAuthKey, enforceDailyHoursLimit, enforceStopRateLimit, ensurePeriodUnlocked } from "@/lib/security";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { timeEntries } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,13 +15,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json() as { entryId?: string; endedAt?: string };
     if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
 
-    const entry = store.entries.get(body.entryId);
+    const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, body.entryId));
     if (!entry || entry.workspaceId !== session.workspaceId || entry.userId !== session.sub || entry.stoppedAt) {
       return NextResponse.json({ error: "No active timer found for entry" }, { status: 404 });
     }
 
     const endedAt = body.endedAt ? new Date(body.endedAt) : new Date();
-    const startedAt = new Date(entry.startedAt);
+    const startedAt = new Date(entry.startedAt!);
 
     if (Number.isNaN(endedAt.getTime())) {
       return NextResponse.json({ error: "endedAt must be a valid date" }, { status: 400 });
@@ -34,8 +36,12 @@ export async function POST(req: NextRequest) {
     await ensurePeriodUnlocked(session.workspaceId, startedAt, endedAt);
     await enforceDailyHoursLimit(session.sub, startedAt, durationSeconds);
 
-    entry.stoppedAt = endedAt.toISOString();
-    entry.durationSeconds = durationSeconds;
+    const stoppedAtIso = endedAt.toISOString();
+    
+    await db.update(timeEntries).set({
+      stoppedAt: endedAt,
+      durationSeconds,
+    }).where(eq(timeEntries.id, entry.id));
 
     await appendAuditLog({
       workspaceId: session.workspaceId,
@@ -43,7 +49,7 @@ export async function POST(req: NextRequest) {
       actorUserId: session.sub,
       eventType: "timer_stopped",
       diff: {
-        stoppedAt: { before: null, after: entry.stoppedAt },
+        stoppedAt: { before: null, after: stoppedAtIso },
         durationSeconds: { before: null, after: durationSeconds },
       },
     });

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { timeEntries, projects, users } from "@/lib/db/schema";
+import { eq, and, gte, lte } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,23 +12,16 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get("start");
     const endDate = searchParams.get("end");
 
-    // Gather all time entries for the workspace
-    const workspaceEntries = Array.from(store.entries.values()).filter(
-      (e) => e.workspaceId === session.workspaceId
-    );
-
-    // Filter by dates if provided
-    let filtered = workspaceEntries;
+    const conditions = [eq(timeEntries.workspaceId, session.workspaceId)];
     if (startDate) {
-      filtered = filtered.filter((e) => new Date(e.startedAt) >= new Date(startDate));
+      conditions.push(gte(timeEntries.startedAt, new Date(startDate)));
     }
     if (endDate) {
-      filtered = filtered.filter((e) => {
-        if (!e.stoppedAt) return false;
-        return new Date(e.stoppedAt) <= new Date(endDate);
-      });
+      conditions.push(lte(timeEntries.stoppedAt, new Date(endDate)));
     }
 
+    const filtered = await db.select().from(timeEntries).where(and(...conditions));
+    
     // Process aggregations
     let totalDurationSeconds = 0;
     let totalBillableAmount = 0;
@@ -44,7 +39,7 @@ export async function GET(req: NextRequest) {
         totalBillableAmount += (entry.durationSeconds / 3600) * entry.hourlyRate;
       }
 
-      const dayParams = entry.startedAt.split("T")[0];
+      const dayParams = entry.startedAt.toISOString().split("T")[0];
       byDate[dayParams] = (byDate[dayParams] || 0) + entry.durationSeconds;
 
       if (entry.projectId) {
@@ -54,13 +49,20 @@ export async function GET(req: NextRequest) {
       byUser[entry.userId] = (byUser[entry.userId] || 0) + entry.durationSeconds;
     }
 
-    // Format for Recharts consumption
+    const projectIds = Object.keys(byProject);
+    const projectList = projectIds.length > 0 ? await db.select().from(projects).where(eq(projects.workspaceId, session.workspaceId)) : [];
+    const projectMap = new Map(projectList.map(p => [p.id, p]));
+
+    const userIds = Object.keys(byUser);
+    const userList = userIds.length > 0 ? await db.select().from(users) : [];
+    const userMap = new Map(userList.map(u => [u.id, u]));
+
     const dailyTrend = Object.entries(byDate)
       .map(([date, seconds]) => ({ date, hours: seconds / 3600 }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
     const projectDistribution = Object.entries(byProject).map(([projectId, seconds]) => {
-      const proj = store.projects.get(projectId);
+      const proj = projectMap.get(projectId);
       return {
         projectId,
         name: proj?.name || "Unknown Project",
@@ -69,7 +71,7 @@ export async function GET(req: NextRequest) {
     });
 
     const userDistribution = Object.entries(byUser).map(([userId, seconds]) => {
-      const u = store.users.get(userId);
+      const u = userMap.get(userId);
       return {
         userId,
         email: u?.email || "Unknown User",

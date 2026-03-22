@@ -66,7 +66,7 @@ export default function LoginPage() {
               </svg>
               <h3 className="mb-2 text-lg font-semibold text-emerald-400">Check your inbox</h3>
               <p className="text-sm text-emerald-200/70">
-                We've sent a secure sign-in link to <strong className="text-emerald-300">{email}</strong>. Please check your spam folder if you don't see it.
+                We&apos;ve sent a secure sign-in link to <strong className="text-emerald-300">{email}</strong>. Please check your spam folder if you don&apos;t see it.
               </p>
               <button
                 type="button"

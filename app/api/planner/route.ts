@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { memberships, users, projectTasks } from "@/lib/db/schema";
+import { eq, ne, and } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -10,23 +12,25 @@ export async function GET() {
 
     const workspaceId = session.workspaceId;
 
-    // 1. Get all members of the workspace
-    const memberIds = store.memberships
-      .filter((m) => m.workspaceId === workspaceId)
-      .map((m) => m.userId);
+    const workspaceMemberships = await db.select().from(memberships).where(eq(memberships.workspaceId, workspaceId));
+    const allUsers = await db.select().from(users);
+    
+    const memberIds = workspaceMemberships.map((m) => m.userId);
 
     const members = memberIds.map((id) => {
-      const u = store.users.get(id);
+      const u = allUsers.find(user => user.id === id);
       return {
         id,
         email: u?.email ?? "Unknown",
-        displayName: u?.displayName,
+        displayName: u?.displayName ?? null,
       };
     });
 
-    // 2. Get all unfinished tasks in the workspace
-    const tasks = [...store.tasks.values()].filter(
-      (t) => t.workspaceId === workspaceId && t.status !== "done"
+    const tasks = await db.select().from(projectTasks).where(
+      and(
+        eq(projectTasks.workspaceId, workspaceId),
+        ne(projectTasks.status, "done")
+      )
     );
 
     return NextResponse.json({ ok: true, members, tasks });

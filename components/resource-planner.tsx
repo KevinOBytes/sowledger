@@ -98,7 +98,7 @@ export function ResourcePlanner() {
                                 <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-slate-300 tracking-wider">
                                     {t.status.replace("_", " ")}
                                 </span>
-                                {t.dueDate && <span className="text-[10px] text-slate-500 font-medium">Due: {t.dueDate}</span>}
+                                {t.dueDate && <span className="text-[10px] text-slate-500 font-medium">Due: {String(t.dueDate)}</span>}
                              </div>
                          </div>
                      ))}

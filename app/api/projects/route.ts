@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { projects } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 function getAuthStatus(error: unknown): number {
   const err: unknown = error;
-
   if (err && ((err as Record<string, unknown>).code === "FORBIDDEN" || (err as Record<string, unknown>).status === 403 || (err as Record<string, unknown>).message === "Forbidden")) {
     return 403;
   }
-
   return 401;
 }
 
@@ -17,8 +17,8 @@ export async function GET() {
     const session = await requireSession();
     requireRole("member", session.role);
 
-    const projects = [...store.projects.values()].filter((item) => item.workspaceId === session.workspaceId);
-    return NextResponse.json({ ok: true, projects });
+    const data = await db.select().from(projects).where(eq(projects.workspaceId, session.workspaceId));
+    return NextResponse.json({ ok: true, projects: data });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
   }
@@ -37,16 +37,15 @@ export async function POST(req: NextRequest) {
 
     if (!body.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
-    const project = {
+    const newProject = {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
       name: body.name,
       billingModel: body.billingModel ?? "hourly",
       percentComplete: Math.max(0, Math.min(100, body.percentComplete ?? 0)),
-      createdAt: new Date().toISOString(),
     };
 
-    store.projects.set(project.id, project);
+    const [project] = await db.insert(projects).values(newProject).returning();
     return NextResponse.json({ ok: true, project });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
@@ -67,17 +66,17 @@ export async function PATCH(req: NextRequest) {
 
     if (!body.projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
 
-    const project = store.projects.get(body.projectId);
-    if (!project || project.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(projects).where(eq(projects.id, body.projectId));
+    if (!existing || existing.workspaceId !== session.workspaceId) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    project.name = body.name ?? project.name;
-    project.billingModel = body.billingModel ?? project.billingModel;
-    project.percentComplete = body.percentComplete !== undefined
-      ? Math.max(0, Math.min(100, body.percentComplete))
-      : project.percentComplete;
+    const updates: Partial<typeof projects.$inferInsert> = {};
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.billingModel !== undefined) updates.billingModel = body.billingModel;
+    if (body.percentComplete !== undefined) updates.percentComplete = Math.max(0, Math.min(100, body.percentComplete));
 
+    const [project] = await db.update(projects).set(updates).where(eq(projects.id, body.projectId)).returning();
     return NextResponse.json({ ok: true, project });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 401 });
@@ -92,22 +91,23 @@ export async function DELETE(req: NextRequest) {
     const projectId = req.nextUrl.searchParams.get("projectId");
     if (!projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
 
-    const project = store.projects.get(projectId);
-    if (!project || project.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(projects).where(eq(projects.id, projectId));
+    if (!existing || existing.workspaceId !== session.workspaceId) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    store.projects.delete(projectId);
-    for (const entry of store.entries.values()) {
-      if (entry.workspaceId === session.workspaceId && entry.projectId === projectId) {
-        entry.projectId = undefined;
-      }
-    }
-    for (const goal of store.goals.values()) {
-      if (goal.workspaceId === session.workspaceId && goal.projectId === projectId) {
-        goal.projectId = undefined;
-      }
-    }
+    await db.delete(projects).where(eq(projects.id, projectId));
+
+    // Also need to clear projectId from time entries and goals
+    // Wait, let's keep it simple by querying them
+    // Actually, in schema.ts, projectId doesn't have ON DELETE SET NULL for time entries and goals, we must do it manually or let schema handle it?
+    // In lib/store.ts: 
+    // for (const entry of ...) entry.projectId = undefined;
+    
+    // We can do this with Drizzle:
+    const { timeEntries, goals } = await import("@/lib/db/schema");
+    await db.update(timeEntries).set({ projectId: null }).where(and(eq(timeEntries.workspaceId, session.workspaceId), eq(timeEntries.projectId, projectId)));
+    await db.update(goals).set({ projectId: null }).where(and(eq(goals.workspaceId, session.workspaceId), eq(goals.projectId, projectId)));
 
     return NextResponse.json({ ok: true, deletedProjectId: projectId });
   } catch (error) {

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { appendAuditLog, enforceAuthKey } from "@/lib/security";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { timeEntries } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "r2Key must be in receipts/ and be a supported file extension" }, { status: 400 });
     }
 
-    const entry = store.entries.get(body.entryId);
+    const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, body.entryId));
     if (!entry || entry.workspaceId !== session.workspaceId) {
       return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     }
@@ -46,7 +48,9 @@ export async function POST(req: NextRequest) {
       r2Key: body.r2Key,
     };
 
-    entry.expenses.push(expense);
+    const newExpenses = [...entry.expenses, expense];
+
+    await db.update(timeEntries).set({ expenses: newExpenses }).where(eq(timeEntries.id, entry.id));
 
     await appendAuditLog({
       workspaceId: session.workspaceId,
@@ -56,7 +60,7 @@ export async function POST(req: NextRequest) {
       diff: { expense: { before: null, after: expense } },
     });
 
-    return NextResponse.json({ ok: true, entryId: entry.id, expenses: entry.expenses });
+    return NextResponse.json({ ok: true, entryId: entry.id, expenses: newExpenses });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }

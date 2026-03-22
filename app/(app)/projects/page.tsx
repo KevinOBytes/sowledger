@@ -1,5 +1,7 @@
 import { requireSession } from "@/lib/auth";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { projects as projectsTable, projectTasks as tasksTable } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import { FolderKanban } from "lucide-react";
 
@@ -8,11 +10,9 @@ export const metadata = { title: "Projects – Timely" };
 export default async function ProjectsPage() {
   const session = await requireSession();
   
-  const projects = [...store.projects.values()]
-    .filter(p => p.workspaceId === session.workspaceId)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const projects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId)).orderBy(desc(projectsTable.createdAt));
     
-  const tasks = [...store.tasks.values()].filter(t => t.workspaceId === session.workspaceId);
+  const tasks = await db.select().from(tasksTable).where(eq(tasksTable.workspaceId, session.workspaceId));
 
   return (
     <main className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">

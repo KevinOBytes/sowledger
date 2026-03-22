@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
     }
 
-    const token = createMagicLink(body.email);
+    const token = await createMagicLink(body.email);
     const baseUrl = env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
     const verifyUrl = `${baseUrl}/api/auth/verify?token=${encodeURIComponent(token)}`;
 

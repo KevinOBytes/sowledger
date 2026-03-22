@@ -18,15 +18,29 @@ export default function WebhooksPage() {
   const [status, setStatus] = useState("");
 
   const loadData = async () => {
-    const res = await fetch("/api/webhooks");
-    if (res.ok) {
-        const data = await res.json();
-        setWebhooks(data.webhooks);
+    try {
+      const res = await fetch("/api/webhooks");
+      if (res.ok) {
+          const data = await res.json();
+          setWebhooks(data.webhooks);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { 
+    let mounted = true;
+    fetch("/api/webhooks").then(res => {
+      if (!mounted) return;
+      if (res.ok) res.json().then(data => {
+        if (mounted) setWebhooks(data.webhooks);
+        if (mounted) setLoading(false);
+      });
+      else if (mounted) setLoading(false);
+    }).catch(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
 
   async function createWebhook(e: React.FormEvent) {
     e.preventDefault();

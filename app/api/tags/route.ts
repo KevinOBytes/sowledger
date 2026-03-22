@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ForbiddenError, requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
-import { listWorkspaceTags, store } from "@/lib/store";
+import { listWorkspaceTags } from "@/lib/store";
+import { db } from "@/lib/db";
+import { timeEntries, users, memberships } from "@/lib/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function GET() {
@@ -8,7 +11,7 @@ export async function GET() {
     const session = await requireSession();
     requireRole("member", session.role);
 
-    const tags = listWorkspaceTags(session.workspaceId);
+    const tags = await listWorkspaceTags(session.workspaceId);
     return NextResponse.json({ ok: true, tags });
   } catch (error) {
     const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
@@ -31,20 +34,27 @@ export async function PATCH(req: NextRequest) {
     if (!from || !to) return NextResponse.json({ error: "Tags cannot be empty" }, { status: 400 });
 
     let changedEntries = 0;
-    for (const entry of store.entries.values()) {
-      if (entry.workspaceId !== session.workspaceId) continue;
-      if (entry.tags.includes(from)) {
-        entry.tags = normalizeTags(entry.tags.map((tag) => (tag === from ? to : tag)));
+    const entries = await db.select().from(timeEntries).where(eq(timeEntries.workspaceId, session.workspaceId));
+    
+    for (const entry of entries) {
+      if (entry.tags && entry.tags.includes(from)) {
+        const newTags = normalizeTags(entry.tags.map((tag) => (tag === from ? to : tag)));
+        await db.update(timeEntries).set({ tags: newTags }).where(eq(timeEntries.id, entry.id));
         changedEntries += 1;
       }
     }
 
-    const workspaceUserIds = new Set(
-      store.memberships.filter((m) => m.workspaceId === session.workspaceId).map((m) => m.userId),
-    );
-    for (const user of store.users.values()) {
-      if (!workspaceUserIds.has(user.id)) continue;
-      user.preferredTags = normalizeTags(user.preferredTags.map((tag) => (tag === from ? to : tag)));
+    const mems = await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.workspaceId, session.workspaceId));
+    const userIds = mems.map(m => m.userId);
+
+    if (userIds.length > 0) {
+      const workspaceUsers = await db.select().from(users).where(inArray(users.id, userIds));
+      for (const user of workspaceUsers) {
+        if (user.preferredTags && user.preferredTags.includes(from)) {
+           const newPreferred = normalizeTags(user.preferredTags.map((tag) => (tag === from ? to : tag)));
+           await db.update(users).set({ preferredTags: newPreferred }).where(eq(users.id, user.id));
+        }
+      }
     }
 
     return NextResponse.json({ ok: true, fromTag: from, toTag: to, changedEntries });
@@ -63,20 +73,26 @@ export async function DELETE(req: NextRequest) {
     if (!tag) return NextResponse.json({ error: "tag is required" }, { status: 400 });
 
     let changedEntries = 0;
-    for (const entry of store.entries.values()) {
-      if (entry.workspaceId !== session.workspaceId) continue;
-      if (entry.tags.includes(tag)) {
-        entry.tags = entry.tags.filter((existing) => existing !== tag);
+    const entries = await db.select().from(timeEntries).where(eq(timeEntries.workspaceId, session.workspaceId));
+    for (const entry of entries) {
+      if (entry.tags && entry.tags.includes(tag)) {
+        const newTags = entry.tags.filter((existing) => existing !== tag);
+        await db.update(timeEntries).set({ tags: newTags }).where(eq(timeEntries.id, entry.id));
         changedEntries += 1;
       }
     }
 
-    const workspaceUserIds = new Set(
-      store.memberships.filter((m) => m.workspaceId === session.workspaceId).map((m) => m.userId),
-    );
-    for (const user of store.users.values()) {
-      if (!workspaceUserIds.has(user.id)) continue;
-      user.preferredTags = user.preferredTags.filter((existing) => existing !== tag);
+    const mems = await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.workspaceId, session.workspaceId));
+    const userIds = mems.map(m => m.userId);
+
+    if (userIds.length > 0) {
+      const workspaceUsers = await db.select().from(users).where(inArray(users.id, userIds));
+      for (const user of workspaceUsers) {
+        if (user.preferredTags && user.preferredTags.includes(tag)) {
+          const newPreferred = user.preferredTags.filter((existing) => existing !== tag);
+          await db.update(users).set({ preferredTags: newPreferred }).where(eq(users.id, user.id));
+        }
+      }
     }
 
     return NextResponse.json({ ok: true, removedTag: tag, changedEntries });

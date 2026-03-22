@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { store, type WebhookIntegration } from "@/lib/store";
+import { db } from "@/lib/db";
+import { webhooks } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
     
-    const webhooks = Array.from(store.webhooks.values()).filter(w => w.workspaceId === session.workspaceId);
-    return NextResponse.json({ ok: true, webhooks });
-  } catch (error) {
+    const workspaceWebhooks = await db.select().from(webhooks).where(eq(webhooks.workspaceId, session.workspaceId));
+    return NextResponse.json({ ok: true, webhooks: workspaceWebhooks });
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }
@@ -24,17 +26,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "A valid HTTPS URL is required." }, { status: 400 });
     }
 
-    const hook: WebhookIntegration = {
+    const [hook] = await db.insert(webhooks).values({
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
       url: body.url,
       events: body.events && body.events.length > 0 ? body.events : ["*"],
-      createdAt: new Date().toISOString()
-    };
+    }).returning();
 
-    store.webhooks.set(hook.id, hook);
     return NextResponse.json({ ok: true, webhook: hook });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to create webhook" }, { status: 400 });
   }
 }
@@ -47,13 +47,10 @@ export async function DELETE(req: Request) {
     const id = searchParams.get("id");
     
     if (id) {
-       const hook = store.webhooks.get(id);
-       if (hook && hook.workspaceId === session.workspaceId) {
-           store.webhooks.delete(id);
-       }
+       await db.delete(webhooks).where(eq(webhooks.id, id));
     }
     return NextResponse.json({ ok: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }

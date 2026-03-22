@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ForbiddenError, requireSession, requireRole, UnauthorizedError } from "@/lib/auth";
-import { enforceAuthKey } from "@/lib/security";
-import { store } from "@/lib/store";
+import { enforceAuthKey, appendAuditLog } from "@/lib/security";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,13 +10,18 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json() as { businessDate?: string; submitted?: boolean };
     const businessDate = body.businessDate ? new Date(body.businessDate) : new Date();
-    const key = `${session.workspaceId}:${session.sub}:${businessDate.toISOString().slice(0, 10)}`;
 
-    if (body.submitted ?? true) {
-      store.dailySubmissions.add(key);
-    } else {
-      store.dailySubmissions.delete(key);
-    }
+    // Replaced in-memory store dailySubmissions tracking with an audit log
+    await appendAuditLog({
+      workspaceId: session.workspaceId,
+      timeEntryId: "system", // Generic since it doesn't belong to a time entry
+      actorUserId: session.sub,
+      eventType: "compliance_check",
+      diff: {
+        businessDate: { before: null, after: businessDate.toISOString().slice(0, 10) },
+        submitted: { before: null, after: body.submitted ?? true }
+      }
+    });
 
     return NextResponse.json({ ok: true, businessDate: businessDate.toISOString(), submitted: body.submitted ?? true });
   } catch (error) {

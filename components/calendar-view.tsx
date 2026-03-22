@@ -104,8 +104,10 @@ export function CalendarView() {
 
                         const dayEntries = entries.filter(e => e.startedAt.startsWith(cell.dateStr));
                         const totalSeconds = dayEntries.reduce((acc, curr) => acc + (curr.durationSeconds || 0), 0);
-                        const dayTasks = tasks.filter(t => t.dueDate === cell.dateStr || (t.createdAt.startsWith(cell.dateStr) && !t.dueDate));
-
+                        const dayTasks = tasks.filter(t => 
+                            (t.dueDate as unknown as string) === cell.dateStr || 
+                            ((t.createdAt as unknown as string).startsWith(cell.dateStr) && !t.dueDate)
+                        );
                         const isToday = cell.dateStr === new Date().toISOString().split("T")[0];
 
                         return (

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enforceAuthKey } from "@/lib/security";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { timeEntries } from "@/lib/db/schema";
+import { isNull, lt, and } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,11 +14,17 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const threshold = Date.now() - 1000 * 60 * 60 * 8;
-  const stale = [...store.entries.values()]
-    .filter((entry) => !entry.stoppedAt && new Date(entry.startedAt).getTime() < threshold)
-    .slice(0, 250)
-    .map(({ id, workspaceId, userId, startedAt }) => ({ id, workspaceId, userId, startedAt }));
+  const thresholdDate = new Date(Date.now() - 1000 * 60 * 60 * 8);
+  
+  const stale = await db.select({
+    id: timeEntries.id,
+    workspaceId: timeEntries.workspaceId,
+    userId: timeEntries.userId,
+    startedAt: timeEntries.startedAt,
+  }).from(timeEntries).where(and(
+    isNull(timeEntries.stoppedAt),
+    lt(timeEntries.startedAt, thresholdDate)
+  )).limit(250);
 
   return NextResponse.json({
     ok: true,

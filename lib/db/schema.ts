@@ -1,0 +1,160 @@
+import { boolean, integer, jsonb, pgTable, real, text, timestamp, varchar, primaryKey } from "drizzle-orm/pg-core";
+
+export const users = pgTable("users", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 255 }),
+  timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
+  preferredTags: jsonb("preferred_tags").$type<string[]>().default([]).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const workspaces = pgTable("workspaces", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  baseCurrency: varchar("base_currency", { length: 10 }).notNull().default("USD"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const memberships = pgTable("memberships", {
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { enum: ["client", "member", "manager", "owner"] }).notNull().default("member"),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.workspaceId, table.userId] }),
+}));
+
+export const projects = pgTable("projects", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  billingModel: varchar("billing_model", { enum: ["hourly", "fixed_fee", "hybrid"] }).notNull().default("hourly"),
+  percentComplete: real("percent_complete").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const goals = pgTable("goals", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id", { length: 255 }),
+  name: varchar("name", { length: 255 }).notNull(),
+  targetHours: real("target_hours"),
+  dueDate: timestamp("due_date"),
+  completed: boolean("completed").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const invitations = pgTable("invitations", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  role: varchar("role", { enum: ["client", "member", "manager", "owner"] }).notNull(),
+  invitedByUserId: varchar("invited_by_user_id", { length: 255 }).notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  acceptedAt: integer("accepted_at"),
+});
+
+export const magicLinks = pgTable("magic_links", {
+  tokenId: varchar("token_id", { length: 255 }).primaryKey(),
+  tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  workspaceSlug: varchar("workspace_slug", { length: 255 }).notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  usedAt: integer("used_at"),
+});
+
+export const timeEntries = pgTable("time_entries", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id", { length: 255 }).notNull(),
+  projectId: varchar("project_id", { length: 255 }),
+  goalId: varchar("goal_id", { length: 255 }),
+  tags: jsonb("tags").$type<string[]>().default([]).notNull(),
+  startedAt: timestamp("started_at").notNull(),
+  stoppedAt: timestamp("stopped_at"),
+  durationSeconds: real("duration_seconds"),
+  description: text("description"),
+  action: varchar("action", { length: 255 }),
+  hourlyRate: real("hourly_rate"),
+  status: varchar("status", { enum: ["draft", "submitted", "approved", "invoiced"] }).notNull().default("draft"),
+  source: varchar("source", { enum: ["web", "calendar", "manual"] }).notNull().default("web"),
+  collaborators: jsonb("collaborators").$type<string[]>().default([]).notNull(),
+  expenses: jsonb("expenses").$type<{ label: string; amount: number; currency: string; r2Key: string }[]>().default([]).notNull(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  timeEntryId: varchar("time_entry_id", { length: 255 }).notNull(),
+  actorUserId: varchar("actor_user_id", { length: 255 }).notNull(),
+  eventType: varchar("event_type", { length: 255 }).notNull(),
+  diff: jsonb("diff").notNull(),
+  signature: text("signature").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const lockPeriods = pgTable("lock_periods", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  reason: text("reason").notNull(),
+  lockedByUserId: varchar("locked_by_user_id", { length: 255 }).notNull(),
+});
+
+export const userActions = pgTable("user_actions", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  hourlyRate: real("hourly_rate"),
+});
+
+export const projectTasks = pgTable("project_tasks", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id", { length: 255 }).notNull().references(() => projects.id, { onDelete: "cascade" }),
+  parentId: varchar("parent_id", { length: 255 }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  status: varchar("status", { enum: ["todo", "in_progress", "review", "done"] }).notNull().default("todo"),
+  position: real("position").notNull(),
+  dueDate: timestamp("due_date"),
+  assigneeId: varchar("assignee_id", { length: 255 }),
+  estimatedHours: real("estimated_hours"),
+  blockedByTaskIds: jsonb("blocked_by_task_ids").$type<string[]>().default([]),
+  attachments: jsonb("attachments").$type<{ name: string; url: string; size?: number }[]>().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  read: boolean("read").notNull().default(false),
+  relatedEntityId: varchar("related_entity_id", { length: 255 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const invoices = pgTable("invoices", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id", { length: 255 }),
+  number: varchar("number", { length: 255 }).notNull(),
+  amount: real("amount").notNull(),
+  status: varchar("status", { enum: ["draft", "sent", "paid"] }).notNull().default("draft"),
+  dueDate: timestamp("due_date"),
+  timeEntryIds: jsonb("time_entry_ids").$type<string[]>().default([]).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const webhooks = pgTable("webhooks", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  url: varchar("url", { length: 1024 }).notNull(),
+  events: jsonb("events").$type<string[]>().default([]).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

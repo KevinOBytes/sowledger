@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { projects, timeEntries, invoices } from "@/lib/db/schema";
+import { eq, and, ne, desc } from "drizzle-orm";
 
 export async function GET() {
   try {
     const session = await requireSession();
     requireRole("client", session.role);
 
-    const workspaceProjects = Array.from(store.projects.values()).filter(p => p.workspaceId === session.workspaceId);
+    const workspaceProjects = await db.select().from(projects).where(eq(projects.workspaceId, session.workspaceId));
     
     // Aggregate hours per project
+    const allEntries = await db.select().from(timeEntries).where(and(eq(timeEntries.workspaceId, session.workspaceId), ne(timeEntries.status, "draft")));
+
     const projectAggregates = workspaceProjects.map(p => {
-       const entries = Array.from(store.entries.values()).filter(e => e.projectId === p.id && e.workspaceId === session.workspaceId && e.status !== "draft");
+       const entries = allEntries.filter(e => e.projectId === p.id);
        const totalSeconds = entries.reduce((acc, curr) => acc + (curr.durationSeconds || 0), 0);
        return {
           id: p.id,
@@ -21,19 +25,18 @@ export async function GET() {
        };
     });
 
-    const invoices = Array.from(store.invoices.values())
-        .filter(i => i.workspaceId === session.workspaceId)
-        .map(i => {
-           const project = i.projectId ? store.projects.get(i.projectId) : null;
-           return {
-              ...i,
-              projectName: project?.name || "General Workspace"
-           };
-        })
-        .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const workspaceInvoices = await db.select().from(invoices).where(eq(invoices.workspaceId, session.workspaceId)).orderBy(desc(invoices.createdAt));
+    
+    const mappedInvoices = workspaceInvoices.map(i => {
+        const project = i.projectId ? workspaceProjects.find(p => p.id === i.projectId) : null;
+        return {
+            ...i,
+            projectName: project?.name || "General Workspace"
+        };
+    });
 
-    return NextResponse.json({ ok: true, projects: projectAggregates, invoices });
-  } catch (error) {
+    return NextResponse.json({ ok: true, projects: projectAggregates, invoices: mappedInvoices });
+  } catch {
      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }

@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
     const token = req.nextUrl.searchParams.get("token");
     if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
-    const { user, workspace, membership } = consumeMagicLink(token);
+    const { user, workspace, membership } = await consumeMagicLink(token);
     await setSessionCookie({
       sub: user.id,
       email: user.email,

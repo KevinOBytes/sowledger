@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { store, Invoice } from "@/lib/store";
+import { db } from "@/lib/db";
+import { invoices as invoicesTable, timeEntries as timeEntriesTable, projects as projectsTable, users as usersTable } from "@/lib/db/schema";
+import { desc, eq, and, isNotNull } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -8,31 +10,45 @@ export async function GET() {
     // Only managers/owners can view invoices
     requireRole("manager", session.role);
 
-    const invoices = Array.from(store.invoices.values())
-      .filter((i) => i.workspaceId === session.workspaceId)
-      .map((i) => {
-        const project = i.projectId ? store.projects.get(i.projectId) : null;
+    const workspaceInvoices = await db.select().from(invoicesTable)
+      .where(eq(invoicesTable.workspaceId, session.workspaceId))
+      .orderBy(desc(invoicesTable.createdAt));
+      
+    const workspaceProjects = await db.select().from(projectsTable)
+      .where(eq(projectsTable.workspaceId, session.workspaceId));
+
+    const invoices = workspaceInvoices.map((i) => {
+        const project = i.projectId ? workspaceProjects.find(p => p.id === i.projectId) : null;
         return {
           ...i,
           projectName: project?.name || "General Workspace",
         };
-      })
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      });
 
     // Also return approved but not invoiced entries so they can generate new invoices
-    const billableEntries = Array.from(store.entries.values())
-      .filter((e) => e.workspaceId === session.workspaceId && e.status === "approved" && e.hourlyRate && e.durationSeconds)
-      .map((e) => {
-        const user = store.users.get(e.userId);
-        const project = e.projectId ? store.projects.get(e.projectId) : null;
+    const approvedEntries = await db.select().from(timeEntriesTable)
+      .where(
+        and(
+          eq(timeEntriesTable.workspaceId, session.workspaceId),
+          eq(timeEntriesTable.status, "approved"),
+          isNotNull(timeEntriesTable.hourlyRate),
+          isNotNull(timeEntriesTable.durationSeconds)
+        )
+      )
+      .orderBy(desc(timeEntriesTable.startedAt));
+
+    const allUsers = await db.select().from(usersTable);
+
+    const billableEntries = approvedEntries.map((e) => {
+        const user = allUsers.find(u => u.id === e.userId);
+        const project = e.projectId ? workspaceProjects.find(p => p.id === e.projectId) : null;
         return {
           ...e,
           userEmail: user?.email || "Unknown User",
           projectName: project?.name || "General",
           amount: (e.durationSeconds! / 3600) * e.hourlyRate!,
         };
-      })
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+      });
 
     return NextResponse.json({ ok: true, invoices, billableEntries });
   } catch (error) {
@@ -56,7 +72,7 @@ export async function POST(req: NextRequest) {
     let totalAmount = 0;
     
     for (const id of body.timeEntryIds) {
-      const entry = store.entries.get(id);
+      const [entry] = await db.select().from(timeEntriesTable).where(eq(timeEntriesTable.id, id));
       if (!entry || entry.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: `Invalid entry ${id}` }, { status: 400 });
       }
@@ -68,26 +84,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const workspaceInvoices = Array.from(store.invoices.values()).filter((i) => i.workspaceId === session.workspaceId);
+    const workspaceInvoices = await db.select().from(invoicesTable).where(eq(invoicesTable.workspaceId, session.workspaceId));
     const nextNum = workspaceInvoices.length + 1;
     
-    const invoice: Invoice = {
+    const [invoice] = await db.insert(invoicesTable).values({
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
-      projectId: body.projectId,
+      projectId: body.projectId || null,
       number: `INV-${new Date().getFullYear()}-${nextNum.toString().padStart(4, "0")}`,
       amount: totalAmount,
       status: "draft",
-      dueDate: body.dueDate,
+      dueDate: body.dueDate ? new Date(body.dueDate) : null,
       timeEntryIds: body.timeEntryIds,
-      createdAt: new Date().toISOString(),
-    };
+    }).returning();
 
-    store.invoices.set(invoice.id, invoice);
 
     for (const id of body.timeEntryIds) {
-      const entry = store.entries.get(id)!;
-      entry.status = "invoiced";
+      await db.update(timeEntriesTable)
+        .set({ status: "invoiced" })
+        .where(eq(timeEntriesTable.id, id));
     }
 
     return NextResponse.json({ ok: true, invoice });
