@@ -4,6 +4,7 @@ import { projects as projectsTable, projectTasks as tasksTable } from "@/lib/db/
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import { FolderKanban } from "lucide-react";
+import { CreateProjectButton } from "@/components/create-project-button";
 
 export const metadata = { title: "Projects – Billabled" };
 
@@ -16,16 +17,21 @@ export default async function ProjectsPage() {
 
   return (
     <main className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Projects Pipeline</h1>
-        <p className="mt-2 text-sm text-slate-400">Select a project to view its Kanban board and tasks.</p>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Projects Pipeline</h1>
+          <p className="mt-2 text-sm text-slate-400">Select a project to view its Kanban board and tasks.</p>
+        </div>
+        <div className="shrink-0 flex items-start self-end sm:self-auto relative z-50">
+          <CreateProjectButton />
+        </div>
       </div>
 
       {projects.length === 0 ? (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-16 text-center flex flex-col items-center">
             <FolderKanban className="w-16 h-16 text-slate-700 mb-4" />
             <h3 className="text-xl font-medium text-white">No active projects</h3>
-            <p className="text-slate-400 mt-2 max-w-md">Projects help you organize time entries and tasks. Create your first project from the Timer Dashboard project selector.</p>
+            <p className="text-slate-400 mt-2 max-w-md">Projects help you organize time entries and tasks. Create your first project by clicking the button above.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

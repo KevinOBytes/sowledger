@@ -3,6 +3,7 @@
 import { motion, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
 import { useRef, useEffect, useState } from "react";
+import { STRIPE_PLANS } from "@/lib/billing-plans";
 
 // The constant background animation component
 function BackgroundText() {
@@ -167,6 +168,85 @@ export default function MarketingPage() {
                 <h3 className="mb-2 text-2xl font-bold">API & Webhooks</h3>
                 <p className="text-slate-400">Integrate deeply into your existing ecosystem. We seamlessly sync with Slack, Discord, and internal tools.</p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing Section */}
+        <section id="pricing" className="py-32 px-6 bg-gradient-to-b from-transparent via-[#050914] to-transparent">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-20 text-center">
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="mb-4 inline-flex rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-violet-400"
+              >
+                Pricing
+              </motion.div>
+              <h2 className="text-4xl font-bold tracking-tight sm:text-6xl">Simple, transparent scale.</h2>
+              <p className="mt-4 text-lg text-slate-400">Everything you need to run your business gracefully.</p>
+            </div>
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+              {Object.values(STRIPE_PLANS).map((plan, i) => (
+                <motion.div
+                  key={plan.planId}
+                  initial={{ y: 20, opacity: 0 }}
+                  whileInView={{ y: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className="flex flex-col justify-between rounded-3xl border border-white/10 bg-slate-900/50 p-8 shadow-xl backdrop-blur-md transition-transform hover:-translate-y-2 hover:border-cyan-500/50"
+                >
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
+                    <p className="mt-2 text-sm text-slate-400 min-h-[40px]">{plan.description}</p>
+                    <div className="my-6">
+                      <span className="text-5xl font-extrabold tracking-tight">${plan.price}</span>
+                      <span className="text-slate-500">/mo</span>
+                    </div>
+
+                    <ul className="mb-8 space-y-4 text-sm text-slate-300">
+                      <li className="flex items-center gap-3">
+                        <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        {plan.limits.members === 9999 ? "Unlimited members" : `Up to ${plan.limits.members} members`}
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        {plan.limits.projects === 9999 ? "Unlimited projects" : `Up to ${plan.limits.projects} active projects`}
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        {plan.limits.storageMB >= 999999 ? "Unlimited file storage" : `${Math.round(plan.limits.storageMB / 1000)}GB file storage`}
+                      </li>
+                      {plan.features.includes("invoicing") && (
+                        <li className="flex items-center gap-3">
+                          <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          Professional Invoicing
+                        </li>
+                      )}
+                      {plan.features.includes("approvals") && (
+                        <li className="flex items-center gap-3">
+                          <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          Manager Approvals Flow
+                        </li>
+                      )}
+                      {plan.features.includes("saml") && (
+                        <li className="flex items-center gap-3">
+                          <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          SAML SSO & Audit Logs
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                  <Link
+                    href="/login"
+                    className="block w-full rounded-xl bg-white/5 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/10 focus:ring-2 focus:ring-cyan-500"
+                  >
+                    Get Started
+                  </Link>
+                </motion.div>
+              ))}
             </div>
           </div>
         </section>
