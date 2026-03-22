@@ -1,4 +1,4 @@
-# Timely Architecture (Settings + Projects/Goals/Tags CRUD)
+# Timed Architecture (Settings + Projects/Goals/Tags CRUD)
 
 ## BLUF
 This update adds complete management lifecycle support for time metadata objects:
@@ -53,7 +53,7 @@ These are validated against workspace scope on write endpoints.
 
 ## Environment
 ```bash
-NEXT_PUBLIC_APP_URL=https://timely.tkoresearch.com
+NEXT_PUBLIC_APP_URL=https://timed.tkoresearch.com
 AUTH_SHARED_KEY=replace_with_internal_service_key
 AUTH_COOKIE_SECRET=replace_with_long_random_secret_min_24_chars
 AUDIT_SIGNING_SECRET=replace_with_long_random_secret

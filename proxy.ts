@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const AUTH_COOKIE_NAME = "timely_session";
+const AUTH_COOKIE_NAME = "timed_session";
 
-/** Paths that are always public (no authentication required). */
-const PUBLIC_PREFIXES = ["/login", "/api/auth/", "/_next/", "/favicon.ico"];
+const PUBLIC_PREFIXES = ["/login", "/api/auth/", "/_next/", "/favicon.ico", "/api/test/"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

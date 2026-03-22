@@ -9,6 +9,11 @@ export async function GET() {
     const session = await requireSession();
     requireRole("manager", session.role);
     
+    // Feature gate check
+    const { checkWorkspaceLimits } = await import("@/lib/billing");
+    const limits = await checkWorkspaceLimits(session.workspaceId, "webhooks");
+    if (!limits.allowed) return NextResponse.json({ error: limits.error }, { status: 402 });
+
     const workspaceWebhooks = await db.select().from(webhooks).where(eq(webhooks.workspaceId, session.workspaceId));
     return NextResponse.json({ ok: true, webhooks: workspaceWebhooks });
   } catch {

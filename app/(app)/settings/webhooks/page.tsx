@@ -40,6 +40,10 @@ export default function WebhooksPage() {
         if (mounted) setWebhooks(data.webhooks);
         if (mounted) setLoading(false);
       });
+      else if (res.status === 402) {
+        if (mounted) setRequiresUpgrade(true);
+        if (mounted) setLoading(false);
+      }
       else if (mounted) setLoading(false);
     }).catch(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };

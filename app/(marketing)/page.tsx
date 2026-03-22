@@ -83,7 +83,7 @@ export default function MarketingPage() {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="mb-6 inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-sm font-medium text-cyan-300"
             >
-              Introducing Timely Pro
+              Introducing Timed Pro
             </motion.div>
             <motion.h1
               initial={{ y: 20, opacity: 0 }}

@@ -1,4 +1,4 @@
-# Potential Features & Widgets for Timely
+# Potential Features & Widgets for Timed
 
 1. **Global Command Palette (CMD + K)**
    - A universal search bar that opens seamlessly anywhere in the app to jump between projects, tasks, invoices, or users via keyboard.
@@ -16,7 +16,7 @@
    - A widget to upload receipt images where AI parses the total/date and appends reimbursable expenses to projects and invoices.
 
 6. **Public API & Personal Access Tokens**
-   - Allow users to generate API keys to interact with Timely programmatically, opening up native integrations (Zapier, Make, custom CRMs).
+   - Allow users to generate API keys to interact with Timed programmatically, opening up native integrations (Zapier, Make, custom CRMs).
 
 7. **Custom Role / Permissions Matrix**
    - Allow admins to create granular custom roles with explicit boolean toggles (e.g., Accountant role: can see Invoices, but cannot see Project Tasks).

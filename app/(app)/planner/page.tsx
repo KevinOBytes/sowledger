@@ -1,6 +1,6 @@
 import { ResourcePlanner } from "@/components/resource-planner";
 
-export const metadata = { title: "Capacity Planner – Timely" };
+export const metadata = { title: "Capacity Planner – Timed" };
 
 export default function PlannerPage() {
   return (

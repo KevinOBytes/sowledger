@@ -239,7 +239,7 @@ export function TimerDashboard() {
               <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z" clipRule="evenodd" />
             </svg>
           </div>
-          <span className="text-sm font-semibold text-white">Timely</span>
+          <span className="text-sm font-semibold text-white">Timed</span>
           {session && (
             <span className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-400 sm:inline">
               {workspaceSlug}

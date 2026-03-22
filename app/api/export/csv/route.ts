@@ -34,8 +34,8 @@ export async function GET() {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename=timely-${new Date().toISOString().slice(0, 10)}.csv`,
-        "x-timely-export-sha256": digest,
+        "Content-Disposition": `attachment; filename=timed-${new Date().toISOString().slice(0, 10)}.csv`,
+        "x-timed-export-sha256": digest,
       },
     });
   } catch (error) {

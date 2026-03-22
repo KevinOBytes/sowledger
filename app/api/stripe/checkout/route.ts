@@ -1,61 +1,52 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
-import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import { workspaces } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { env } from "@/lib/env";
+import { stripe } from "@/lib/stripe";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const session = await requireSession();
+    
+    // Only owners can initiate an upgrade
     if (session.role !== "owner") {
-      return NextResponse.json({ error: "Only workspace owners can manage billing." }, { status: 403 });
+      return NextResponse.json({ error: "Only workspace owners can manage billing" }, { status: 403 });
     }
 
-    const { priceId } = await req.json() as { priceId?: string };
+    const { priceId } = await req.json();
+
     if (!priceId) {
-      return NextResponse.json({ error: "Price ID is required." }, { status: 400 });
+      return NextResponse.json({ error: "No price ID provided" }, { status: 400 });
     }
 
-    const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, session.workspaceId));
-    if (!workspace) throw new Error("Workspace not found");
-
-    const baseUrl = env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, session.workspaceId));
+    if (!ws) throw new Error("Workspace not found");
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
-      customer: workspace.stripeCustomerId || undefined,
-      client_reference_id: workspace.id,
-      customer_email: workspace.stripeCustomerId ? undefined : session.email,
+      customer: ws.stripeCustomerId || undefined,
+      client_reference_id: ws.id,
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/dashboard/settings/billing?success=true`,
-      cancel_url: `${baseUrl}/dashboard/settings/billing?canceled=true`,
-      metadata: {
-        workspaceId: workspace.id,
-      },
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/settings/billing?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/settings/billing?canceled=true`,
       subscription_data: {
         metadata: {
-          workspaceId: workspace.id,
+          workspaceId: ws.id,
         },
       },
+      customer_email: ws.stripeCustomerId ? undefined : session.email,
     });
 
-    if (!checkoutSession.url) {
-      throw new Error("Failed to create checkout session URL");
-    }
-
     return NextResponse.json({ url: checkoutSession.url });
-  } catch (error) {
-    console.error("Stripe Checkout Error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal Server Error" },
-      { status: 500 }
-    );
+
+  } catch (error: any) {
+    console.error("Stripe checkout error:", error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }

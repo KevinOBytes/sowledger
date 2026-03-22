@@ -3,8 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workspaces, memberships, projects } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { PLAN_LIMITS } from "@/lib/billing";
-import { env } from "@/lib/env";
+import { STRIPE_PLANS } from "@/lib/billing-plans";
 
 export async function GET() {
   try {
@@ -16,7 +15,7 @@ export async function GET() {
     const [membersResult] = await db.select({ count: sql<number>`count(*)` }).from(memberships).where(eq(memberships.workspaceId, session.workspaceId));
     const [projectsResult] = await db.select({ count: sql<number>`count(*)` }).from(projects).where(eq(projects.workspaceId, session.workspaceId));
 
-    const limits = PLAN_LIMITS[ws.plan] || PLAN_LIMITS.free;
+    const planData = STRIPE_PLANS[ws.plan as keyof typeof STRIPE_PLANS] || STRIPE_PLANS.free;
 
     return NextResponse.json({ 
       ok: true, 
@@ -26,10 +25,10 @@ export async function GET() {
         members: membersResult.count,
         projects: projectsResult.count,
       },
-      limits,
+      limits: planData.limits,
       prices: {
-        pro: env.STRIPE_PRO_PRICE_ID,
-        smb: env.STRIPE_SMB_PRICE_ID,
+        pro: STRIPE_PLANS.pro.priceId,
+        smb: STRIPE_PLANS.smb.priceId,
       }
     });
 

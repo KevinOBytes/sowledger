@@ -49,8 +49,8 @@ export function Sidebar() {
       <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-64 flex-col border-r border-slate-800 bg-[#050914]">
         {/* Brand */}
         <div className="flex h-16 shrink-0 items-center px-6">
-          <Image src="/logo.png" alt="Timely" width={24} height={24} className="mr-2 rounded-md" />
-          <span className="text-xl font-bold tracking-tight text-white">Timely</span>
+          <Image src="/logo.png" alt="Timed" width={24} height={24} className="mr-2 rounded-md" unoptimized />
+          <span className="text-xl font-bold tracking-tight text-white">Timed</span>
         </div>
 
         {/* Navigation */}

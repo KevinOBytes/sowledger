@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Timely Workforce Intelligence",
+  title: "Timed Workforce Intelligence",
   description: "Compliance-first time tracking with auditability and local-first resilience",
 };
 

@@ -1,6 +1,6 @@
 import { CalendarView } from "@/components/calendar-view";
 
-export const metadata = { title: "Calendar – Timely" };
+export const metadata = { title: "Calendar – Timed" };
 
 export default function CalendarPage() {
   return (

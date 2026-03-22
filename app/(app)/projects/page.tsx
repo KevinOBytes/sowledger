@@ -5,7 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import { FolderKanban } from "lucide-react";
 
-export const metadata = { title: "Projects – Timely" };
+export const metadata = { title: "Projects – Timed" };
 
 export default async function ProjectsPage() {
   const session = await requireSession();
