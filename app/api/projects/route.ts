@@ -37,6 +37,12 @@ export async function POST(req: NextRequest) {
 
     if (!body.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
+    const { checkWorkspaceLimits } = await import("@/lib/billing");
+    const limits = await checkWorkspaceLimits(session.workspaceId, "projects");
+    if (!limits.allowed) {
+      return NextResponse.json({ error: limits.error }, { status: 402 }); // 402 Payment Required
+    }
+
     const newProject = {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,

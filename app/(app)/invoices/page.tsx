@@ -29,6 +29,7 @@ export default function InvoicesPage() {
   const [billables, setBillables] = useState<BillableEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
+  const [requiresUpgrade, setRequiresUpgrade] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -41,6 +42,8 @@ export default function InvoicesPage() {
         const data = await res.json();
         setInvoices(data.invoices || []);
         setBillables(data.billableEntries || []);
+      } else if (res.status === 402) {
+        setRequiresUpgrade(true);
       }
     } catch {
       // Handle network issue
@@ -85,6 +88,28 @@ export default function InvoicesPage() {
         <div className="flex flex-col items-center">
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-cyan-500"></div>
           <p>Tallying financials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (requiresUpgrade) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-900/30">
+            <Receipt className="h-8 w-8 text-cyan-400" />
+          </div>
+          <h2 className="mb-3 text-2xl font-bold text-white">Invoicing is a Pro feature</h2>
+          <p className="mb-8 text-slate-400">
+            Upgrade to the Pro plan to start generating professional invoices from your approved billables.
+          </p>
+          <a
+            href="/settings/billing"
+            className="inline-flex rounded-xl bg-cyan-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-cyan-500"
+          >
+            Upgrade to Pro
+          </a>
         </div>
       </div>
     );

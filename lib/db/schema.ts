@@ -14,6 +14,11 @@ export const workspaces = pgTable("workspaces", {
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
   baseCurrency: varchar("base_currency", { length: 10 }).notNull().default("USD"),
+  plan: varchar("plan", { enum: ["free", "pro", "smb", "enterprise"] }).notNull().default("free"),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  stripeCurrentPeriodEnd: timestamp("stripe_current_period_end"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

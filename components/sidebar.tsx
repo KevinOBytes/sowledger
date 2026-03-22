@@ -38,7 +38,8 @@ export function Sidebar() {
     { name: "Invoices", href: "/invoices", icon: Receipt },
     { name: "Calendar", href: "/calendar", icon: CalendarDays },
     { name: "Notifications", href: "/notifications", icon: Bell },
-    { name: "Billing Actions", href: "/settings/actions", icon: Settings },
+    { name: "Settings", href: "/settings", icon: Settings },
+    { name: "Billing", href: "/settings/billing", icon: Receipt },
     { name: "Webhooks", href: "/settings/webhooks", icon: Webhook },
   ];
 
@@ -50,7 +51,6 @@ export function Sidebar() {
         <div className="flex h-16 shrink-0 items-center px-6">
           <Image src="/logo.png" alt="Timely" width={24} height={24} className="mr-2 rounded-md" />
           <span className="text-xl font-bold tracking-tight text-white">Timely</span>
-          <span className="ml-2 rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-cyan-400 uppercase">Pro</span>
         </div>
 
         {/* Navigation */}

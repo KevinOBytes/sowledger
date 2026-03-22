@@ -10,6 +10,10 @@ export async function GET() {
     // Only managers/owners can view invoices
     requireRole("manager", session.role);
 
+    const { checkWorkspaceLimits } = await import("@/lib/billing");
+    const limits = await checkWorkspaceLimits(session.workspaceId, "invoices");
+    if (!limits.allowed) return NextResponse.json({ error: limits.error, requiresUpgrade: true, invoices: [], billableEntries: [] }, { status: 402 });
+
     const workspaceInvoices = await db.select().from(invoicesTable)
       .where(eq(invoicesTable.workspaceId, session.workspaceId))
       .orderBy(desc(invoicesTable.createdAt));
@@ -63,6 +67,10 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     requireRole("manager", session.role);
     
+    const { checkWorkspaceLimits } = await import("@/lib/billing");
+    const limits = await checkWorkspaceLimits(session.workspaceId, "invoices");
+    if (!limits.allowed) return NextResponse.json({ error: limits.error }, { status: 402 });
+
     const body = await req.json() as { timeEntryIds: string[]; projectId?: string; dueDate?: string };
     
     if (!body.timeEntryIds || body.timeEntryIds.length === 0) {

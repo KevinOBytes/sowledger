@@ -80,12 +80,20 @@ export default function SettingsPage() {
             <h1 className="text-2xl font-bold text-white">User Settings</h1>
             {user && <p className="mt-1 text-sm text-slate-400">{user.email}</p>}
           </div>
-          <Link
-            href="/"
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white"
-          >
-            ← Back
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/settings/billing"
+              className="rounded-lg border border-cyan-700 bg-cyan-900/30 px-4 py-2 text-sm font-medium text-cyan-300 transition hover:bg-cyan-800/40 hover:text-white shadow-sm"
+            >
+              Billing & Plans
+            </Link>
+            <Link
+              href="/"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white shadow-sm"
+            >
+              ← Back
+            </Link>
+          </div>
         </div>
 
         {/* Form */}

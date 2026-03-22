@@ -20,6 +20,11 @@ export async function POST(req: Request) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
+
+    const { checkWorkspaceLimits } = await import("@/lib/billing");
+    const limits = await checkWorkspaceLimits(session.workspaceId, "webhooks");
+    if (!limits.allowed) return NextResponse.json({ error: limits.error }, { status: 402 });
+
     const body = await req.json() as { url: string; events: string[] };
 
     if (!body.url || !body.url.startsWith("https://")) {
