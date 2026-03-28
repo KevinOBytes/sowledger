@@ -9,7 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@datadog/browser-rum": "^6.32.0",
     "@neondatabase/serverless": "^1.0.2",
+    "@sentry/nextjs": "^10.46.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
@@ -22,6 +24,7 @@
     "react-dom": "19.2.4",
     "recharts": "^3.8.0",
     "resend": "^6.9.4",
+    "sonner": "^2.0.7",
     "stripe": "^20.4.1",
     "tailwind-merge": "^3.5.0"
   },

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { appendAuditLog, enforceAuthKey } from "@/lib/security";
+import { appendAuditLog } from "@/lib/security";
 import { db } from "@/lib/db";
 import { timeEntries } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
-    await enforceAuthKey(req);
     const session = await requireSession();
     requireRole("manager", session.role);
 

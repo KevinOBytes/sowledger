@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { appendAuditLog, enforceAuthKey, ensurePeriodUnlocked, createTimeEntry } from "@/lib/security";
+import { appendAuditLog, ensurePeriodUnlocked, createTimeEntry } from "@/lib/security";
 import { db } from "@/lib/db";
 import { timeEntries, projects } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -9,7 +9,6 @@ import { normalizeTags } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
-    await enforceAuthKey(req);
     const session = await requireSession();
     const body = await req.json() as {
       entryId?: string;

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { appendAuditLog, enforceAuthKey, enforceDailyHoursLimit, enforceStopRateLimit, ensurePeriodUnlocked } from "@/lib/security";
+import { appendAuditLog, enforceDailyHoursLimit, enforceStopRateLimit, ensurePeriodUnlocked } from "@/lib/security";
 import { db } from "@/lib/db";
 import { timeEntries } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
-    await enforceAuthKey(req);
     const session = await requireSession();
     requireRole("member", session.role);
     await enforceStopRateLimit(session.sub);

@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/client/local-db";
 import { isAdminEmail } from "@/lib/admin";
 import { ProfileMenu } from "@/components/profile-menu";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+import { Play, Square, Pause, Plus, ChevronDown, Check, Activity, Clock, Settings2, Folder, Target, Briefcase, Tag } from "lucide-react";
 
 type CurrencyPayload = { payload?: { rates?: Record<string, number> } };
 type SessionState = { email: string; role: string; workspaceId: string } | null;
@@ -22,27 +25,25 @@ function fmt(seconds: number) {
 
 /** SVG ring showing pomodoro progress (0–1) */
 function PomodoroRing({ progress, isRunning }: { progress: number; isRunning: boolean }) {
-  const r = 88;
+  const r = 90;
   const circ = 2 * Math.PI * r;
   const dash = circ * (1 - progress);
   return (
     <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full -rotate-90">
-      {/* Track */}
-      <circle cx="100" cy="100" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
-      {/* Progress */}
-      <circle
+      <circle cx="100" cy="100" r={r} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="4" />
+      <motion.circle
         cx="100" cy="100" r={r} fill="none"
-        stroke={isRunning ? "url(#ringGrad)" : "rgba(100,116,139,0.4)"}
+        stroke={isRunning ? "url(#ringGrad)" : "rgba(100,116,139,0.3)"}
         strokeWidth="6"
         strokeLinecap="round"
         strokeDasharray={circ}
-        strokeDashoffset={dash}
-        style={{ transition: "stroke-dashoffset 0.5s ease" }}
+        animate={{ strokeDashoffset: dash }}
+        transition={{ duration: 0.5, ease: "linear" }}
       />
       <defs>
         <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#7c3aed" />
+          <stop offset="100%" stopColor="#8b5cf6" />
         </linearGradient>
       </defs>
     </svg>
@@ -56,17 +57,22 @@ export function TimerDashboard() {
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [pomodoroMinutes] = useState(25);
-  const [status, setStatus] = useState<string | null>(null);
   const [rates, setRates] = useState<Record<string, number>>({});
   const [session, setSession] = useState<SessionState>(null);
+  
+  // Context states
   const [projectId, setProjectId] = useState("");
   const [goalId, setGoalId] = useState("");
   const [actionId, setActionId] = useState("");
   const [tags, setTags] = useState("focus");
+  
+  // Data lists
   const [projects, setProjects] = useState<Project[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
   const [workspaceTags, setWorkspaceTags] = useState<string[]>([]);
+  
+  // UI states
   const [showConfig, setShowConfig] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newGoalName, setNewGoalName] = useState("");
@@ -78,25 +84,31 @@ export function TimerDashboard() {
   const pomodoroDone = elapsed >= pomodoroTotal;
 
   async function refreshSession() {
-    const response = await fetch("/api/auth/me");
-    const data = await response.json();
-    if (response.ok) {
-      setSession(data.session);
-    } else {
+    try {
+      const response = await fetch("/api/auth/me");
+      const data = await response.json();
+      if (response.ok) setSession(data.session);
+      else setSession(null);
+    } catch {
       setSession(null);
     }
   }
 
   async function loadProjectsAndGoals() {
-    const [pr, gr, tr, ar] = await Promise.all([fetch("/api/projects"), fetch("/api/goals"), fetch("/api/tags"), fetch("/api/user/actions")]);
-    const pd = await pr.json();
-    const gd = await gr.json();
-    const td = await tr.json();
-    const ad = await ar.json();
-    if (pr.ok) setProjects(pd.projects ?? []);
-    if (gr.ok) setGoals(gd.goals ?? []);
-    if (tr.ok) setWorkspaceTags(td.tags ?? []);
-    if (ar.ok) setActions(ad.actions ?? []);
+    try {
+      const [pr, gr, tr, ar] = await Promise.all([
+        fetch("/api/projects").catch(() => null), 
+        fetch("/api/goals").catch(() => null), 
+        fetch("/api/tags").catch(() => null), 
+        fetch("/api/user/actions").catch(() => null)
+      ]);
+      if (pr?.ok) setProjects((await pr.json()).projects ?? []);
+      if (gr?.ok) setGoals((await gr.json()).goals ?? []);
+      if (tr?.ok) setWorkspaceTags((await tr.json()).tags ?? []);
+      if (ar?.ok) setActions((await ar.json()).actions ?? []);
+    } catch (err) {
+      console.error("Failed to load context data:", err);
+    }
   }
 
   // Tick
@@ -110,7 +122,12 @@ export function TimerDashboard() {
   // Idle detection
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (document.hidden && isRunning) setStatus("Idle detected — review whether to discard or reassign this time block.");
+      if (document.hidden && isRunning) {
+        toast.info("Idle detected", {
+          description: "Review whether to discard or reassign this time block when you return.",
+          duration: 10000,
+        });
+      }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
@@ -118,110 +135,157 @@ export function TimerDashboard() {
 
   // Load on mount
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshSession();
     loadProjectsAndGoals();
-  }, []); // intentionally empty — only runs once on mount
-
-  // Auto-dismiss status after 6s
-  useEffect(() => {
-    if (!status) return;
-    const t = setTimeout(() => setStatus(null), 6000);
-    return () => clearTimeout(t);
-  }, [status]);
-
+  }, []);
 
   async function createProject() {
     if (!newProjectName.trim()) return;
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newProjectName.trim(), billingModel: "hourly" }),
-    });
-    const data = await res.json();
-    setStatus(res.ok ? `Project "${data.project.name}" created` : `Error: ${data.error}`);
-    if (res.ok) { setNewProjectName(""); await loadProjectsAndGoals(); }
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newProjectName.trim(), billingModel: "hourly" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Project created", { description: data.project.name });
+        setNewProjectName("");
+        await loadProjectsAndGoals();
+      } else throw new Error(data.error);
+    } catch (err: any) {
+      toast.error("Failed to create project", { description: err.message });
+    }
   }
 
   async function deleteProject() {
     if (!projectId) return;
-    const res = await fetch(`/api/projects?projectId=${encodeURIComponent(projectId)}`, { method: "DELETE" });
-    const data = await res.json();
-    setStatus(res.ok ? "Project removed" : `Error: ${data.error}`);
-    if (res.ok) { setProjectId(""); await loadProjectsAndGoals(); }
+    try {
+      const res = await fetch(`/api/projects?projectId=${encodeURIComponent(projectId)}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Project removed");
+        setProjectId("");
+        await loadProjectsAndGoals();
+      } else {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      toast.error("Failed to remove project", { description: err.message });
+    }
   }
 
   async function createGoal() {
     if (!newGoalName.trim()) return;
-    const res = await fetch("/api/goals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newGoalName.trim(), projectId: projectId || undefined }),
-    });
-    const data = await res.json();
-    setStatus(res.ok ? `Goal "${data.goal.name}" created` : `Error: ${data.error}`);
-    if (res.ok) { setNewGoalName(""); await loadProjectsAndGoals(); }
+    try {
+      const res = await fetch("/api/goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newGoalName.trim(), projectId: projectId || undefined }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Goal created", { description: data.goal.name });
+        setNewGoalName("");
+        await loadProjectsAndGoals();
+      } else throw new Error(data.error);
+    } catch (err: any) {
+      toast.error("Failed to create goal", { description: err.message });
+    }
   }
 
   async function deleteGoal() {
     if (!goalId) return;
-    const res = await fetch(`/api/goals?goalId=${encodeURIComponent(goalId)}`, { method: "DELETE" });
-    const data = await res.json();
-    setStatus(res.ok ? "Goal removed" : `Error: ${data.error}`);
-    if (res.ok) { setGoalId(""); await loadProjectsAndGoals(); }
+    try {
+      const res = await fetch(`/api/goals?goalId=${encodeURIComponent(goalId)}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Goal removed");
+        setGoalId("");
+        await loadProjectsAndGoals();
+      } else {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      toast.error("Failed to remove goal", { description: err.message });
+    }
   }
 
   async function startTimer() {
     const started = new Date();
-    const res = await fetch("/api/timer/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const res = await fetch("/api/timer/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId,
+          description: "Focus block",
+          projectId: projectId || undefined,
+          goalId: goalId || undefined,
+          actionId: actionId || undefined,
+          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start timer");
+      
+      setEntryId(data.entry.id);
+      setStartedAt(started);
+      setElapsed(0);
+      
+      await db.draftTimers.put({
+        id: data.entry.id,
         taskId,
-        description: "Focus block",
-        projectId: projectId || undefined,
-        goalId: goalId || undefined,
-        actionId: actionId || undefined,
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) return setStatus(`Start failed: ${data.error}`);
-    setEntryId(data.entry.id);
-    setStartedAt(started);
-    setElapsed(0);
-    await db.draftTimers.put({
-      id: data.entry.id,
-      taskId,
-      workspaceId: data.entry.workspaceId,
-      startedAt: started.toISOString(),
-      pomodoroMinutes,
-      lastSeenAt: new Date().toISOString(),
-    });
-    setStatus("Timer running — session persisted locally.");
+        workspaceId: data.entry.workspaceId,
+        startedAt: started.toISOString(),
+        pomodoroMinutes,
+        lastSeenAt: new Date().toISOString(),
+      });
+      
+      toast.success("Timer Started", { 
+        description: "Session is running and persisted locally.",
+        icon: <Play className="h-4 w-4 text-cyan-400" />
+      });
+    } catch (err: any) {
+      toast.error("Could not start session", { description: err.message });
+    }
   }
 
   async function stopTimer() {
     if (!entryId) return;
-    const res = await fetch("/api/timer/stop", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entryId }),
-    });
-    const data = await res.json();
-    if (!res.ok) return setStatus(`Stop failed: ${data.error}`);
-    await db.draftTimers.delete(entryId);
-    setEntryId(null);
-    setStartedAt(null);
-    setElapsed(0);
-    setStatus(`Session logged — ${data.durationSeconds}s recorded.`);
+    try {
+      const res = await fetch("/api/timer/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entryId }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || "Failed to stop timer");
+      
+      await db.draftTimers.delete(entryId);
+      setEntryId(null);
+      setStartedAt(null);
+      setElapsed(0);
+      
+      toast.success("Session Logged", { 
+        description: `${data.durationSeconds}s recorded successfully to your timesheet.`,
+        icon: <Check className="h-4 w-4 text-emerald-400" />
+      });
+    } catch (err: any) {
+      toast.error("Could not stop session", { description: err.message });
+    }
   }
 
   async function loadRates() {
-    const res = await fetch("/api/currency/rates?base=USD&symbols=EUR,GBP,CAD,JPY");
-    const data = (await res.json()) as CurrencyPayload;
-    setRates(data.payload?.rates ?? {});
-    setStatus("FX rates updated.");
+    try {
+      const res = await fetch("/api/currency/rates?base=USD&symbols=EUR,GBP,CAD,JPY");
+      const data = (await res.json()) as CurrencyPayload;
+      setRates(data.payload?.rates ?? {});
+      toast.success("FX Rates Updated");
+    } catch (err) {
+      toast.error("Failed to fetch FX rates");
+    }
   }
 
   const selectedProject = projects.find((p) => p.id === projectId);
@@ -230,313 +294,348 @@ export function TimerDashboard() {
   const activeTags = tags.split(",").map((t) => t.trim()).filter(Boolean);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-4xl space-y-6">
       {/* ─── Top Nav ─── */}
-      <nav className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/5 px-5 py-3 backdrop-blur-xl">
+      <nav className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] px-5 py-3 backdrop-blur-3xl shadow-2xl">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-violet-600 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-white">
-              <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z" clipRule="evenodd" />
-            </svg>
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 shadow-lg shadow-cyan-500/20">
+            <Activity className="h-4 w-4 text-white" />
           </div>
-          <span className="text-sm font-semibold text-white">Billabled</span>
+          <span className="text-sm font-semibold tracking-wide text-white">Billabled</span>
           {session && (
-            <span className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-400 sm:inline">
+            <span className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-slate-400 sm:inline">
               {workspaceSlug}
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          {isRunning && (
-            <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
-              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-              Tracking
-            </span>
-          )}
-          {session && (
-            <ProfileMenu email={session.email} isAdmin={isAdminEmail(session.email)} />
-          )}
+        <div className="flex items-center gap-4">
+          <AnimatePresence>
+            {isRunning && (
+              <motion.span 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400 shadow-inner"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping shadow-lg shadow-emerald-400 absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                Live
+              </motion.span>
+            )}
+          </AnimatePresence>
+          {session && <ProfileMenu email={session.email} isAdmin={isAdminEmail(session.email)} />}
         </div>
       </nav>
 
       {/* ─── Timer Hero ─── */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/5 backdrop-blur-xl">
-        {/* Glow when running */}
-        {isRunning && (
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent" />
-        )}
-        {pomodoroDone && isRunning && (
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-violet-500/10 to-transparent" />
-        )}
+      <motion.div 
+        layout
+        className="relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-2xl"
+      >
+        <AnimatePresence>
+          {isRunning && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="pointer-events-none absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-transparent to-transparent opacity-50 mix-blend-screen" 
+            />
+          )}
+          {pomodoroDone && isRunning && (
+             <motion.div 
+             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+             className="pointer-events-none absolute inset-0 bg-gradient-to-b from-violet-500/10 via-transparent to-transparent opacity-50 mix-blend-screen" 
+           />
+          )}
+        </AnimatePresence>
 
-        <div className="flex flex-col items-center gap-6 px-6 py-10 sm:py-14">
+        <div className="flex flex-col items-center gap-8 px-6 py-12 sm:py-16">
           {/* Ring + time */}
-          <div className="relative flex h-52 w-52 items-center justify-center sm:h-60 sm:w-60">
+          <div className="relative flex h-56 w-56 items-center justify-center sm:h-72 sm:w-72">
             <PomodoroRing progress={pomodoroProgress} isRunning={isRunning} />
-            <div className="z-10 flex flex-col items-center">
-              <span className={`font-mono text-5xl font-bold tabular-nums tracking-tight sm:text-6xl ${isRunning ? "text-white" : "text-slate-400"}`}>
+            <motion.div layout className="z-10 flex flex-col items-center">
+              <span className={`font-mono text-6xl font-light tabular-nums tracking-tighter sm:text-7xl transition-colors duration-500 ${isRunning ? "text-white" : "text-slate-500"}`}>
                 {fmt(elapsed)}
               </span>
-              <span className="mt-1 text-xs font-medium text-slate-500">
-                {isRunning
-                  ? (pomodoroDone ? "🍅 Pomodoro complete!" : `${fmt(pomodoroRemaining)} remaining`)
-                  : "Stopped"}
-              </span>
-            </div>
+              <AnimatePresence mode="popLayout">
+                {isRunning ? (
+                  <motion.span 
+                    initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+                    className={`mt-2 text-xs font-medium ${pomodoroDone ? "text-violet-400" : "text-cyan-400"}`}
+                  >
+                    {pomodoroDone ? "🍅 Pomodoro complete!" : `${fmt(pomodoroRemaining)} remaining`}
+                  </motion.span>
+                ) : (
+                  <motion.span 
+                    initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+                    className="mt-2 text-xs font-medium text-slate-500 uppercase tracking-widest"
+                  >
+                    Ready Setup
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.div>
           </div>
 
-          {/* Context summary */}
-          <div className="flex flex-wrap justify-center gap-2">
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
-              {taskId}
+          {/* Context summary pills */}
+          <div className="flex max-w-lg flex-wrap justify-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-slate-300">
+              <Briefcase className="h-3 w-3" /> {taskId}
             </span>
             {selectedProject && (
-              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
-                {selectedProject.name}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-cyan-300">
+                <Folder className="h-3 w-3" /> {selectedProject.name}
               </span>
             )}
             {selectedGoal && (
-              <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300">
-                {selectedGoal.name}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-violet-300">
+                <Target className="h-3 w-3" /> {selectedGoal.name}
               </span>
             )}
             {selectedAction && (
-              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
-                {selectedAction.name} {selectedAction.hourlyRate !== undefined && `($${selectedAction.hourlyRate}/hr)`}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-emerald-300">
+                <Activity className="h-3 w-3" /> {selectedAction.name} {selectedAction.hourlyRate !== undefined && `($${selectedAction.hourlyRate}/hr)`}
               </span>
             )}
             {activeTags.map((tag) => (
-              <span key={tag} className="rounded-full border border-slate-700 bg-slate-800/60 px-3 py-1 text-xs text-slate-400">
-                #{tag}
+              <span key={tag} className="inline-flex items-center gap-1 rounded-full border border-slate-700/50 bg-slate-800/40 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                <Tag className="h-3 w-3" /> {tag}
               </span>
             ))}
           </div>
 
-          {/* Start / Stop */}
-          <div className="flex gap-3">
-            {!isRunning ? (
-              <button
-                onClick={startTimer}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 transition hover:from-cyan-400 hover:to-cyan-500 active:scale-95"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                  <path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.84Z" />
-                </svg>
-                Start Session
-              </button>
-            ) : (
-              <button
+          {/* Action Button */}
+          <div className="mt-2 flex">
+            {isRunning ? (
+              <motion.button
+                whileHover={{ scale: 1.02, backgroundColor: "rgb(225, 29, 72)" }}
+                whileTap={{ scale: 0.98 }}
                 onClick={stopTimer}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-500/25 transition hover:from-rose-400 hover:to-rose-500 active:scale-95"
+                className="group flex items-center gap-3 rounded-2xl bg-rose-500 px-10 py-4 text-sm font-semibold tracking-wide text-white shadow-xl shadow-rose-500/20 transition-all hover:shadow-rose-500/40 border border-rose-400/50"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                  <path d="M5.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75A.75.75 0 0 0 7.25 3h-1.5ZM12.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75h-1.5Z" />
-                </svg>
-                Stop
-              </button>
+                <Square className="h-4 w-4 fill-white flex-shrink-0" />
+                Stop Logging
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={startTimer}
+                className="group relative flex items-center gap-3 overflow-hidden rounded-2xl bg-white px-10 py-4 text-sm font-semibold tracking-wide text-slate-900 shadow-xl shadow-white/10 transition-all"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-violet-400/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                <Play className="relative h-4 w-4 fill-slate-900 group-hover:text-cyan-600 transition-colors" />
+                <span className="relative">Start Session</span>
+              </motion.button>
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* ─── Session Context ─── */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {/* Task + Tags */}
-        <div className="rounded-2xl border border-white/8 bg-white/5 p-5 backdrop-blur-xl">
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">Session Context</h2>
-          <div className="space-y-3">
+      {/* ─── Forms / Context ─── */}
+      <motion.div layout className="grid gap-6 sm:grid-cols-2">
+        {/* Task & Tags Form */}
+        <div className="group rounded-3xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-3xl shadow-2xl transition hover:bg-white/[0.03]">
+          <div className="mb-6 flex items-center gap-2">
+            <div className="rounded-lg bg-white/5 p-2"><Clock className="h-4 w-4 text-slate-400" /></div>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Focal Context</h2>
+          </div>
+          
+          <div className="space-y-5">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Task ID</label>
+              <label className="mb-2 block text-xs font-medium text-slate-400">Task Reference / ID</label>
               <input
                 value={taskId}
                 onChange={(e) => setTaskId(e.target.value)}
-                className="w-full rounded-lg border border-white/8 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-                placeholder="TASK-1"
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                placeholder="Ex: TKO-101"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Tags</label>
+              <label className="mb-2 block text-xs font-medium text-slate-400">Activity Tags</label>
               <input
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                className="w-full rounded-lg border border-white/8 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-                placeholder="focus, deep-work"
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                placeholder="focus, research, deep-work"
               />
               {workspaceTags.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {workspaceTags.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => {
-                        const cur = tags.split(",").map((x) => x.trim()).filter(Boolean);
-                        const next = cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t];
-                        setTags(next.join(", "));
-                      }}
-                      className={`rounded-full border px-2.5 py-0.5 text-xs transition ${
-                        activeTags.includes(t)
-                          ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300"
-                          : "border-white/10 bg-white/5 text-slate-400 hover:border-white/20 hover:text-slate-300"
-                      }`}
-                    >
-                      #{t}
-                    </button>
-                  ))}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {workspaceTags.map((t) => {
+                    const isActive = activeTags.includes(t);
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => {
+                          const cur = tags.split(",").map((x) => x.trim()).filter(Boolean);
+                          const next = isActive ? cur.filter((x) => x !== t) : [...cur, t];
+                          setTags(next.join(", "));
+                        }}
+                        className={`rounded-lg border px-3 py-1 text-[11px] font-medium tracking-wide transition-all ${
+                          isActive
+                            ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300 shadow-sm shadow-cyan-500/20"
+                            : "border-white/5 bg-white/5 text-slate-400 hover:border-white/20 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        #{t}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Project + Goal */}
-        <div className="rounded-2xl border border-white/8 bg-white/5 p-5 backdrop-blur-xl">
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">Project & Goal</h2>
-          <div className="space-y-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Project</label>
+        {/* Assignments Form */}
+        <div className="group rounded-3xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-3xl shadow-2xl transition hover:bg-white/[0.03]">
+          <div className="mb-6 flex items-center gap-2">
+            <div className="rounded-lg bg-white/5 p-2"><Target className="h-4 w-4 text-slate-400" /></div>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Billable Assignments</h2>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <label className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Project Workspace</label>
               <select
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="w-full rounded-lg border border-white/8 bg-slate-900 px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                className="w-full appearance-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
               >
-                <option value="">— No project —</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <option value="" className="bg-slate-900 border-none">— Unassigned Project —</option>
+                {projects.map((p) => <option className="bg-slate-900 border-none" key={p.id} value={p.id}>{p.name}</option>)}
               </select>
+              <ChevronDown className="absolute bottom-3.5 right-4 h-4 w-4 text-slate-500 pointer-events-none" />
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Goal</label>
+            
+            <div className="relative">
+              <label className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Billing Goal</label>
               <select
                 value={goalId}
                 onChange={(e) => setGoalId(e.target.value)}
-                className="w-full rounded-lg border border-white/8 bg-slate-900 px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                className="w-full appearance-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
               >
-                <option value="">— No goal —</option>
-                {goals.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                <option value="" className="bg-slate-900">— Unassigned Goal —</option>
+                {goals.map((g) => <option className="bg-slate-900" key={g.id} value={g.id}>{g.name}</option>)}
               </select>
+              <ChevronDown className="absolute bottom-3.5 right-4 h-4 w-4 text-slate-500 pointer-events-none" />
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-400">Action</label>
+
+            <div className="relative">
+              <label className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Action Rate Card</label>
               <select
                 value={actionId}
                 onChange={(e) => setActionId(e.target.value)}
-                className="w-full rounded-lg border border-white/8 bg-slate-900 px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                className="w-full appearance-none rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-100 transition focus:border-emerald-500/50 focus:bg-emerald-500/10 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
               >
-                <option value="">— No action —</option>
-                {actions.map((a) => <option key={a.id} value={a.id}>{a.name} {a.hourlyRate !== undefined ? `($${a.hourlyRate}/hr)` : ""}</option>)}
+                <option value="" className="bg-slate-900">— Select Action Rate —</option>
+                {actions.map((a) => <option className="bg-slate-900" key={a.id} value={a.id}>{a.name} {a.hourlyRate !== undefined ? `($${a.hourlyRate}/hr)` : ""}</option>)}
               </select>
+              <ChevronDown className="absolute bottom-3.5 right-4 h-4 w-4 text-emerald-500/50 pointer-events-none" />
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* ─── Manage (collapsible) ─── */}
-      <div className="rounded-2xl border border-white/8 bg-white/5 backdrop-blur-xl">
+      {/* ─── Manage Defaults (Collapsible) ─── */}
+      <motion.div layout className="rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-2xl overflow-hidden">
         <button
           onClick={() => setShowConfig((v) => !v)}
-          className="flex w-full items-center justify-between px-5 py-4 text-left"
+          className="group flex w-full items-center justify-between px-6 py-5 text-left transition hover:bg-white/[0.02]"
         >
-          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Manage Projects, Goals & FX</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-            className={`h-4 w-4 text-slate-500 transition-transform ${showConfig ? "rotate-180" : ""}`}
-          >
-            <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-          </svg>
+          <div className="flex items-center gap-3">
+            <Settings2 className="h-4 w-4 text-slate-500 group-hover:text-cyan-400 transition" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 group-hover:text-slate-200 transition">Workspace Preferences & Entities</span>
+          </div>
+          <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform duration-300 ${showConfig ? "rotate-180" : ""}`} />
         </button>
 
-        {showConfig && (
-          <div className="border-t border-white/8 px-5 pb-5 pt-4">
-            <div className="grid gap-6 sm:grid-cols-3">
-              {/* New Project */}
-              <div>
-                <p className="mb-2 text-xs font-medium text-slate-400">New Project</p>
-                <div className="flex gap-2">
-                  <input
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && createProject()}
-                    placeholder="Project name"
-                    className="min-w-0 flex-1 rounded-lg border border-white/8 bg-white/5 px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none"
-                  />
-                  <button
-                    onClick={createProject}
-                    className="rounded-lg bg-cyan-600/80 px-3 py-2 text-xs font-medium text-white hover:bg-cyan-600"
-                  >
-                    Add
-                  </button>
-                </div>
-                {projectId && (
-                  <button
-                    onClick={deleteProject}
-                    className="mt-2 text-xs text-rose-400/70 hover:text-rose-400"
-                  >
-                    Delete selected project
-                  </button>
-                )}
-              </div>
-
-              {/* New Goal */}
-              <div>
-                <p className="mb-2 text-xs font-medium text-slate-400">New Goal</p>
-                <div className="flex gap-2">
-                  <input
-                    value={newGoalName}
-                    onChange={(e) => setNewGoalName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && createGoal()}
-                    placeholder="Goal name"
-                    className="min-w-0 flex-1 rounded-lg border border-white/8 bg-white/5 px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none"
-                  />
-                  <button
-                    onClick={createGoal}
-                    className="rounded-lg bg-violet-600/80 px-3 py-2 text-xs font-medium text-white hover:bg-violet-600"
-                  >
-                    Add
-                  </button>
-                </div>
-                {goalId && (
-                  <button
-                    onClick={deleteGoal}
-                    className="mt-2 text-xs text-rose-400/70 hover:text-rose-400"
-                  >
-                    Delete selected goal
-                  </button>
-                )}
-              </div>
-
-              {/* FX Rates */}
-              <div>
-                <p className="mb-2 text-xs font-medium text-slate-400">Exchange Rates (USD base)</p>
-                {Object.keys(rates).length === 0 ? (
-                  <button
-                    onClick={loadRates}
-                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400 hover:bg-white/10 hover:text-white"
-                  >
-                    Load FX rates
-                  </button>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(rates).map(([currency, rate]) => (
-                      <span key={currency} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300">
-                        {currency} <span className="text-slate-500">{Number(rate).toFixed(4)}</span>
-                      </span>
-                    ))}
-                    <button onClick={loadRates} className="text-xs text-slate-600 hover:text-slate-400">↻</button>
+        <AnimatePresence>
+          {showConfig && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t border-white/5"
+            >
+              <div className="grid gap-8 p-6 sm:grid-cols-3">
+                {/* New Project */}
+                <div>
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Create New Project</p>
+                  <div className="flex gap-2 relative">
+                    <input
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && createProject()}
+                      placeholder="E.g., Website Redesign"
+                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 pl-4 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none"
+                    />
+                    <button
+                      onClick={createProject}
+                      className="absolute right-1.5 top-1.5 bottom-1.5 w-8 flex items-center justify-center rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 transition"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+                  {projectId && (
+                    <button onClick={deleteProject} className="mt-3 text-xs font-medium text-rose-500/60 hover:text-rose-400 transition">
+                      Delete selected project
+                    </button>
+                  )}
+                </div>
 
-      {/* ─── Status Toast ─── */}
-      {status && (
-        <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-slate-900/80 px-4 py-3 text-sm text-slate-300 shadow-lg backdrop-blur-xl">
-          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-cyan-400" />
-          {status}
-          <button onClick={() => setStatus(null)} className="ml-auto text-slate-600 hover:text-slate-400">✕</button>
-        </div>
-      )}
+                {/* New Goal */}
+                <div>
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Create Goal</p>
+                  <div className="flex gap-2 relative">
+                    <input
+                      value={newGoalName}
+                      onChange={(e) => setNewGoalName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && createGoal()}
+                      placeholder="E.g., Q3 Launch"
+                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 pl-4 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none"
+                    />
+                    <button
+                      onClick={createGoal}
+                      className="absolute right-1.5 top-1.5 bottom-1.5 w-8 flex items-center justify-center rounded-lg bg-violet-500 hover:bg-violet-400 text-white transition"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {goalId && (
+                    <button onClick={deleteGoal} className="mt-3 text-xs font-medium text-rose-500/60 hover:text-rose-400 transition">
+                      Delete selected goal
+                    </button>
+                  )}
+                </div>
+
+                {/* FX Rates */}
+                <div>
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Currency Exchange (USD base)</p>
+                  {Object.keys(rates).length === 0 ? (
+                    <button
+                      onClick={loadRates}
+                      className="w-full rounded-xl border border-dashed border-white/20 bg-transparent px-4 py-2.5 text-sm text-slate-400 hover:border-white/40 hover:text-white transition"
+                    >
+                      Load FX rates
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(rates).map(([currency, rate]) => (
+                        <span key={currency} className="rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-medium tracking-wide text-slate-300">
+                          {currency} <span className="text-slate-500 ml-1">{Number(rate).toFixed(3)}</span>
+                        </span>
+                      ))}
+                      <button onClick={loadRates} className="rounded-lg border border-white/5 bg-white/5 px-3 py-1.5 text-xs text-slate-400 hover:text-white transition">↻ Refresh</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 }

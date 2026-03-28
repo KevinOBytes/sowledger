@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { createTimeEntry, enforceAuthKey } from "@/lib/security";
+import { createTimeEntry } from "@/lib/security";
 import { db } from "@/lib/db";
 import { projects, goals, userActions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -8,7 +8,6 @@ import { normalizeTags } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
-    await enforceAuthKey(req);
     const session = await requireSession();
     requireRole("member", session.role);
 

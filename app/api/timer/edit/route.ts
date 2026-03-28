@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { appendAuditLog, enforceAuthKey, enforceDailyHoursLimit, ensurePeriodUnlocked } from "@/lib/security";
+import { appendAuditLog, enforceDailyHoursLimit, ensurePeriodUnlocked } from "@/lib/security";
 import { db } from "@/lib/db";
 import { timeEntries, projects, goals, userActions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -8,7 +8,6 @@ import { normalizeTags } from "@/lib/validators";
 
 export async function PATCH(req: NextRequest) {
   try {
-    await enforceAuthKey(req);
     const session = await requireSession();
     const body = await req.json() as {
       entryId?: string;
