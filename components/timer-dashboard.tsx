@@ -1,18 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { db } from "@/lib/client/local-db";
 import { isAdminEmail } from "@/lib/admin";
 import { ProfileMenu } from "@/components/profile-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Play, Square, Pause, Plus, ChevronDown, Check, Activity, Clock, Settings2, Folder, Target, Briefcase, Tag } from "lucide-react";
+import { Play, Square, Plus, ChevronDown, Check, Activity, Clock, Settings2, Folder, Target, Briefcase } from "lucide-react";
 
 type CurrencyPayload = { payload?: { rates?: Record<string, number> } };
-type SessionState = { email: string; role: string; workspaceId: string } | null;
+type SessionState = { email: string; role: string; workspaceId: string; sub?: string } | null;
 type Project = { id: string; name: string };
 type Goal = { id: string; name: string };
 type Action = { id: string; name: string; hourlyRate?: number };
+
+type ActiveTimer = {
+  id: string;
+  taskId: string;
+  projectId?: string;
+  goalId?: string;
+  actionId?: string;
+  tags?: string[];
+  startedAt: string;
+};
 
 /** Format seconds as HH:MM:SS */
 function fmt(seconds: number) {
@@ -51,16 +61,17 @@ function PomodoroRing({ progress, isRunning }: { progress: number; isRunning: bo
 }
 
 export function TimerDashboard() {
-  const [taskId, setTaskId] = useState("TASK-1");
   const [workspaceSlug] = useState("default-workspace");
-  const [entryId, setEntryId] = useState<string | null>(null);
-  const [startedAt, setStartedAt] = useState<Date | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [pomodoroMinutes] = useState(25);
-  const [rates, setRates] = useState<Record<string, number>>({});
   const [session, setSession] = useState<SessionState>(null);
   
-  // Context states
+  // Timer State
+  const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
+  const [now, setNow] = useState(Date.now());
+  const [pomodoroMinutes] = useState(25);
+  const [rates, setRates] = useState<Record<string, number>>({});
+  
+  // Builder Context states
+  const [taskId, setTaskId] = useState("TASK-1");
   const [projectId, setProjectId] = useState("");
   const [goalId, setGoalId] = useState("");
   const [actionId, setActionId] = useState("");
@@ -77,11 +88,13 @@ export function TimerDashboard() {
   const [newProjectName, setNewProjectName] = useState("");
   const [newGoalName, setNewGoalName] = useState("");
 
-  const isRunning = Boolean(entryId && startedAt);
   const pomodoroTotal = pomodoroMinutes * 60;
-  const pomodoroRemaining = useMemo(() => Math.max(0, pomodoroTotal - elapsed), [elapsed, pomodoroTotal]);
-  const pomodoroProgress = Math.min(1, elapsed / pomodoroTotal);
-  const pomodoroDone = elapsed >= pomodoroTotal;
+  
+  // Tick
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function refreshSession() {
     try {
@@ -91,6 +104,32 @@ export function TimerDashboard() {
       else setSession(null);
     } catch {
       setSession(null);
+    }
+  }
+
+  async function fetchActiveTimers() {
+    try {
+      const res = await fetch("/api/timer/active");
+      if (res.ok) {
+        const data = await res.json() as { activeEntries: ActiveTimer[] };
+        const timers = (data.activeEntries || []).map((entry) => ({
+          ...entry,
+          tags: Array.isArray(entry.tags) ? entry.tags : []
+        }));
+        
+        // Sort descending by start time to show most recent first
+        timers.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+        setActiveTimers(timers);
+      }
+    } catch {
+      console.error("Failed to fetch active timers");
+      // Fallback: sync from IndexedDB
+      const localTimers = await db.draftTimers.getAll();
+      setActiveTimers(localTimers.map((t) => ({
+        id: t.id,
+        taskId: t.taskId,
+        startedAt: t.startedAt
+      })));
     }
   }
 
@@ -111,32 +150,11 @@ export function TimerDashboard() {
     }
   }
 
-  // Tick
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (startedAt) setElapsed(Math.floor((Date.now() - startedAt.getTime()) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [startedAt]);
-
-  // Idle detection
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.hidden && isRunning) {
-        toast.info("Idle detected", {
-          description: "Review whether to discard or reassign this time block when you return.",
-          duration: 10000,
-        });
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [isRunning]);
-
   // Load on mount
   useEffect(() => {
     refreshSession();
     loadProjectsAndGoals();
+    fetchActiveTimers();
   }, []);
 
   async function createProject() {
@@ -153,8 +171,8 @@ export function TimerDashboard() {
         setNewProjectName("");
         await loadProjectsAndGoals();
       } else throw new Error(data.error);
-    } catch (err: any) {
-      toast.error("Failed to create project", { description: err.message });
+    } catch (err) {
+      toast.error("Failed to create project", { description: (err as Error).message });
     }
   }
 
@@ -170,8 +188,8 @@ export function TimerDashboard() {
         const data = await res.json();
         throw new Error(data.error);
       }
-    } catch (err: any) {
-      toast.error("Failed to remove project", { description: err.message });
+    } catch (err) {
+      toast.error("Failed to remove project", { description: (err as Error).message });
     }
   }
 
@@ -189,8 +207,8 @@ export function TimerDashboard() {
         setNewGoalName("");
         await loadProjectsAndGoals();
       } else throw new Error(data.error);
-    } catch (err: any) {
-      toast.error("Failed to create goal", { description: err.message });
+    } catch (err) {
+      toast.error("Failed to create goal", { description: (err as Error).message });
     }
   }
 
@@ -206,14 +224,14 @@ export function TimerDashboard() {
         const data = await res.json();
         throw new Error(data.error);
       }
-    } catch (err: any) {
-      toast.error("Failed to remove goal", { description: err.message });
+    } catch (err) {
+      toast.error("Failed to remove goal", { description: (err as Error).message });
     }
   }
 
   async function startTimer() {
-    const started = new Date();
     try {
+      const tArray = tags.split(",").map((t) => t.trim()).filter(Boolean);
       const res = await fetch("/api/timer/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -223,36 +241,43 @@ export function TimerDashboard() {
           projectId: projectId || undefined,
           goalId: goalId || undefined,
           actionId: actionId || undefined,
-          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+          tags: tArray,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to start timer");
       
-      setEntryId(data.entry.id);
-      setStartedAt(started);
-      setElapsed(0);
+      const newTimer: ActiveTimer = {
+        id: data.entry.id,
+        taskId,
+        projectId: projectId || undefined,
+        goalId: goalId || undefined,
+        actionId: actionId || undefined,
+        tags: tArray,
+        startedAt: new Date().toISOString()
+      };
+      
+      setActiveTimers(prev => [newTimer, ...prev]);
       
       await db.draftTimers.put({
         id: data.entry.id,
         taskId,
         workspaceId: data.entry.workspaceId,
-        startedAt: started.toISOString(),
+        startedAt: newTimer.startedAt,
         pomodoroMinutes,
         lastSeenAt: new Date().toISOString(),
       });
       
       toast.success("Timer Started", { 
-        description: "Session is running and persisted locally.",
+        description: `Running ${taskId} concurrently.`,
         icon: <Play className="h-4 w-4 text-cyan-400" />
       });
-    } catch (err: any) {
-      toast.error("Could not start session", { description: err.message });
+    } catch (err) {
+      toast.error("Could not start session", { description: (err as Error).message });
     }
   }
 
-  async function stopTimer() {
-    if (!entryId) return;
+  async function stopTimer(entryId: string, silent = false) {
     try {
       const res = await fetch("/api/timer/stop", {
         method: "POST",
@@ -264,16 +289,16 @@ export function TimerDashboard() {
       if (!res.ok) throw new Error(data.error || "Failed to stop timer");
       
       await db.draftTimers.delete(entryId);
-      setEntryId(null);
-      setStartedAt(null);
-      setElapsed(0);
+      setActiveTimers(prev => prev.filter(t => t.id !== entryId));
       
-      toast.success("Session Logged", { 
-        description: `${data.durationSeconds}s recorded successfully to your timesheet.`,
-        icon: <Check className="h-4 w-4 text-emerald-400" />
-      });
-    } catch (err: any) {
-      toast.error("Could not stop session", { description: err.message });
+      if (!silent) {
+        toast.success("Session Logged", { 
+          description: `${data.durationSeconds}s recorded successfully.`,
+          icon: <Check className="h-4 w-4 text-emerald-400" />
+        });
+      }
+    } catch (err) {
+      toast.error("Could not stop session", { description: (err as Error).message });
     }
   }
 
@@ -283,15 +308,20 @@ export function TimerDashboard() {
       const data = (await res.json()) as CurrencyPayload;
       setRates(data.payload?.rates ?? {});
       toast.success("FX Rates Updated");
-    } catch (err) {
+    } catch {
       toast.error("Failed to fetch FX rates");
     }
   }
 
-  const selectedProject = projects.find((p) => p.id === projectId);
-  const selectedGoal = goals.find((g) => g.id === goalId);
-  const selectedAction = actions.find((a) => a.id === actionId);
   const activeTags = tags.split(",").map((t) => t.trim()).filter(Boolean);
+  const heroTimer = activeTimers[0] || null;
+  const secondaryTimers = activeTimers.slice(1);
+
+  // Compute hero states
+  const heroElapsed = heroTimer ? Math.max(0, Math.floor((now - new Date(heroTimer.startedAt).getTime()) / 1000)) : 0;
+  const heroPomodoroRemaining = Math.max(0, pomodoroTotal - heroElapsed);
+  const heroPomodoroProgress = Math.min(1, heroElapsed / pomodoroTotal);
+  const heroPomodoroDone = heroElapsed >= pomodoroTotal;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -311,7 +341,7 @@ export function TimerDashboard() {
 
         <div className="flex items-center gap-4">
           <AnimatePresence>
-            {isRunning && (
+            {activeTimers.length > 0 && (
               <motion.span 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -322,7 +352,7 @@ export function TimerDashboard() {
                   <span className="animate-ping shadow-lg shadow-emerald-400 absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                Live
+                {activeTimers.length} Live
               </motion.span>
             )}
           </AnimatePresence>
@@ -330,19 +360,57 @@ export function TimerDashboard() {
         </div>
       </nav>
 
-      {/* ─── Timer Hero ─── */}
+      {/* ─── Multiple Timer Stack ─── */}
+      <AnimatePresence>
+        {secondaryTimers.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex flex-col gap-2"
+          >
+            {secondaryTimers.map((timer) => {
+              const elap = Math.max(0, Math.floor((now - new Date(timer.startedAt).getTime()) / 1000));
+              const proj = projects.find(p => p.id === timer.projectId);
+              return (
+                <motion.div 
+                  key={timer.id}
+                  layout
+                  className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-5 py-3 backdrop-blur-md transition-all hover:bg-white/10"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="font-mono text-xl font-medium tracking-tight text-white">{fmt(elap)}</span>
+                    <div className="hidden sm:flex flex-col">
+                      <span className="text-sm font-semibold text-slate-200">{timer.taskId}</span>
+                      {proj && <span className="text-[10px] uppercase tracking-wider text-cyan-400/80">{proj.name}</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => stopTimer(timer.id)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors"
+                  >
+                    <Square className="h-4 w-4" />
+                  </button>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Hero Active Timer OR Empty Placeholder ─── */}
       <motion.div 
         layout
         className="relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-2xl"
       >
         <AnimatePresence>
-          {isRunning && (
+          {heroTimer && (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="pointer-events-none absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-transparent to-transparent opacity-50 mix-blend-screen" 
             />
           )}
-          {pomodoroDone && isRunning && (
+          {heroTimer && heroPomodoroDone && (
              <motion.div 
              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
              className="pointer-events-none absolute inset-0 bg-gradient-to-b from-violet-500/10 via-transparent to-transparent opacity-50 mix-blend-screen" 
@@ -351,20 +419,19 @@ export function TimerDashboard() {
         </AnimatePresence>
 
         <div className="flex flex-col items-center gap-8 px-6 py-12 sm:py-16">
-          {/* Ring + time */}
           <div className="relative flex h-56 w-56 items-center justify-center sm:h-72 sm:w-72">
-            <PomodoroRing progress={pomodoroProgress} isRunning={isRunning} />
+            <PomodoroRing progress={heroTimer ? heroPomodoroProgress : 0} isRunning={!!heroTimer} />
             <motion.div layout className="z-10 flex flex-col items-center">
-              <span className={`font-mono text-6xl font-light tabular-nums tracking-tighter sm:text-7xl transition-colors duration-500 ${isRunning ? "text-white" : "text-slate-500"}`}>
-                {fmt(elapsed)}
+              <span className={`font-mono text-6xl font-light tabular-nums tracking-tighter sm:text-7xl transition-colors duration-500 ${heroTimer ? "text-white" : "text-slate-500"}`}>
+                {fmt(heroElapsed)}
               </span>
               <AnimatePresence mode="popLayout">
-                {isRunning ? (
+                {heroTimer ? (
                   <motion.span 
                     initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                    className={`mt-2 text-xs font-medium ${pomodoroDone ? "text-violet-400" : "text-cyan-400"}`}
+                    className={`mt-2 text-xs font-medium ${heroPomodoroDone ? "text-violet-400" : "text-cyan-400"}`}
                   >
-                    {pomodoroDone ? "🍅 Pomodoro complete!" : `${fmt(pomodoroRemaining)} remaining`}
+                    {heroPomodoroDone ? "🍅 Pomodoro complete!" : `${fmt(heroPomodoroRemaining)} remaining`}
                   </motion.span>
                 ) : (
                   <motion.span 
@@ -378,40 +445,36 @@ export function TimerDashboard() {
             </motion.div>
           </div>
 
-          {/* Context summary pills */}
           <div className="flex max-w-lg flex-wrap justify-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-slate-300">
-              <Briefcase className="h-3 w-3" /> {taskId}
+              <Briefcase className="h-3 w-3" /> {heroTimer ? heroTimer.taskId : taskId}
             </span>
-            {selectedProject && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-cyan-300">
-                <Folder className="h-3 w-3" /> {selectedProject.name}
-              </span>
-            )}
-            {selectedGoal && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-violet-300">
-                <Target className="h-3 w-3" /> {selectedGoal.name}
-              </span>
-            )}
-            {selectedAction && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-emerald-300">
-                <Activity className="h-3 w-3" /> {selectedAction.name} {selectedAction.hourlyRate !== undefined && `($${selectedAction.hourlyRate}/hr)`}
-              </span>
-            )}
-            {activeTags.map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-1 rounded-full border border-slate-700/50 bg-slate-800/40 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                <Tag className="h-3 w-3" /> {tag}
-              </span>
-            ))}
+            {(() => {
+              const pId = heroTimer ? heroTimer.projectId : projectId;
+              const proj = projects.find(x => x.id === pId);
+              return proj ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-cyan-300">
+                  <Folder className="h-3 w-3" /> {proj.name}
+                </span>
+              ) : null;
+            })()}
+            {(() => {
+              const gId = heroTimer ? heroTimer.goalId : goalId;
+              const g = goals.find(x => x.id === gId);
+              return g ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-violet-300">
+                  <Target className="h-3 w-3" /> {g.name}
+                </span>
+              ) : null;
+            })()}
           </div>
 
-          {/* Action Button */}
           <div className="mt-2 flex">
-            {isRunning ? (
+            {heroTimer ? (
               <motion.button
                 whileHover={{ scale: 1.02, backgroundColor: "rgb(225, 29, 72)" }}
                 whileTap={{ scale: 0.98 }}
-                onClick={stopTimer}
+                onClick={() => stopTimer(heroTimer.id)}
                 className="group flex items-center gap-3 rounded-2xl bg-rose-500 px-10 py-4 text-sm font-semibold tracking-wide text-white shadow-xl shadow-rose-500/20 transition-all hover:shadow-rose-500/40 border border-rose-400/50"
               >
                 <Square className="h-4 w-4 fill-white flex-shrink-0" />
@@ -435,17 +498,28 @@ export function TimerDashboard() {
 
       {/* ─── Forms / Context ─── */}
       <motion.div layout className="grid gap-6 sm:grid-cols-2">
-        {/* Task & Tags Form */}
         <div className="group rounded-3xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-3xl shadow-2xl transition hover:bg-white/[0.03]">
-          <div className="mb-6 flex items-center gap-2">
-            <div className="rounded-lg bg-white/5 p-2"><Clock className="h-4 w-4 text-slate-400" /></div>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Focal Context</h2>
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-white/5 p-2"><Clock className="h-4 w-4 text-slate-400" /></div>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Configure Next Timer</h2>
+            </div>
+            {heroTimer && (
+              <button 
+                onClick={startTimer}
+                title="Start a secondary, concurrent timer against these contexts"
+                className="flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 p-2 hover:bg-cyan-500/20 transition"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
           </div>
           
           <div className="space-y-5">
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400">Task Reference / ID</label>
+              <label htmlFor="taskId" className="mb-2 block text-xs font-medium text-slate-400">Task Reference / ID</label>
               <input
+                id="taskId"
                 value={taskId}
                 onChange={(e) => setTaskId(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
@@ -453,8 +527,9 @@ export function TimerDashboard() {
               />
             </div>
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400">Activity Tags</label>
+              <label htmlFor="tags" className="mb-2 block text-xs font-medium text-slate-400">Activity Tags</label>
               <input
+                id="tags"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
@@ -463,8 +538,8 @@ export function TimerDashboard() {
               {workspaceTags.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {workspaceTags.map((t) => {
-                    const isActive = activeTags.includes(t);
-                    return (
+                     const isActive = activeTags.includes(t);
+                     return (
                       <button
                         key={t}
                         onClick={() => {
@@ -488,7 +563,6 @@ export function TimerDashboard() {
           </div>
         </div>
 
-        {/* Assignments Form */}
         <div className="group rounded-3xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-3xl shadow-2xl transition hover:bg-white/[0.03]">
           <div className="mb-6 flex items-center gap-2">
             <div className="rounded-lg bg-white/5 p-2"><Target className="h-4 w-4 text-slate-400" /></div>
@@ -497,8 +571,9 @@ export function TimerDashboard() {
           
           <div className="space-y-4">
             <div className="relative">
-              <label className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Project Workspace</label>
+              <label htmlFor="projectId" className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Project Workspace</label>
               <select
+                id="projectId"
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
                 className="w-full appearance-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
@@ -510,8 +585,9 @@ export function TimerDashboard() {
             </div>
             
             <div className="relative">
-              <label className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Billing Goal</label>
+              <label htmlFor="goalId" className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Billing Goal</label>
               <select
+                id="goalId"
                 value={goalId}
                 onChange={(e) => setGoalId(e.target.value)}
                 className="w-full appearance-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
@@ -523,8 +599,9 @@ export function TimerDashboard() {
             </div>
 
             <div className="relative">
-              <label className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Action Rate Card</label>
+              <label htmlFor="actionId" className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Action Rate Card</label>
               <select
+                id="actionId"
                 value={actionId}
                 onChange={(e) => setActionId(e.target.value)}
                 className="w-full appearance-none rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-100 transition focus:border-emerald-500/50 focus:bg-emerald-500/10 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
@@ -541,6 +618,7 @@ export function TimerDashboard() {
       {/* ─── Manage Defaults (Collapsible) ─── */}
       <motion.div layout className="rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-2xl overflow-hidden">
         <button
+          title="Preferences"
           onClick={() => setShowConfig((v) => !v)}
           className="group flex w-full items-center justify-between px-6 py-5 text-left transition hover:bg-white/[0.02]"
         >
@@ -562,9 +640,10 @@ export function TimerDashboard() {
               <div className="grid gap-8 p-6 sm:grid-cols-3">
                 {/* New Project */}
                 <div>
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Create New Project</p>
+                  <label htmlFor="newProjectName" className="mb-3 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Create New Project</label>
                   <div className="flex gap-2 relative">
                     <input
+                      id="newProjectName"
                       value={newProjectName}
                       onChange={(e) => setNewProjectName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && createProject()}
@@ -572,6 +651,7 @@ export function TimerDashboard() {
                       className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 pl-4 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none"
                     />
                     <button
+                      title="Create Project"
                       onClick={createProject}
                       className="absolute right-1.5 top-1.5 bottom-1.5 w-8 flex items-center justify-center rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 transition"
                     >
@@ -587,9 +667,10 @@ export function TimerDashboard() {
 
                 {/* New Goal */}
                 <div>
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Create Goal</p>
+                  <label htmlFor="newGoalName" className="mb-3 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Create Goal</label>
                   <div className="flex gap-2 relative">
                     <input
+                      id="newGoalName"
                       value={newGoalName}
                       onChange={(e) => setNewGoalName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && createGoal()}
@@ -597,6 +678,7 @@ export function TimerDashboard() {
                       className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 pl-4 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none"
                     />
                     <button
+                      title="Create Goal"
                       onClick={createGoal}
                       className="absolute right-1.5 top-1.5 bottom-1.5 w-8 flex items-center justify-center rounded-lg bg-violet-500 hover:bg-violet-400 text-white transition"
                     >

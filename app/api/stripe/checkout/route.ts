@@ -45,8 +45,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: checkoutSession.url });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Stripe checkout error:", error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
 }

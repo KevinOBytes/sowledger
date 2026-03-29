@@ -5,7 +5,7 @@ import { workspaces } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 
-export async function POST(req: Request) {
+export async function POST() {
   try {
     const session = await requireSession();
     
@@ -28,8 +28,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: portalSession.url });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Stripe portal error:", error);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
 }

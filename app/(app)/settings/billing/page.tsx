@@ -14,7 +14,7 @@ type BillingData = {
 };
 
 export default function BillingPage() {
-  const router = useRouter();
+  // const router = useRouter();
   const [data, setData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);

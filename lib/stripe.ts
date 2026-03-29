@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { env } from "./env";
 
 export const stripe = new Stripe(env.STRIPE_SECRET_KEY || "sk_test_dummy", {
-  apiVersion: "2025-02-24.acacia" as any, // fallback to ignore type error if SDK demands different version
+  apiVersion: "2026-02-25.clover",
   typescript: true,
   appInfo: {
     name: "Billabled",

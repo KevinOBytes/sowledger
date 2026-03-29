@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env' });
-import { neon } from "@neondatabase/serverless";
+// import { neon } from "@neondatabase/serverless";
 import { db } from "./lib/db/index";
 import { users } from "./lib/db/schema";
 import { eq } from "drizzle-orm";

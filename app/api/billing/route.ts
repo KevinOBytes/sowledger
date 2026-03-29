@@ -32,7 +32,7 @@ export async function GET() {
       }
     });
 
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to load billing info" }, { status: 400 });
   }
 }

@@ -25,9 +25,9 @@ export async function POST(req: Request) {
       signature,
       env.STRIPE_WEBHOOK_SECRET || "whsec_dummy"
     );
-  } catch (error: any) {
-    console.error("Webhook signature verification failed.", error.message);
-    return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
+  } catch (error) {
+    console.error("Webhook signature verification failed.", (error as Error).message);
+    return new NextResponse(`Webhook Error: ${(error as Error).message}`, { status: 400 });
   }
 
   const session = event.data.object as Stripe.Checkout.Session;

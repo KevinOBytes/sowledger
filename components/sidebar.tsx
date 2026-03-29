@@ -31,6 +31,7 @@ export function Sidebar() {
 
   const navItems = [
     { name: "Timer", href: "/dashboard", icon: Clock },
+    { name: "Activity", href: "/activity", icon: CalendarDays },
     { name: "Projects", href: "/projects", icon: FolderKanban },
     { name: "Planner", href: "/planner", icon: Users },
     { name: "Reports", href: "/reports", icon: BarChart3 },

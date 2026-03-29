@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
       from: env.RESEND_LOGIN_FROM,
       note: "Send verifyUrl with Resend from logins@kevinbytes.com in production.",
     });
-  } catch (error: any) {
-    const errorMsg = error.cause ? `${error.message} | Cause: ${error.cause.message}` : error.message;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: errorMsg }, { status: 500 });
   }
 }

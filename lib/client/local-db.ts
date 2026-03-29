@@ -46,5 +46,20 @@ export const db = {
       });
       connection.close();
     },
+    async getAll(): Promise<DraftTimer[]> {
+      const connection = await openDb();
+      return new Promise((resolve, reject) => {
+        const tx = connection.transaction(STORE_NAME, "readonly");
+        const request = tx.objectStore(STORE_NAME).getAll();
+        request.onsuccess = () => {
+          resolve(request.result as DraftTimer[]);
+          connection.close();
+        };
+        request.onerror = () => {
+          reject(request.error);
+          connection.close();
+        };
+      });
+    },
   },
 };

@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.metadata?.workspaceId) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as any;
           
           let planData = "pro";
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "customer.subscription.updated": {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const subscription = event.data.object as any;
         const customerId = subscription.customer as string;
 

@@ -34,8 +34,8 @@ export function CreateProjectButton() {
       setIsOpen(false);
       setName("");
       router.refresh(); // Refresh the Server Component data
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
