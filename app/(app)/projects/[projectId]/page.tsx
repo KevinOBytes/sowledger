@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { KanbanBoard } from "@/components/kanban-board";
 import { ActivityFeed } from "@/components/activity-feed";
 import { ProjectActions } from "@/components/project-actions";
+import { ProjectFinancials } from "@/components/project-financials";
 import Link from "next/link";
 import { ChevronLeft, Activity, LayoutDashboard, Archive } from "lucide-react";
 
@@ -55,6 +56,8 @@ export default async function ProjectBoardPage({
             </div>
         </div>
         <p className="mt-2 text-sm text-slate-400">Manage tasks across execution stages and review chronological activity.</p>
+        
+        <ProjectFinancials projectId={project.id} />
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-6 mt-8 border-b border-white/10 px-2">

@@ -30,11 +30,32 @@ export const memberships = pgTable("memberships", {
   pk: primaryKey({ columns: [table.workspaceId, table.userId] }),
 }));
 
-export const projects = pgTable("projects", {
+export const clients = pgTable("clients", {
   id: varchar("id", { length: 255 }).primaryKey(),
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  address: text("address"),
+  currencyOverride: varchar("currency_override", { length: 10 }),
+  status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const projects = pgTable("projects", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id", { length: 255 }).references(() => clients.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 50 }).notNull().default("#3b82f6"),
   billingModel: varchar("billing_model", { enum: ["hourly", "fixed_fee", "hybrid"] }).notNull().default("hourly"),
+  hourlyRate: real("hourly_rate"),
+  budgetType: varchar("budget_type", { enum: ["hours", "fees", "none"] }).notNull().default("none"),
+  budgetAmount: real("budget_amount"),
+  budgetAlertThreshold: real("budget_alert_threshold").notNull().default(80),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  isPrivate: boolean("is_private").notNull().default(false),
   status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
   percentComplete: real("percent_complete").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -44,8 +65,13 @@ export const goals = pgTable("goals", {
   id: varchar("id", { length: 255 }).primaryKey(),
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   projectId: varchar("project_id", { length: 255 }),
+  assignedUserId: varchar("assigned_user_id", { length: 255 }),
   name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  recurrence: varchar("recurrence", { enum: ["none", "weekly", "monthly", "quarterly", "yearly"] }).notNull().default("none"),
   targetHours: real("target_hours"),
+  targetAmount: real("target_amount"),
+  targetType: varchar("target_type", { enum: ["hours", "amount"] }).notNull().default("hours"),
   dueDate: timestamp("due_date"),
   completed: boolean("completed").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -168,6 +194,9 @@ export const webhooks = pgTable("webhooks", {
 export const workspaceTags = pgTable("workspace_tags", {
   id: varchar("id", { length: 255 }).primaryKey(),
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id", { length: 255 }),
   name: varchar("name", { length: 255 }).notNull(),
   color: varchar("color", { length: 50 }).notNull().default("#3b82f6"),
+  isBillableDefault: boolean("is_billable_default").notNull().default(true),
+  status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { memberships, users, projectTasks } from "@/lib/db/schema";
+import { memberships, users, projectTasks, goals } from "@/lib/db/schema";
 import { eq, ne, and } from "drizzle-orm";
 
 export async function GET() {
@@ -33,7 +33,14 @@ export async function GET() {
       )
     );
 
-    return NextResponse.json({ ok: true, members, tasks });
+    const workspaceGoals = await db.select().from(goals).where(
+      and(
+        eq(goals.workspaceId, workspaceId),
+        eq(goals.completed, false)
+      )
+    );
+
+    return NextResponse.json({ ok: true, members, tasks, goals: workspaceGoals });
   } catch (error) {
     const err = error as Record<string, unknown>;
     const status = err.code === "FORBIDDEN" || err.status === 403 ? 403 : 401;

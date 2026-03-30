@@ -5,10 +5,21 @@ import { ProjectTask } from "@/lib/store";
 import { Users, Clock, AlertTriangle } from "lucide-react";
 
 type Member = { id: string; email: string; displayName?: string };
+type WorkspaceGoal = {
+  id: string;
+  name: string;
+  assignedUserId: string | null;
+  targetType: "hours" | "amount";
+  targetHours: number | null;
+  targetAmount: number | null;
+  recurrence: string;
+  dueDate: string | null;
+};
 
 export function ResourcePlanner() {
   const [members, setMembers] = useState<Member[]>([]);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  const [goals, setGoals] = useState<WorkspaceGoal[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,6 +29,7 @@ export function ResourcePlanner() {
         const data = await res.json();
         setMembers(data.members || []);
         setTasks(data.tasks || []);
+        setGoals(data.goals || []);
       }
       setLoading(false);
     }
@@ -31,8 +43,9 @@ export function ResourcePlanner() {
   // Create a bucket for each member plus one for "Unassigned"
   const memberBuckets = members.map((m) => {
     const assignedTasks = tasks.filter((t) => t.assigneeId === m.id);
-    const totalHours = assignedTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
-    return { ...m, assignedTasks, totalHours };
+    const assignedGoals = goals.filter((g) => g.assignedUserId === m.id);
+    const totalHours = assignedTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0) + assignedGoals.reduce((sum, g) => sum + (g.targetType === "hours" ? (g.targetHours || 0) : 0), 0);
+    return { ...m, assignedTasks, assignedGoals, totalHours };
   });
 
   const unassignedTasks = tasks.filter((t) => !t.assigneeId);
@@ -81,13 +94,40 @@ export function ResourcePlanner() {
                     </div>
                     <div className={`px-2 py-1 rounded-md text-sm font-bold flex items-center gap-1 ${isOverloaded ? 'bg-rose-500/10 text-rose-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
                         {isOverloaded && <AlertTriangle className="h-3 w-3" />}
-                        {bucket.totalHours} hrs {bucket.assignedTasks.length > 0 && ` / ${bucket.assignedTasks.length} act`}
+                        {bucket.totalHours} hrs {bucket.assignedTasks.length > 0 && ` / ${bucket.assignedTasks.length} act`} {bucket.assignedGoals.length > 0 && ` / ${bucket.assignedGoals.length} goals`}
                     </div>
                  </div>
                  <div className="p-4 space-y-3">
-                     {bucket.assignedTasks.length === 0 && (
-                         <div className="text-sm text-slate-500 italic py-4 text-center border border-dashed border-slate-800 rounded-lg">No active assignments</div>
+                     {bucket.assignedTasks.length === 0 && bucket.assignedGoals.length === 0 && (
+                         <div className="text-sm text-slate-500 italic py-4 text-center border border-dashed border-slate-800 rounded-lg">No active assignments or goals</div>
                      )}
+                     
+                     {/* Goals Section */}
+                     {bucket.assignedGoals.length > 0 && (
+                         <div className="mb-4">
+                             <h5 className="text-[10px] uppercase font-bold text-slate-500 mb-2 tracking-wider">Active Goals</h5>
+                             <div className="space-y-2">
+                                 {bucket.assignedGoals.map((g: WorkspaceGoal) => (
+                                     <div key={g.id} className="flex justify-between items-start gap-4 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 shadow-sm">
+                                         <div>
+                                            <p className="text-sm text-indigo-300 font-medium line-clamp-2">{g.name}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                {g.recurrence !== 'none' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-indigo-900/50 text-indigo-300 tracking-wider flex items-center gap-1">{g.recurrence}</span>}
+                                                {g.dueDate && <span className="text-[10px] text-slate-400 font-medium">Due: {new Date(g.dueDate).toLocaleDateString()}</span>}
+                                            </div>
+                                         </div>
+                                         <span className="text-xs font-mono font-bold text-indigo-400 shrink-0">{g.targetType === 'hours' ? `${g.targetHours || 0}h` : `$${g.targetAmount || 0}`}</span>
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
+                     )}
+
+                     {/* Tasks Section */}
+                     {bucket.assignedTasks.length > 0 && (
+                         <div>
+                             <h5 className="text-[10px] uppercase font-bold text-slate-500 mb-2 tracking-wider">Assigned Tasks</h5>
+                             <div className="space-y-2">
                      {bucket.assignedTasks.map((t) => (
                          <div key={t.id} className="flex flex-col gap-1 p-3 rounded-xl bg-slate-900 border border-white/5 shadow-sm">
                              <div className="flex justify-between items-start gap-4">
@@ -102,6 +142,9 @@ export function ResourcePlanner() {
                              </div>
                          </div>
                      ))}
+                             </div>
+                         </div>
+                     )}
                  </div>
                </div>
              )

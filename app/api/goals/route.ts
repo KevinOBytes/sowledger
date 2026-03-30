@@ -32,7 +32,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json() as {
       name?: string;
       projectId?: string;
+      assignedUserId?: string;
+      description?: string;
+      recurrence?: "none" | "weekly" | "monthly" | "quarterly" | "yearly";
       targetHours?: number;
+      targetAmount?: number;
+      targetType?: "hours" | "amount";
       dueDate?: string;
     };
 
@@ -50,7 +55,12 @@ export async function POST(req: NextRequest) {
       workspaceId: session.workspaceId,
       name: body.name,
       projectId: body.projectId || null,
+      assignedUserId: body.assignedUserId || null,
+      description: body.description || null,
+      recurrence: body.recurrence || "none",
       targetHours: body.targetHours || null,
+      targetAmount: body.targetAmount || null,
+      targetType: body.targetType || "hours",
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
       completed: false,
     };
@@ -71,7 +81,12 @@ export async function PATCH(req: NextRequest) {
       goalId?: string;
       name?: string;
       projectId?: string | null;
+      assignedUserId?: string | null;
+      description?: string | null;
+      recurrence?: "none" | "weekly" | "monthly" | "quarterly" | "yearly";
       targetHours?: number | null;
+      targetAmount?: number | null;
+      targetType?: "hours" | "amount";
       dueDate?: string | null;
       completed?: boolean;
     };
@@ -93,7 +108,12 @@ export async function PATCH(req: NextRequest) {
     const updates: Partial<typeof goals.$inferInsert> = {};
     if (body.name !== undefined) updates.name = body.name;
     if (body.projectId !== undefined) updates.projectId = body.projectId;
+    if (body.assignedUserId !== undefined) updates.assignedUserId = body.assignedUserId;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.recurrence !== undefined) updates.recurrence = body.recurrence;
     if (body.targetHours !== undefined) updates.targetHours = body.targetHours;
+    if (body.targetAmount !== undefined) updates.targetAmount = body.targetAmount;
+    if (body.targetType !== undefined) updates.targetType = body.targetType;
     if (body.dueDate !== undefined) updates.dueDate = body.dueDate ? new Date(body.dueDate) : null;
     if (body.completed !== undefined) updates.completed = body.completed;
 

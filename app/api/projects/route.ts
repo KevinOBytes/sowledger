@@ -33,6 +33,16 @@ export async function POST(req: NextRequest) {
       name?: string;
       billingModel?: "hourly" | "fixed_fee" | "hybrid";
       percentComplete?: number;
+      clientId?: string;
+      description?: string;
+      color?: string;
+      hourlyRate?: number;
+      budgetType?: "hours" | "fees" | "none";
+      budgetAmount?: number;
+      budgetAlertThreshold?: number;
+      startDate?: string;
+      endDate?: string;
+      isPrivate?: boolean;
     };
 
     if (!body.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -46,8 +56,18 @@ export async function POST(req: NextRequest) {
     const newProject = {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
+      clientId: body.clientId || null,
       name: body.name,
+      description: body.description || null,
+      color: body.color || "#3b82f6",
       billingModel: body.billingModel ?? "hourly",
+      hourlyRate: body.hourlyRate || null,
+      budgetType: body.budgetType || "none",
+      budgetAmount: body.budgetAmount || null,
+      budgetAlertThreshold: body.budgetAlertThreshold ?? 80,
+      startDate: body.startDate ? new Date(body.startDate) : null,
+      endDate: body.endDate ? new Date(body.endDate) : null,
+      isPrivate: body.isPrivate ?? false,
       percentComplete: Math.max(0, Math.min(100, body.percentComplete ?? 0)),
     };
 
@@ -66,7 +86,17 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json() as {
       projectId?: string;
       name?: string;
+      clientId?: string;
+      description?: string;
+      color?: string;
       billingModel?: "hourly" | "fixed_fee" | "hybrid";
+      hourlyRate?: number;
+      budgetType?: "hours" | "fees" | "none";
+      budgetAmount?: number;
+      budgetAlertThreshold?: number;
+      startDate?: string;
+      endDate?: string;
+      isPrivate?: boolean;
       status?: "active" | "archived";
       percentComplete?: number;
     };
@@ -80,7 +110,17 @@ export async function PATCH(req: NextRequest) {
 
     const updates: Partial<typeof projects.$inferInsert> = {};
     if (body.name !== undefined) updates.name = body.name;
+    if (body.clientId !== undefined) updates.clientId = body.clientId;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.color !== undefined) updates.color = body.color;
     if (body.billingModel !== undefined) updates.billingModel = body.billingModel;
+    if (body.hourlyRate !== undefined) updates.hourlyRate = body.hourlyRate;
+    if (body.budgetType !== undefined) updates.budgetType = body.budgetType;
+    if (body.budgetAmount !== undefined) updates.budgetAmount = body.budgetAmount;
+    if (body.budgetAlertThreshold !== undefined) updates.budgetAlertThreshold = body.budgetAlertThreshold;
+    if (body.startDate !== undefined) updates.startDate = body.startDate ? new Date(body.startDate) : null;
+    if (body.endDate !== undefined) updates.endDate = body.endDate ? new Date(body.endDate) : null;
+    if (body.isPrivate !== undefined) updates.isPrivate = body.isPrivate;
     if (body.status !== undefined) updates.status = body.status;
     if (body.percentComplete !== undefined) updates.percentComplete = Math.max(0, Math.min(100, body.percentComplete));
 
