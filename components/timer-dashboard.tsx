@@ -67,7 +67,7 @@ export function TimerDashboard() {
   // Timer State
   const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
   const [now, setNow] = useState(Date.now());
-  const [pomodoroMinutes] = useState(25);
+  const [pomodoroMinutes, setPomodoroMinutes] = useState(0);
   const [rates, setRates] = useState<Record<string, number>>({});
   
   // Builder Context states
@@ -319,9 +319,10 @@ export function TimerDashboard() {
 
   // Compute hero states
   const heroElapsed = heroTimer ? Math.max(0, Math.floor((now - new Date(heroTimer.startedAt).getTime()) / 1000)) : 0;
-  const heroPomodoroRemaining = Math.max(0, pomodoroTotal - heroElapsed);
-  const heroPomodoroProgress = Math.min(1, heroElapsed / pomodoroTotal);
-  const heroPomodoroDone = heroElapsed >= pomodoroTotal;
+  const isPomodoro = pomodoroTotal > 0;
+  const heroPomodoroRemaining = isPomodoro ? Math.max(0, pomodoroTotal - heroElapsed) : 0;
+  const heroPomodoroProgress = isPomodoro ? Math.min(1, heroElapsed / pomodoroTotal) : (heroElapsed % 3600) / 3600; // Loops every hour for unlimited
+  const heroPomodoroDone = isPomodoro ? heroElapsed >= pomodoroTotal : false;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -429,9 +430,13 @@ export function TimerDashboard() {
                 {heroTimer ? (
                   <motion.span 
                     initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                    className={`mt-2 text-xs font-medium ${heroPomodoroDone ? "text-violet-400" : "text-cyan-400"}`}
+                    className={`mt-2 text-xs font-medium ${heroPomodoroDone && isPomodoro ? "text-violet-400" : "text-cyan-400"}`}
                   >
-                    {heroPomodoroDone ? "🍅 Pomodoro complete!" : `${fmt(heroPomodoroRemaining)} remaining`}
+                    {!isPomodoro 
+                      ? "⏱️ Tracking active" 
+                      : heroPomodoroDone 
+                        ? "🍅 Pomodoro complete!" 
+                        : `${fmt(heroPomodoroRemaining)} remaining`}
                   </motion.span>
                 ) : (
                   <motion.span 
@@ -504,27 +509,32 @@ export function TimerDashboard() {
               <div className="rounded-lg bg-white/5 p-2"><Clock className="h-4 w-4 text-slate-400" /></div>
               <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Configure Next Timer</h2>
             </div>
-            {heroTimer && (
-              <button 
-                onClick={startTimer}
-                title="Start a secondary, concurrent timer against these contexts"
-                className="flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 p-2 hover:bg-cyan-500/20 transition"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            )}
           </div>
           
           <div className="space-y-5">
-            <div>
-              <label htmlFor="taskId" className="mb-2 block text-xs font-medium text-slate-400">Task Reference / ID</label>
-              <input
-                id="taskId"
-                value={taskId}
-                onChange={(e) => setTaskId(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-                placeholder="Ex: TKO-101"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="taskId" className="mb-2 block text-xs font-medium text-slate-400">Task Reference / ID</label>
+                <input
+                  id="taskId"
+                  value={taskId}
+                  onChange={(e) => setTaskId(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                  placeholder="Ex: TKO-101"
+                />
+              </div>
+              <div>
+                <label htmlFor="pomodoroMinutes" className="mb-2 block text-xs font-medium text-slate-400">Target Time (Minutes) - 0 for continuous</label>
+                <input
+                  id="pomodoroMinutes"
+                  type="number"
+                  min="0"
+                  max="480"
+                  value={pomodoroMinutes}
+                  onChange={(e) => setPomodoroMinutes(parseInt(e.target.value) || 0)}
+                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                />
+              </div>
             </div>
             <div>
               <label htmlFor="tags" className="mb-2 block text-xs font-medium text-slate-400">Activity Tags</label>
@@ -560,6 +570,17 @@ export function TimerDashboard() {
                 </div>
               )}
             </div>
+            {heroTimer && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={startTimer}
+                className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-cyan-500/10 px-4 py-3 text-sm font-semibold tracking-wide text-cyan-400 shadow-xl shadow-cyan-500/5 transition-all hover:bg-cyan-500/20 border border-cyan-500/20"
+              >
+                <Plus className="relative h-4 w-4" />
+                <span className="relative">Start Concurrent Timer</span>
+              </motion.button>
+            )}
           </div>
         </div>
 

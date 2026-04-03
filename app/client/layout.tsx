@@ -2,7 +2,7 @@ import { requireSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { LogOut, Zap } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   let session;

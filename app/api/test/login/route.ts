@@ -25,11 +25,18 @@ export async function GET(request: Request) {
     // Set the requested plan for paywall testing
     await db.update(workspaces).set({ plan }).where(eq(workspaces.id, workspace.id));
     
-    // Cleanup prior test state to prevent 402 limits limits
-    const { projects, projectTasks, timeEntries } = await import("@/lib/db/schema");
-    await db.delete(projectTasks).where(eq(projectTasks.workspaceId, workspace.id));
-    await db.delete(projects).where(eq(projects.workspaceId, workspace.id));
-    await db.delete(timeEntries).where(eq(timeEntries.workspaceId, workspace.id));
+    // Cleanup prior test state to prevent constraint errors and 402 limits
+    const { projects, projectTasks, timeEntries, goals, clients, workspaceTags } = await import("@/lib/db/schema");
+    
+    if (searchParams.get("clean") === "true") {
+      // Delete leaf nodes first to satisfy foreign key constraints
+      await db.delete(timeEntries).where(eq(timeEntries.workspaceId, workspace.id));
+      await db.delete(projectTasks).where(eq(projectTasks.workspaceId, workspace.id));
+      await db.delete(goals).where(eq(goals.workspaceId, workspace.id));
+      await db.delete(projects).where(eq(projects.workspaceId, workspace.id));
+      await db.delete(clients).where(eq(clients.workspaceId, workspace.id));
+      await db.delete(workspaceTags).where(eq(workspaceTags.workspaceId, workspace.id));
+    }
     
     await setSessionCookie({
       sub: user.id,
@@ -40,6 +47,7 @@ export async function GET(request: Request) {
     
     return NextResponse.json({ success: true, userId: user.id, workspaceId: workspace.id });
   } catch (error) {
+    console.error("Test login error:", error);
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }

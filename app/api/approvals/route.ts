@@ -1,17 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { timeEntries, users, projects } from "@/lib/db/schema";
 import { eq, and, notInArray, desc } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await requireSession();
     // Only managers/owners can view approvals
     requireRole("manager", session.role);
 
+    const statusFilter = req.nextUrl.searchParams.get("status");
+
+    let condition = eq(timeEntries.workspaceId, session.workspaceId);
+    if (statusFilter !== "all") {
+      condition = and(condition, notInArray(timeEntries.status, ["approved", "invoiced"]))!;
+    }
+
     const pendingEntriesData = await db.select().from(timeEntries)
-      .where(and(eq(timeEntries.workspaceId, session.workspaceId), notInArray(timeEntries.status, ["approved", "invoiced"])))
+      .where(condition)
       .orderBy(desc(timeEntries.startedAt));
 
     const workspaceUsers = await db.select().from(users); 

@@ -135,8 +135,9 @@ export function CreateProjectButton() {
                   <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
                     
                     <div>
-                      <label className="mb-1.5 block text-sm font-medium text-slate-300">Project Name</label>
+                      <label htmlFor="projectName" className="mb-1.5 block text-sm font-medium text-slate-300">Project Name</label>
                       <input
+                        id="projectName"
                         autoFocus
                         type="text"
                         placeholder="e.g. Acme Website Redesign"

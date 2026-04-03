@@ -162,9 +162,21 @@ export function ResourcePlanner() {
                 </div>
              </div>
              <div className="p-4 space-y-3">
-                 {unassignedTasks.length === 0 && (
+                 {unassignedTasks.length === 0 && goals.filter(g => !g.assignedUserId).length === 0 && (
                      <div className="text-sm text-slate-600 italic py-4 text-center">Backlog is completely empty!</div>
                  )}
+
+                 {/* Unassigned Goals */}
+                 {goals.filter(g => !g.assignedUserId).map(g => (
+                     <div key={g.id} className="flex justify-between items-start gap-4 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 shadow-sm">
+                         <div>
+                             <p className="text-sm text-indigo-300 font-medium line-clamp-2">{g.name}</p>
+                             <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Goal</p>
+                         </div>
+                     </div>
+                 ))}
+
+                 {/* Unassigned Tasks */}
                  {unassignedTasks.slice(0, 10).map((t) => (
                      <div key={t.id} className="flex justify-between items-start gap-4 p-3 rounded-xl bg-[#050914] border border-white/5">
                          <p className="text-sm text-slate-400 font-medium line-clamp-1">{t.title}</p>

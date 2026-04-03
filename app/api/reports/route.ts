@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { timeEntries, projects, users } from "@/lib/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, inArray } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     const projectMap = new Map(projectList.map(p => [p.id, p]));
 
     const userIds = Object.keys(byUser);
-    const userList = userIds.length > 0 ? await db.select().from(users) : [];
+    const userList = userIds.length > 0 ? await db.select().from(users).where(inArray(users.id, userIds)) : [];
     const userMap = new Map(userList.map(u => [u.id, u]));
 
     const dailyTrend = Object.entries(byDate)
