@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Clock, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type PendingEntry = {
   id: string;
@@ -137,17 +138,26 @@ export default function ApprovalsPage() {
 
       <div className="grid gap-4">
         {entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/50 p-12 text-slate-500">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            className="flex flex-col items-center justify-center rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-12 text-slate-500 shadow-2xl"
+          >
             <Check className="mb-4 h-12 w-12 text-emerald-500/50" />
             <p className="text-lg font-medium text-slate-400">All caught up!</p>
             <p className="mt-1 text-sm text-slate-500">There are no {statusFilter === "pending" ? "pending " : ""}timesheets to display.</p>
-          </div>
+          </motion.div>
         ) : (
-          entries.map((entry) => (
-            <div
-              key={entry.id}
-              className={`group flex flex-col justify-between gap-4 rounded-xl border border-white/5 bg-slate-900/80 p-5 shadow-sm transition hover:border-cyan-500/30 sm:flex-row sm:items-center ${entry.status === "approved" || entry.status === "invoiced" ? "opacity-60 grayscale hover:grayscale-0" : ""}`}
-            >
+          <AnimatePresence>
+            {entries.map((entry) => (
+              <motion.div
+                key={entry.id}
+                layout
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className={`group flex flex-col justify-between gap-4 rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl transition-all duration-300 hover:bg-white/[0.04] hover:shadow-cyan-900/10 hover:border-cyan-500/30 sm:flex-row sm:items-center ${entry.status === "approved" || entry.status === "invoiced" ? "opacity-40 grayscale hover:grayscale-0 hover:opacity-100" : ""}`}
+              >
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-white">{entry.userEmail}</span>
@@ -203,8 +213,9 @@ export default function ApprovalsPage() {
                    </div>
                 )}
               </div>
-            </div>
-          ))
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
     </div>

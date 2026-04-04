@@ -15,6 +15,7 @@ import {
   Legend
 } from "recharts";
 import { DownloadIcon, CalendarIcon } from "lucide-react";
+import { motion } from "framer-motion";
 
 type ReportData = {
   ok: boolean;
@@ -145,16 +146,21 @@ export function ReportsPageClient() {
       {!data ? (
         <div className="p-8 text-center text-rose-400">Failed to load report data.</div>
       ) : (
-        <div className={`transition-opacity duration-200 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className={`transition-opacity duration-200 ${loading ? 'opacity-50' : 'opacity-100'}`}
+        >
           <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl relative overflow-hidden group">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl relative overflow-hidden group hover:border-cyan-500/20 hover:shadow-cyan-900/10 transition-all duration-300">
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500" />
               <h2 className="text-sm font-medium text-slate-400 relative z-10">Total Logged Hours</h2>
               <div className="mt-2 text-4xl font-bold text-white relative z-10">
                 {data.totalHours.toFixed(1)} <span className="text-xl font-normal text-slate-500">hrs</span>
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl relative overflow-hidden group">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl relative overflow-hidden group hover:border-emerald-500/20 hover:shadow-emerald-900/10 transition-all duration-300">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500" />
               <h2 className="text-sm font-medium text-slate-400 relative z-10">Total Billable Pipeline</h2>
               <div className="mt-2 text-4xl font-bold text-emerald-400 relative z-10">
@@ -164,7 +170,7 @@ export function ReportsPageClient() {
           </div>
 
           <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl flex flex-col">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl flex flex-col hover:border-white/10 hover:shadow-cyan-900/5 transition-all duration-300">
               <h2 className="mb-6 text-lg font-semibold text-white">Daily Execution Trend</h2>
               <div className="flex-1 min-h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -174,7 +180,7 @@ export function ReportsPageClient() {
                     <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip
                       cursor={{ fill: "#1e293b" }}
-                      contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }}
+                      contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "12px", backdropFilter: "blur(12px)" }}
                     />
                     <Bar dataKey="hours" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -182,7 +188,7 @@ export function ReportsPageClient() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl flex flex-col">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl flex flex-col hover:border-white/10 hover:shadow-emerald-900/5 transition-all duration-300">
               <h2 className="mb-6 text-lg font-semibold text-white">Resource Allocation by Project</h2>
               <div className="flex-1 min-h-[300px] w-full">
                 {data.projectDistribution.length > 0 ? (
@@ -202,7 +208,7 @@ export function ReportsPageClient() {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }}
+                        contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "12px" }}
                       />
                       <Legend verticalAlign="bottom" height={36} iconType="circle" />
                     </PieChart>
@@ -217,13 +223,13 @@ export function ReportsPageClient() {
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-800 bg-slate-800/20">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl shadow-xl overflow-hidden hover:border-white/10 transition-all duration-300">
+                <div className="px-6 py-4 border-b border-white/5 bg-black/20">
                     <h3 className="font-semibold text-white">Top Projects</h3>
                 </div>
-                <div className="divide-y divide-slate-800">
+                <div className="divide-y divide-white/5">
                     {data.projectDistribution.slice().sort((a,b) => b.hours - a.hours).map((p) => (
-                        <div key={p.projectId} className="px-6 py-3 flex justify-between items-center bg-slate-900 hover:bg-slate-800/50 transition">
+                        <div key={p.projectId} className="px-6 py-3 flex justify-between items-center hover:bg-white/[0.02] transition">
                             <span className="text-slate-300 font-medium">{p.name}</span>
                             <span className="text-emerald-400 font-mono">{p.hours.toFixed(1)}h</span>
                         </div>
@@ -234,13 +240,13 @@ export function ReportsPageClient() {
                 </div>
             </div>
             
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-800 bg-slate-800/20">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl shadow-xl overflow-hidden hover:border-white/10 transition-all duration-300">
+                <div className="px-6 py-4 border-b border-white/5 bg-black/20">
                     <h3 className="font-semibold text-white">Top Contributors</h3>
                 </div>
-                <div className="divide-y divide-slate-800">
+                <div className="divide-y divide-white/5">
                     {data.userDistribution.slice().sort((a,b) => b.hours - a.hours).map((u) => (
-                        <div key={u.userId} className="px-6 py-3 flex justify-between items-center bg-slate-900 hover:bg-slate-800/50 transition">
+                        <div key={u.userId} className="px-6 py-3 flex justify-between items-center hover:bg-white/[0.02] transition">
                             <span className="text-slate-300 font-medium">{u.email}</span>
                             <span className="text-cyan-400 font-mono">{u.hours.toFixed(1)}h</span>
                         </div>
@@ -252,7 +258,7 @@ export function ReportsPageClient() {
             </div>
           </div>
           
-        </div>
+        </motion.div>
       )}
     </div>
   );

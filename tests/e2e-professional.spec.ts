@@ -43,7 +43,7 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
     await page.goto('/settings/tags');
 
     // Create a new tag
-    await page.getByPlaceholder('New Tag Name').fill('Legacy E2E Tag');
+    await page.getByPlaceholder('Enter new tag...').fill('Legacy E2E Tag');
     // Select the first color swatch
     await page.locator('button[title="Blue"]').click();
     await page.getByRole('button', { name: 'Add Tag' }).click();
@@ -52,8 +52,8 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
     await expect(page.locator('text=Legacy E2E Tag')).toBeVisible();
 
     // Archive it
-    const tableRow = page.locator('tr').filter({ hasText: 'Legacy E2E Tag' });
-    await tableRow.getByRole('button', { name: 'Archive Tag' }).click();
+    const tagCard = page.locator('div.group').filter({ hasText: 'Legacy E2E Tag' });
+    await tagCard.getByRole('button', { name: 'Archive Tag' }).click();
     
     // The tag should now be archived (opacity reduced). Wait a brief moment.
     await page.waitForTimeout(500);
@@ -184,12 +184,12 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
   test('Story 9: Add a scoped tag to a project and assign it from dashboard', async ({ page }) => {
     // 1. Create a tag mapped to E2E Budget Project
     await page.goto('/settings/tags');
-    await page.getByPlaceholder('New Tag Name').fill('Scoped Tag E2E');
+    await page.getByPlaceholder('Enter new tag...').fill('Scoped Tag E2E');
     await page.getByRole('button', { name: 'Add Tag' }).click();
     
     // There should be a project selector
-    const tableRow = page.locator('tr').filter({ hasText: 'Scoped Tag E2E' });
-    await tableRow.getByRole('combobox', { name: 'Select Project Scope' }).selectOption({ label: 'E2E Budget Project' });
+    const tagCard = page.locator('div.group').filter({ hasText: 'Scoped Tag E2E' });
+    await tagCard.getByRole('combobox', { name: 'Select Project Scope' }).selectOption({ label: 'E2E Budget Project' });
     await page.waitForTimeout(500);
   });
 
