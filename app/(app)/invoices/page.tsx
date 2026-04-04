@@ -132,10 +132,10 @@ export default function InvoicesPage() {
         </button>
       </div>
 
-      <div className="mb-12 grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <div className="mb-12 grid grid-cols-1 gap-8 lg:grid-cols-2 max-w-7xl mx-auto">
         {/* Billable Pipeline */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
+        <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-2xl transition hover:border-emerald-500/20 hover:shadow-emerald-900/10">
+          <h2 className="mb-6 flex items-center gap-2 text-lg font-semibold text-white">
             <DollarSign className="h-5 w-5 text-emerald-400" />
             Approved Billables Pipeline
           </h2>
@@ -147,10 +147,10 @@ export default function InvoicesPage() {
                 <div
                   key={b.id}
                   onClick={() => toggleSelection(b.id)}
-                  className={`cursor-pointer rounded-lg border p-4 transition ${
+                  className={`group cursor-pointer rounded-2xl border p-4 transition-all duration-300 shadow-md ${
                     selectedEntries.has(b.id)
-                      ? "border-cyan-500 bg-cyan-950/20"
-                      : "border-slate-800 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-800"
+                      ? "border-cyan-500 bg-cyan-500/10 shadow-cyan-500/20"
+                      : "border-white/5 bg-black/20 hover:border-white/10 hover:bg-black/40"
                   }`}
                 >
                   <div className="flex justify-between">
@@ -172,8 +172,8 @@ export default function InvoicesPage() {
         </div>
 
         {/* Existing Invoices Tracker */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
+        <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-2xl transition hover:border-indigo-500/20 hover:shadow-indigo-900/10">
+          <h2 className="mb-6 flex items-center gap-2 text-lg font-semibold text-white">
             <FileText className="h-5 w-5 text-indigo-400" />
             Issued Invoices
           </h2>
@@ -182,7 +182,7 @@ export default function InvoicesPage() {
           ) : (
             <div className="space-y-3">
               {invoices.map((inv) => (
-                <div key={inv.id} className="flex flex-col gap-2 rounded-lg border border-slate-800 bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div key={inv.id} className="group flex flex-col gap-3 rounded-2xl border border-white/5 bg-black/20 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between transition-all hover:bg-black/40 hover:border-indigo-500/30">
                   <div className="flex flex-col">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-white">{inv.number}</span>
@@ -196,7 +196,7 @@ export default function InvoicesPage() {
                   </div>
                   <button
                     onClick={() => window.print()}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm font-medium text-white transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4 text-sm font-medium text-white shadow-lg transition hover:bg-white/[0.05] hover:border-white/10 focus:outline-none"
                   >
                     <Download className="h-4 w-4 text-slate-400" />
                     Print PDF
