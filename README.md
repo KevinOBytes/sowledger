@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Timely
 
-## Getting Started
+Timely is a production-oriented, Clockify-inspired (but unique) time tracking app with role-based auth, workspace metadata (projects/goals/tags), compliance controls, and an intuitive tracker UI.
 
-First, run the development server:
+## Production-ready UX update
+- New split-layout tracker experience with:
+  - left navigation rail,
+  - top quick-entry row,
+  - grouped daily time rows,
+  - week/day totals,
+  - one-click CRUD actions for projects/goals/tags.
+- Added `GET /api/timer/list` for grouped time-entry retrieval used by the tracker UI.
 
+## Manageability of tags, projects, goals
+Yes — full management lifecycle is available:
+- Projects: `GET`, `POST`, `PATCH`, `DELETE /api/projects`
+- Goals: `GET`, `POST`, `PATCH`, `DELETE /api/goals`
+- Tags: `GET`, `PATCH` (rename), `DELETE /api/tags`
+
+Deleting project/goal detaches linked references from entries/goals in the runtime model.
+
+## Security and auth
+- Invite-first registration by default.
+- One-time expiring magic links.
+- Signed HTTP-only session cookies.
+- Role checks across mutating endpoints.
+
+## Deployment model
+- Vercel + Neon + Upstash compatible env contract.
+- Readiness probe: `GET /api/deployment/readiness`.
+- SQL-first schema present in `db/migrations/0001_init.sql`.
+
+## Current persistence note
+Runtime state is in-memory for this environment. SQL schema/migration are included for Neon/Postgres adapter wiring without breaking current API contracts.
+
+## Quick start
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Required environment variables
+```bash
+NEXT_PUBLIC_APP_URL=https://timely.tkoresearch.com
+AUTH_SHARED_KEY=replace_with_internal_service_key
+AUTH_COOKIE_SECRET=replace_with_long_random_secret_min_24_chars
+AUDIT_SIGNING_SECRET=replace_with_long_random_secret
+RESEND_API_KEY=re_xxx
+RESEND_LOGIN_FROM=logins@kevinbytes.com
+DATABASE_URL=postgres://...
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+EXCHANGE_RATE_API_URL=https://api.exchangerate.host/latest
+ALLOW_SELF_REGISTRATION=false
+ALLOW_BOOTSTRAP_OWNER=true
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Core API surface
+- Auth: `/api/auth/*`
+- User settings: `/api/user/settings`
+- Projects / Goals / Tags: `/api/projects`, `/api/goals`, `/api/tags`
+- Timers: `/api/timer/start`, `/api/timer/stop`, `/api/timer/edit`, `/api/timer/list`
+- Compliance/Finance/Integrations: `/api/compliance/daily-check`, `/api/export/csv`, `/api/integrations/calendar/import`, etc.
+- Deployment: `/api/deployment/readiness`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Docs
+- Architecture: [`docs/architecture.md`](docs/architecture.md)
