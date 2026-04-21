@@ -109,6 +109,9 @@ export async function PATCH(req: NextRequest) {
 
     const updates: Partial<typeof goals.$inferInsert> = {};
     if (body.name !== undefined) {
+      if (typeof body.name !== "string") {
+        return NextResponse.json({ error: "name must be a string" }, { status: 400 });
+      }
       const normalizedName = body.name.trim();
       if (!normalizedName) return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
       if (normalizedName.length > 120) return NextResponse.json({ error: "name must be 120 chars or fewer" }, { status: 400 });
