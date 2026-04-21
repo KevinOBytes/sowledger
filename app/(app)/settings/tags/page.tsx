@@ -9,8 +9,21 @@ export const metadata = { title: "Tag Settings – Billabled" };
 export default async function TagsSettingsPage() {
   const session = await requireSession();
   
-  const tags = await db.select().from(workspaceTags).where(eq(workspaceTags.workspaceId, session.workspaceId)).orderBy(desc(workspaceTags.status), workspaceTags.name);
-  const projects = await db.select({ id: projectsTable.id, name: projectsTable.name }).from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId));
+  const rawTags = await db.select().from(workspaceTags).where(eq(workspaceTags.workspaceId, session.workspaceId)).orderBy(desc(workspaceTags.status), workspaceTags.name);
+  const tags = rawTags.map(t => ({
+    id: t.id,
+    name: t.name,
+    color: t.color,
+    projectId: t.projectId,
+    isBillableDefault: t.isBillableDefault,
+    status: t.status
+  }));
+
+  const rawProjects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId));
+  const projects = rawProjects.map(p => ({
+    id: p.id,
+    name: p.name
+  }));
 
   return (
     <main className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Receipt, FileText, DollarSign, Download } from "lucide-react";
+import { toast } from "sonner";
 
 type InvoiceRecord = {
   id: string;
@@ -73,12 +74,13 @@ export default function InvoicesPage() {
       if (res.ok) {
         setSelectedEntries(new Set());
         fetchData(); // reload
+        toast.success("Invoice generated successfully");
       } else {
         const data = await res.json();
-        alert(`Failed: ${data.error}`);
+        toast.error(`Failed: ${data.error}`);
       }
     } catch {
-      alert("Failed to generate invoice.");
+      toast.error("Failed to generate invoice.");
     }
   }
 

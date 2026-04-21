@@ -11,9 +11,22 @@ export const metadata = { title: "Projects – Billabled" };
 export default async function ProjectsPage() {
   const session = await requireSession();
   
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId)).orderBy(desc(projectsTable.createdAt));
+  const rawProjects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId)).orderBy(desc(projectsTable.createdAt));
+  const projects = rawProjects.map(p => ({
+    id: p.id,
+    name: p.name,
+    status: p.status,
+    billingModel: p.billingModel,
+    percentComplete: p.percentComplete || 0
+  }));
     
-  const tasks = await db.select().from(tasksTable).where(eq(tasksTable.workspaceId, session.workspaceId));
+  const rawTasks = await db.select().from(tasksTable).where(eq(tasksTable.workspaceId, session.workspaceId));
+  const tasks = rawTasks.map(t => ({
+    id: t.id,
+    projectId: t.projectId,
+    status: t.status,
+    parentId: t.parentId
+  }));
 
   return (
     <main className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">

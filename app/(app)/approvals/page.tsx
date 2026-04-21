@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, Clock, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 type PendingEntry = {
   id: string;
@@ -58,12 +59,13 @@ export default function ApprovalsPage() {
         } else {
            setEntries((prev) => prev.map((e) => e.id === entryId ? { ...e, status: "approved" } : e));
         }
+        toast.success("Timesheet approved");
       } else {
         const data = await res.json();
-        alert(`Error: ${data.error}`);
+        toast.error(`Error: ${data.error}`);
       }
     } catch {
-      alert("Failed to approve entry.");
+      toast.error("Failed to approve entry.");
     }
   }
 
@@ -80,12 +82,13 @@ export default function ApprovalsPage() {
         } else {
            setEntries((prev) => prev.map((e) => e.id === entryId ? { ...e, status: "rejected" } : e));
         }
+        toast.success("Timesheet rejected");
       } else {
         const data = await res.json();
-        alert(`Error: ${data.error}`);
+        toast.error(`Error: ${data.error}`);
       }
     } catch {
-      alert("Failed to reject entry.");
+      toast.error("Failed to reject entry.");
     }
   }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import Link from "next/link";
 import { Check, Zap, Building, Building2 } from "lucide-react";
+import { toast } from "sonner";
 
 type BillingData = {
   plan: "free" | "pro" | "smb" | "enterprise";
@@ -41,11 +42,11 @@ export default function BillingPage() {
       if (resData.url) {
         window.location.href = resData.url;
       } else {
-        alert(resData.error || "Failed to start checkout");
+        toast.error(resData.error || "Failed to start checkout");
         setProcessing(null);
       }
     } catch {
-      alert("Error starting checkout");
+      toast.error("Error starting checkout");
       setProcessing(null);
     }
   }
@@ -58,11 +59,11 @@ export default function BillingPage() {
       if (resData.url) {
         window.location.href = resData.url;
       } else {
-        alert(resData.error || "Failed to open portal");
+        toast.error(resData.error || "Failed to open portal");
         setProcessing(null);
       }
     } catch {
-      alert("Error opening portal");
+      toast.error("Error opening portal");
       setProcessing(null);
     }
   }

@@ -10,10 +10,18 @@ export const metadata = { title: "Clients – Billabled" };
 export default async function ClientsPage() {
   const session = await requireSession();
   
-  const clients = await db.select().from(clientsTable).where(eq(clientsTable.workspaceId, session.workspaceId)).orderBy(desc(clientsTable.createdAt));
+  const clientsData = await db.select({
+    id: clientsTable.id,
+    name: clientsTable.name,
+    email: clientsTable.email,
+    status: clientsTable.status,
+  }).from(clientsTable).where(eq(clientsTable.workspaceId, session.workspaceId)).orderBy(desc(clientsTable.createdAt));
     
   // Fetch all projects to count association per client
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId));
+  const projectsData = await db.select({
+    id: projectsTable.id,
+    clientId: projectsTable.clientId,
+  }).from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId));
 
   return (
     <main className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">
@@ -27,7 +35,7 @@ export default async function ClientsPage() {
         </div>
       </div>
 
-      <ClientsPageClient initialClients={clients} projects={projects} />
+      <ClientsPageClient initialClients={clientsData as any} projects={projectsData as any} />
     </main>
   );
 }
