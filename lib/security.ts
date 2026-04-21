@@ -27,7 +27,12 @@ export async function dispatchWebhook(workspaceId: string, eventType: string, pa
 }
 
 export async function enforceAuthKey(req: NextRequest) {
-  if (!env.AUTH_SHARED_KEY) return;
+  if (!env.AUTH_SHARED_KEY) {
+    if (env.NODE_ENV === "production") {
+      throw new UnauthorizedError("AUTH_SHARED_KEY must be configured");
+    }
+    return;
+  }
   const key = req.headers.get("x-auth-key");
   if (!key || key !== env.AUTH_SHARED_KEY) throw new UnauthorizedError("Invalid auth key");
 }

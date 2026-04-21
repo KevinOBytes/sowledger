@@ -41,7 +41,9 @@ export async function POST(req: NextRequest) {
       dueDate?: string;
     };
 
-    if (!body.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
+    const normalizedName = body.name?.trim();
+    if (!normalizedName) return NextResponse.json({ error: "name is required" }, { status: 400 });
+    if (normalizedName.length > 120) return NextResponse.json({ error: "name must be 120 chars or fewer" }, { status: 400 });
     
     if (body.projectId) {
       const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
     const newGoal = {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
-      name: body.name,
+      name: normalizedName,
       projectId: body.projectId || null,
       assignedUserId: body.assignedUserId || null,
       description: body.description || null,
@@ -106,7 +108,12 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updates: Partial<typeof goals.$inferInsert> = {};
-    if (body.name !== undefined) updates.name = body.name;
+    if (body.name !== undefined) {
+      const normalizedName = body.name.trim();
+      if (!normalizedName) return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
+      if (normalizedName.length > 120) return NextResponse.json({ error: "name must be 120 chars or fewer" }, { status: 400 });
+      updates.name = normalizedName;
+    }
     if (body.projectId !== undefined) updates.projectId = body.projectId;
     if (body.assignedUserId !== undefined) updates.assignedUserId = body.assignedUserId;
     if (body.description !== undefined) updates.description = body.description;

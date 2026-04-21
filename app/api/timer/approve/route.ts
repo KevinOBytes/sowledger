@@ -16,6 +16,12 @@ export async function POST(req: NextRequest) {
     const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, body.entryId));
     if (!entry || entry.workspaceId !== session.workspaceId) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     if (!entry.stoppedAt) return NextResponse.json({ error: "Cannot approve running timer" }, { status: 409 });
+    if (entry.status !== "submitted") {
+      return NextResponse.json(
+        { error: `Cannot approve entry with status '${entry.status}'. Only submitted entries can be approved.` },
+        { status: 409 },
+      );
+    }
 
     const before = entry.status;
     

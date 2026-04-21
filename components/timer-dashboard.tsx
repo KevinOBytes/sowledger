@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/client/local-db";
 import { isAdminEmail } from "@/lib/admin";
 import { ProfileMenu } from "@/components/profile-menu";
@@ -87,6 +87,8 @@ export function TimerDashboard() {
   const [showConfig, setShowConfig] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newGoalName, setNewGoalName] = useState("");
+  const projectNameById = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, project.name])), [projects]);
+  const goalNameById = useMemo(() => Object.fromEntries(goals.map((goal) => [goal.id, goal.name])), [goals]);
 
   const pomodoroTotal = pomodoroMinutes * 60;
   
@@ -254,7 +256,7 @@ export function TimerDashboard() {
         goalId: goalId || undefined,
         actionId: actionId || undefined,
         tags: tArray,
-        startedAt: new Date().toISOString()
+        startedAt: data.entry.startedAt
       };
       
       setActiveTimers(prev => [newTimer, ...prev]);
@@ -372,7 +374,7 @@ export function TimerDashboard() {
           >
             {secondaryTimers.map((timer) => {
               const elap = Math.max(0, Math.floor((now - new Date(timer.startedAt).getTime()) / 1000));
-              const proj = projects.find(p => p.id === timer.projectId);
+              const projectName = timer.projectId ? projectNameById[timer.projectId] : undefined;
               return (
                 <motion.div 
                   key={timer.id}
@@ -383,7 +385,7 @@ export function TimerDashboard() {
                     <span className="font-mono text-xl font-medium tracking-tight text-white">{fmt(elap)}</span>
                     <div className="hidden sm:flex flex-col">
                       <span className="text-sm font-semibold text-slate-200">{timer.taskId}</span>
-                      {proj && <span className="text-[10px] uppercase tracking-wider text-cyan-400/80">{proj.name}</span>}
+                      {projectName && <span className="text-[10px] uppercase tracking-wider text-cyan-400/80">{projectName}</span>}
                     </div>
                   </div>
                   <button
@@ -456,19 +458,19 @@ export function TimerDashboard() {
             </span>
             {(() => {
               const pId = heroTimer ? heroTimer.projectId : projectId;
-              const proj = projects.find(x => x.id === pId);
-              return proj ? (
+              const projectName = pId ? projectNameById[pId] : undefined;
+              return projectName ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-cyan-300">
-                  <Folder className="h-3 w-3" /> {proj.name}
+                  <Folder className="h-3 w-3" /> {projectName}
                 </span>
               ) : null;
             })()}
             {(() => {
               const gId = heroTimer ? heroTimer.goalId : goalId;
-              const g = goals.find(x => x.id === gId);
-              return g ? (
+              const goalName = gId ? goalNameById[gId] : undefined;
+              return goalName ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-violet-300">
-                  <Target className="h-3 w-3" /> {g.name}
+                  <Target className="h-3 w-3" /> {goalName}
                 </span>
               ) : null;
             })()}
