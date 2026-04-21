@@ -1,37 +1,34 @@
-# Timely
+# Billabled
 
-Timely is a production-oriented, Clockify-inspired (but unique) time tracking app with role-based auth, workspace metadata (projects/goals/tags), compliance controls, and an intuitive tracker UI.
+Security-focused workforce intelligence starter on Next.js (App Router) with role-based auth, immutable audit logs, compliance controls, user settings, and local-first timer resilience.
 
-## Production-ready UX update
-- New split-layout tracker experience with:
-  - left navigation rail,
-  - top quick-entry row,
-  - grouped daily time rows,
-  - week/day totals,
-  - one-click CRUD actions for projects/goals/tags.
-- Added `GET /api/timer/list` for grouped time-entry retrieval used by the tracker UI.
+## Registration safety
+- `ALLOW_SELF_REGISTRATION=false` (default) = invite-only access.
+- `ALLOW_BOOTSTRAP_OWNER=true` allows controlled first-owner bootstrap when workspace has zero users.
+- Magic links are one-time, expiring, and replay-protected.
+- Session cookies are signed + HTTP-only.
 
 ## Manageability of tags, projects, goals
-Yes — full management lifecycle is available:
+Yes — you can now **create, update, and delete** all of them via API:
 - Projects: `GET`, `POST`, `PATCH`, `DELETE /api/projects`
 - Goals: `GET`, `POST`, `PATCH`, `DELETE /api/goals`
 - Tags: `GET`, `PATCH` (rename), `DELETE /api/tags`
 
-Deleting project/goal detaches linked references from entries/goals in the runtime model.
+When a project/goal is deleted, linked time entries are cleaned by unsetting the corresponding foreign reference in the runtime model.
 
-## Security and auth
-- Invite-first registration by default.
-- One-time expiring magic links.
-- Signed HTTP-only session cookies.
-- Role checks across mutating endpoints.
+## Added in this update
+- User settings API with timezone management and preferred tags.
+- Project and Goal APIs for time allocation context.
+- Optional `projectId`, `goalId`, and `tags` on time entries.
+- Tags API for workspace-level tag discovery + rename/remove.
+- CSV export includes project/goal/tag fields.
 
-## Deployment model
-- Vercel + Neon + Upstash compatible env contract.
-- Readiness probe: `GET /api/deployment/readiness`.
-- SQL-first schema present in `db/migrations/0001_init.sql`.
+## Vercel + Neon + Upstash readiness
+- `GET /api/deployment/readiness` checks env wiring for Vercel deployment with Neon + Upstash.
+- SQL migration for Postgres remains included at `db/migrations/0001_init.sql`.
 
 ## Current persistence note
-Runtime state is in-memory for this environment. SQL schema/migration are included for Neon/Postgres adapter wiring without breaking current API contracts.
+This branch currently uses an in-memory runtime store for API state so it remains compile-safe in restricted CI environments. SQL-first schema is included and adapter wiring to Neon can be done behind current API contracts.
 
 ## Quick start
 ```bash
@@ -41,7 +38,7 @@ npm run dev
 
 ## Required environment variables
 ```bash
-NEXT_PUBLIC_APP_URL=https://timely.tkoresearch.com
+NEXT_PUBLIC_APP_URL=https://billabled.tkoresearch.com
 AUTH_SHARED_KEY=replace_with_internal_service_key
 AUTH_COOKIE_SECRET=replace_with_long_random_secret_min_24_chars
 AUDIT_SIGNING_SECRET=replace_with_long_random_secret
@@ -55,13 +52,43 @@ ALLOW_SELF_REGISTRATION=false
 ALLOW_BOOTSTRAP_OWNER=true
 ```
 
-## Core API surface
-- Auth: `/api/auth/*`
-- User settings: `/api/user/settings`
-- Projects / Goals / Tags: `/api/projects`, `/api/goals`, `/api/tags`
-- Timers: `/api/timer/start`, `/api/timer/stop`, `/api/timer/edit`, `/api/timer/list`
-- Compliance/Finance/Integrations: `/api/compliance/daily-check`, `/api/export/csv`, `/api/integrations/calendar/import`, etc.
-- Deployment: `/api/deployment/readiness`
+## API surface
+- Auth
+  - `POST /api/auth/request-link`
+  - `GET /api/auth/verify?token=...`
+  - `GET /api/auth/me`
+  - `POST /api/auth/logout`
+  - `POST /api/auth/invite`
+- User settings
+  - `GET /api/user/settings`
+  - `PATCH /api/user/settings`
+- Projects / Goals / Tags
+  - `GET /api/projects`
+  - `POST /api/projects`
+  - `PATCH /api/projects`
+  - `DELETE /api/projects?projectId=...`
+  - `GET /api/goals`
+  - `POST /api/goals`
+  - `PATCH /api/goals`
+  - `DELETE /api/goals?goalId=...`
+  - `GET /api/tags`
+  - `PATCH /api/tags`
+  - `DELETE /api/tags?tag=...`
+- Timers
+  - `POST /api/timer/start`
+  - `POST /api/timer/stop`
+  - `PATCH /api/timer/edit`
+  - `POST /api/timer/approve`
+  - `POST /api/timer/invoice`
+- Compliance/Finance/Integrations
+  - `POST /api/compliance/daily-check`
+  - `GET /api/currency/rates`
+  - `POST /api/expenses/attach`
+  - `GET /api/export/csv`
+  - `POST /api/integrations/calendar/import`
+  - `GET /api/cron/unfinished-timers`
+- Deployment
+  - `GET /api/deployment/readiness`
 
 ## Docs
 - Architecture: [`docs/architecture.md`](docs/architecture.md)

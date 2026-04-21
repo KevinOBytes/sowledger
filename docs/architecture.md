@@ -1,43 +1,59 @@
-# Timely Architecture (Production Tracker UX)
+# Billabled Architecture (Settings + Projects/Goals/Tags CRUD)
 
 ## BLUF
-This iteration moves the app toward production-readiness with a Clockify-like (but unique) workflow:
-- fast top-row timer start/stop,
-- grouped daily logs,
-- clear weekly total visibility,
-- inline CRUD management for projects/goals/tags.
+This update adds complete management lifecycle support for time metadata objects:
+- Projects: create/update/delete
+- Goals: create/update/delete
+- Tags: list/rename/delete
 
-## UX architecture
-- Primary screen is a tracker workspace with:
-  - left rail navigation,
-  - top quick-entry row,
-  - grouped date sections,
-  - per-day + week duration totals,
-  - metadata controls for projects/goals/tags.
-- Data source for time rows: `GET /api/timer/list`.
+## User settings
+- Endpoint: `GET/PATCH /api/user/settings`
+- Fields:
+  - `displayName`
+  - `timezone` (validated as IANA timezone)
+  - `preferredTags`
 
-## Metadata lifecycle management
-- Projects (`/api/projects`): list/create/update/delete
-- Goals (`/api/goals`): list/create/update/delete
-- Tags (`/api/tags`): list/rename/delete
+## Projects, goals, tags management
+- Projects API (`/api/projects`)
+  - `GET`: list projects in workspace
+  - `POST`: create project
+  - `PATCH`: modify project name/billing model/percent complete
+  - `DELETE`: remove project and detach it from linked goals/time entries
 
-Deletion behavior:
-- removing a project clears related `projectId` references,
-- removing a goal clears related `goalId` references,
-- tag rename/delete propagates across entry tags and preferred tags.
+- Goals API (`/api/goals`)
+  - `GET`: list goals in workspace
+  - `POST`: create goal
+  - `PATCH`: modify goal metadata and completion state
+  - `DELETE`: remove goal and detach it from linked time entries
 
-## Security and controls
-- Role-based guards (`member`, `manager`, `owner`).
-- Manager+ required for metadata mutations.
-- Invite-first registration and signed session cookies remain enforced.
+- Tags API (`/api/tags`)
+  - `GET`: list workspace tags derived from entries
+  - `PATCH`: rename tag across entries and user preferred tags
+  - `DELETE`: remove tag across entries and user preferred tags
+
+## Time entry semantics
+Time entries support optional:
+- `projectId`
+- `goalId`
+- `tags[]`
+
+These are validated against workspace scope on write endpoints.
+
+## Security & authorization
+- Role model (`member`, `manager`, `owner`) enforced.
+- Modifying/deleting projects, goals, and tags requires manager+ role.
+- Registration remains invite-first unless `ALLOW_SELF_REGISTRATION=true`.
 
 ## Deployment readiness
-- Vercel + Neon + Upstash env contract remains unchanged.
-- Readiness endpoint: `GET /api/deployment/readiness`.
+- `GET /api/deployment/readiness` surfaces environment readiness for:
+  - Vercel deployment
+  - Neon Postgres
+  - Upstash KV
+  - auth/audit secrets
 
 ## Environment
 ```bash
-NEXT_PUBLIC_APP_URL=https://timely.tkoresearch.com
+NEXT_PUBLIC_APP_URL=https://billabled.tkoresearch.com
 AUTH_SHARED_KEY=replace_with_internal_service_key
 AUTH_COOKIE_SECRET=replace_with_long_random_secret_min_24_chars
 AUDIT_SIGNING_SECRET=replace_with_long_random_secret

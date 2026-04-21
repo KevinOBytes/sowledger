@@ -1,0 +1,615 @@
+
+> timely@0.1.0 build
+> next build
+
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/example/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /Users/example/Projects/timely/package-lock.json
+
+▲ Next.js 16.2.0 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 35 errors:
+./Projects/timely/app/(app)/projects/[projectId]/page.tsx:2:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { requireSession } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m3 |[0m [36mimport[0m { projects [36mas[0m projectsTable } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m4 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m5 |[0m [36mimport[0m { redirect } [36mfrom[0m [32m"next/navigation"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-rsc] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/(app)/projects/page.tsx:2:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { requireSession } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m3 |[0m [36mimport[0m { projects [36mas[0m projectsTable, projectTasks [36mas[0m tasksTable } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m4 |[0m [36mimport[0m { eq, desc } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m5 |[0m [36mimport[0m [33mLink[0m [36mfrom[0m [32m"next/link"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-rsc] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/admin/page.tsx:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, [33mForbiddenError[0m, [33mUnauthorizedError[0m } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { isAdminEmail } [36mfrom[0m [32m"@/lib/admin"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { users [36mas[0m usersTable, workspaces [36mas[0m workspacesTable, memberships [36mas[0m membershipsTable, timeEntries [36mas[0m timeEntriesTable } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { sql } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m [36mimport[0m [33mLink[0m [36mfrom[0m [32m"next/link"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-rsc] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/activity/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { auditLogs, users, timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, desc, and } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/admin/stats/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { [33mForbiddenError[0m, requireRole, requireSession, [33mUnauthorizedError[0m } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { isAdminEmail } [36mfrom[0m [32m"@/lib/admin"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { users, workspaces, memberships, timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { sql } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/approvals/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { timeEntries, users, projects } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and, notInArray, desc } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/calendar/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { timeEntries, projectTasks } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/client/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { projects, timeEntries, invoices } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and, ne, desc } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/cron/unfinished-timers/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { enforceAuthKey } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { isNull, lt, and } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/expenses/attach/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { appendAuditLog, enforceAuthKey } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/export/csv/route.ts:5:1
+Export db doesn't exist in target module
+  [90m3 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m4 |[0m [36mimport[0m { toCsv } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m5 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m [36mimport[0m { timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m7 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m8 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/goals/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireRole, requireSession } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { goals, projects, timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/integrations/calendar/import/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { createTimeEntry, enforceAuthKey } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { projects, goals } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m [36mimport[0m { normalizeTags } [36mfrom[0m [32m"@/lib/validators"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/notifications/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { notifications } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and, desc } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/planner/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { memberships, users, projectTasks } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, ne, and } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/projects/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireRole, requireSession } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { projects } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/reports/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { timeEntries, projects, users } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and, gte, lte } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/tags/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { [33mForbiddenError[0m, requireRole, requireSession, [33mUnauthorizedError[0m } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { listWorkspaceTags } [36mfrom[0m [32m"@/lib/store"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { timeEntries, users, memberships } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq, inArray } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m [36mimport[0m { normalizeTags } [36mfrom[0m [32m"@/lib/validators"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/tasks/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireRole, requireSession } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { projectTasks } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m [36mimport[0m { [33mKanbanColumn[0m } [36mfrom[0m [32m"@/lib/store"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/timer/active/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and, isNotNull, isNull } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/timer/approve/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { appendAuditLog, enforceAuthKey } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/timer/edit/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { appendAuditLog, enforceAuthKey, enforceDailyHoursLimit, ensurePeriodUnlocked } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { timeEntries, projects, goals, userActions } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m [36mimport[0m { normalizeTags } [36mfrom[0m [32m"@/lib/validators"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/timer/invoice/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { appendAuditLog, enforceAuthKey } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { timeEntries, lockPeriods } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/timer/split/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { appendAuditLog, enforceAuthKey, ensurePeriodUnlocked, createTimeEntry } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { timeEntries, projects } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m [36mimport[0m { calculateEffectiveRate } [36mfrom[0m [32m"@/lib/store"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/timer/start/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { createTimeEntry, enforceAuthKey } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { projects, goals, userActions } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m [36mimport[0m { normalizeTags } [36mfrom[0m [32m"@/lib/validators"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/timer/stop/route.ts:4:1
+Export db doesn't exist in target module
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+  [90m3 |[0m [36mimport[0m { appendAuditLog, enforceAuthKey, enforceDailyHoursLimit, enforceStopRateLimit, ensurePeriodUnlocked } [36mfrom[0m [32m"@/lib/security"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { timeEntries } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m7 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/user/actions/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { userActions } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq, and, ne } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/user/settings/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { [33mForbiddenError[0m, requireSession, requireRole, [33mUnauthorizedError[0m } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { users } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { isValidTimezone, normalizeTags } [36mfrom[0m [32m"@/lib/validators"[0m;
+  [90m6 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/app/api/webhooks/route.ts:3:1
+Export db doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { webhooks } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m5 |[0m [36mimport[0m { eq } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m6 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+./Projects/timely/lib/auth.ts:14:1
+Export db doesn't exist in target module
+  [90m12 |[0m   [36mtype[0m [33mWorkspaceRole[0m,
+  [90m13 |[0m } [36mfrom[0m [32m"./store"[0m;
+[31m[1m>[0m [90m14 |[0m [36mimport[0m { db } [36mfrom[0m [32m"./db"[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m15 |[0m [36mimport[0m { users, memberships, workspaces, magicLinks, invitations } [36mfrom[0m [32m"./db/schema"[0m;
+  [90m16 |[0m [36mimport[0m { eq, and } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m17 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  App Route:
+    ./Projects/timely/lib/auth.ts
+    ./Projects/timely/app/api/user/settings/route.ts
+
+  Server Component:
+    ./Projects/timely/lib/auth.ts
+    ./Projects/timely/app/client/layout.tsx
+
+
+./Projects/timely/lib/auth.ts:14:1
+Export db doesn't exist in target module
+  [90m12 |[0m   [36mtype[0m [33mWorkspaceRole[0m,
+  [90m13 |[0m } [36mfrom[0m [32m"./store"[0m;
+[31m[1m>[0m [90m14 |[0m [36mimport[0m { db } [36mfrom[0m [32m"./db"[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m15 |[0m [36mimport[0m { users, memberships, workspaces, magicLinks, invitations } [36mfrom[0m [32m"./db/schema"[0m;
+  [90m16 |[0m [36mimport[0m { eq, and } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m17 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-rsc] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  App Route:
+    ./Projects/timely/lib/auth.ts
+    ./Projects/timely/app/api/user/settings/route.ts
+
+  Server Component:
+    ./Projects/timely/lib/auth.ts
+    ./Projects/timely/app/client/layout.tsx
+
+
+./Projects/timely/lib/security.ts:5:1
+Export db doesn't exist in target module
+  [90m3 |[0m [36mimport[0m { env } [36mfrom[0m [32m"./env"[0m;
+  [90m4 |[0m [36mimport[0m { [33mUnauthorizedError[0m } [36mfrom[0m [32m"./auth"[0m;
+[31m[1m>[0m [90m5 |[0m [36mimport[0m { db } [36mfrom[0m [32m"./db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m [36mimport[0m { webhooks, lockPeriods, timeEntries, auditLogs } [36mfrom[0m [32m"./db/schema"[0m;
+  [90m7 |[0m [36mimport[0m { eq, and, gt, lt } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m8 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./Projects/timely/lib/security.ts
+    ./Projects/timely/app/api/timer/stop/route.ts
+
+
+./Projects/timely/lib/store.ts:1:1
+Export db doesn't exist in target module
+[31m[1m>[0m [90m1 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m2 |[0m [36mimport[0m { users, workspaces, memberships, projects, goals, invitations, magicLinks, timeEntries, auditLogs, lockPeriods, userActions, projectTasks, notifications, invoices, webhooks } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m3 |[0m [36mimport[0m { eq, and, gt, desc } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m4 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-route] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  App Route:
+    ./Projects/timely/lib/store.ts
+    ./Projects/timely/app/api/tags/route.ts
+
+  Server Component:
+    ./Projects/timely/lib/store.ts
+    ./Projects/timely/lib/auth.ts
+    ./Projects/timely/app/client/layout.tsx
+
+
+./Projects/timely/lib/store.ts:1:1
+Export db doesn't exist in target module
+[31m[1m>[0m [90m1 |[0m [36mimport[0m { db } [36mfrom[0m [32m"@/lib/db"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m2 |[0m [36mimport[0m { users, workspaces, memberships, projects, goals, invitations, magicLinks, timeEntries, auditLogs, lockPeriods, userActions, projectTasks, notifications, invoices, webhooks } [36mfrom[0m [32m"@/lib/db/schema"[0m;
+  [90m3 |[0m [36mimport[0m { eq, and, gt, desc } [36mfrom[0m [32m"drizzle-orm"[0m;
+  [90m4 |[0m
+
+The export db was not found in module [project]/Projects/timely/lib/db.ts [app-rsc] (ecmascript).
+Did you mean to import getDb?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  App Route:
+    ./Projects/timely/lib/store.ts
+    ./Projects/timely/app/api/tags/route.ts
+
+  Server Component:
+    ./Projects/timely/lib/store.ts
+    ./Projects/timely/lib/auth.ts
+    ./Projects/timely/app/client/layout.tsx
+
+
+./Projects/timely/app/api/invoices/route.ts:3:1
+Export store doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { [33mNextRequest[0m, [33mNextResponse[0m } [36mfrom[0m [32m"next/server"[0m;
+  [90m2 |[0m [36mimport[0m { requireSession, requireRole } [36mfrom[0m [32m"@/lib/auth"[0m;
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { store, [33mInvoice[0m } [36mfrom[0m [32m"@/lib/store"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m
+  [90m5 |[0m [36mexport[0m [36masync[0m [36mfunction[0m [33mGET[0m() {
+  [90m6 |[0m   [36mtry[0m {
+
+The export store was not found in module [project]/Projects/timely/lib/store.ts [app-route] (ecmascript).
+Did you mean to import listWorkspaceTags?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+    at <unknown> (./Projects/timely/app/(app)/projects/[projectId]/page.tsx:2:1)
+    at <unknown> (./Projects/timely/app/(app)/projects/page.tsx:2:1)
+    at <unknown> (./Projects/timely/app/admin/page.tsx:4:1)
+    at <unknown> (./Projects/timely/app/api/activity/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/admin/stats/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/approvals/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/calendar/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/client/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/cron/unfinished-timers/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/expenses/attach/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/export/csv/route.ts:5:1)
+    at <unknown> (./Projects/timely/app/api/goals/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/integrations/calendar/import/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/notifications/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/planner/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/projects/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/reports/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/tags/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/tasks/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/timer/active/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/timer/approve/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/timer/edit/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/timer/invoice/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/timer/split/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/timer/start/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/timer/stop/route.ts:4:1)
+    at <unknown> (./Projects/timely/app/api/user/actions/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/user/settings/route.ts:3:1)
+    at <unknown> (./Projects/timely/app/api/webhooks/route.ts:3:1)
+    at <unknown> (./Projects/timely/lib/auth.ts:14:1)
+    at <unknown> (./Projects/timely/lib/auth.ts:14:1)
+    at <unknown> (./Projects/timely/lib/security.ts:5:1)
+    at <unknown> (./Projects/timely/lib/store.ts:1:1)
+    at <unknown> (./Projects/timely/lib/store.ts:1:1)
+    at <unknown> (./Projects/timely/app/api/invoices/route.ts:3:1)

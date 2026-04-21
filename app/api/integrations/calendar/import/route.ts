@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { createTimeEntry, enforceAuthKey } from "@/lib/security";
-import { store } from "@/lib/store";
+import { createTimeEntry } from "@/lib/security";
+import { db } from "@/lib/db";
+import { projects, goals } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
-    await enforceAuthKey(req);
     const session = await requireSession();
     requireRole("manager", session.role);
 
@@ -20,14 +21,14 @@ export async function POST(req: NextRequest) {
     };
 
     if (body.projectId) {
-      const project = store.projects.get(body.projectId);
+      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
       if (!project || project.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
     }
 
     if (body.goalId) {
-      const goal = store.goals.get(body.goalId);
+      const [goal] = await db.select().from(goals).where(eq(goals.id, body.goalId));
       if (!goal || goal.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: "Invalid goalId" }, { status: 400 });
       }
@@ -39,18 +40,19 @@ export async function POST(req: NextRequest) {
       const ended = new Date(event.endsAt);
       const durationSeconds = Math.max(0, Math.floor((ended.getTime() - started.getTime()) / 1000));
 
-      const draft = createTimeEntry({
+      const draft = await createTimeEntry({
         workspaceId: session.workspaceId,
         userId: body.assigneeUserId ?? session.sub,
         taskId: `calendar:${event.id}`,
-        projectId: body.projectId,
-        goalId: body.goalId,
+        projectId: body.projectId || null,
+        goalId: body.goalId || null,
         tags: normalizeTags(body.tags),
-        billable: false,
         description: event.title,
-        startedAt: started.toISOString(),
-        stoppedAt: ended.toISOString(),
+        startedAt: started,
+        stoppedAt: ended,
         durationSeconds,
+        action: null,
+        hourlyRate: null,
         status: "draft",
         source: "calendar",
         collaborators: [],

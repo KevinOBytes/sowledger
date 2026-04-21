@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TYPE entry_status AS ENUM ('draft', 'submitted', 'approved', 'invoiced');
 CREATE TYPE project_billing_model AS ENUM ('hourly', 'fixed_fee', 'hybrid');
 
@@ -12,6 +14,7 @@ CREATE TABLE users (
 CREATE TABLE workspaces (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
   base_currency TEXT NOT NULL DEFAULT 'USD',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -82,6 +85,53 @@ CREATE TABLE compliance_daily_submissions (
   business_date TIMESTAMPTZ NOT NULL,
   submitted BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE goals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT,
+  due_date TIMESTAMPTZ,
+  created_by_user_id UUID NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE memberships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL,
+  user_id UUID NOT NULL,
+  role TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (workspace_id, user_id)
+);
+
+CREATE TABLE invitations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL,
+  email TEXT NOT NULL,
+  inviter_user_id UUID NOT NULL,
+  token TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (token)
+);
+
+CREATE TABLE magic_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  token TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (token)
 );
 
 CREATE INDEX idx_time_entries_workspace_started_at ON time_entries (workspace_id, started_at DESC);

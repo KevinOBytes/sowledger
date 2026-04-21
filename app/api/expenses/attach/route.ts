@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { appendAuditLog, enforceAuthKey } from "@/lib/security";
-import { store } from "@/lib/store";
+import { appendAuditLog } from "@/lib/security";
+import { db } from "@/lib/db";
+import { timeEntries } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
-    await enforceAuthKey(req);
     const session = await requireSession();
     requireRole("member", session.role);
 
@@ -17,14 +18,20 @@ export async function POST(req: NextRequest) {
       r2Key?: string;
     };
 
-    if (!body.entryId || !body.label || !body.amount || !body.r2Key) {
+    if (!body.entryId || !body.label || body.amount === undefined || !body.r2Key) {
       return NextResponse.json({ error: "entryId, label, amount, r2Key required" }, { status: 400 });
     }
+
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json({ error: "amount must be a positive, finite number" }, { status: 400 });
+    }
+
     if (!/^receipts\/.+\.(pdf|png|jpg|jpeg)$/i.test(body.r2Key)) {
       return NextResponse.json({ error: "r2Key must be in receipts/ and be a supported file extension" }, { status: 400 });
     }
 
-    const entry = store.entries.get(body.entryId);
+    const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, body.entryId));
     if (!entry || entry.workspaceId !== session.workspaceId) {
       return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     }
@@ -35,12 +42,14 @@ export async function POST(req: NextRequest) {
 
     const expense = {
       label: body.label,
-      amount: Number(body.amount),
+      amount: amount,
       currency: (body.currency ?? "USD").toUpperCase(),
       r2Key: body.r2Key,
     };
 
-    entry.expenses.push(expense);
+    const newExpenses = [...entry.expenses, expense];
+
+    await db.update(timeEntries).set({ expenses: newExpenses }).where(eq(timeEntries.id, entry.id));
 
     await appendAuditLog({
       workspaceId: session.workspaceId,
@@ -50,7 +59,7 @@ export async function POST(req: NextRequest) {
       diff: { expense: { before: null, after: expense } },
     });
 
-    return NextResponse.json({ ok: true, entryId: entry.id, expenses: entry.expenses });
+    return NextResponse.json({ ok: true, entryId: entry.id, expenses: newExpenses });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }

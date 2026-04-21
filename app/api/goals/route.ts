@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
-import { store } from "@/lib/store";
+import { db } from "@/lib/db";
+import { goals, projects, timeEntries } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
+
+function getAuthStatus(error: unknown): number {
+  const err: unknown = error;
+  if (err && ((err as Record<string, unknown>).code === "FORBIDDEN" || (err as Record<string, unknown>).status === 403 || (err as Record<string, unknown>).message === "Forbidden")) {
+    return 403;
+  }
+  return 401;
+}
 
 export async function GET() {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
 
-    const goals = [...store.goals.values()].filter((item) => item.workspaceId === session.workspaceId);
-    return NextResponse.json({ ok: true, goals });
+    const data = await db.select().from(goals).where(eq(goals.workspaceId, session.workspaceId));
+    return NextResponse.json({ ok: true, goals: data });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
   }
 }
 
@@ -22,33 +32,43 @@ export async function POST(req: NextRequest) {
     const body = await req.json() as {
       name?: string;
       projectId?: string;
+      assignedUserId?: string;
+      description?: string;
+      recurrence?: "none" | "weekly" | "monthly" | "quarterly" | "yearly";
       targetHours?: number;
+      targetAmount?: number;
+      targetType?: "hours" | "amount";
       dueDate?: string;
     };
 
     if (!body.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
+    
     if (body.projectId) {
-      const project = store.projects.get(body.projectId);
+      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
       if (!project || project.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
     }
 
-    const goal = {
+    const newGoal = {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
       name: body.name,
-      projectId: body.projectId,
-      targetHours: body.targetHours,
-      dueDate: body.dueDate,
+      projectId: body.projectId || null,
+      assignedUserId: body.assignedUserId || null,
+      description: body.description || null,
+      recurrence: body.recurrence || "none",
+      targetHours: body.targetHours || null,
+      targetAmount: body.targetAmount || null,
+      targetType: body.targetType || "hours",
+      dueDate: body.dueDate ? new Date(body.dueDate) : null,
       completed: false,
-      createdAt: new Date().toISOString(),
     };
 
-    store.goals.set(goal.id, goal);
+    const [goal] = await db.insert(goals).values(newGoal).returning();
     return NextResponse.json({ ok: true, goal });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
   }
 }
 
@@ -60,35 +80,47 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json() as {
       goalId?: string;
       name?: string;
-      projectId?: string;
-      targetHours?: number;
-      dueDate?: string;
+      projectId?: string | null;
+      assignedUserId?: string | null;
+      description?: string | null;
+      recurrence?: "none" | "weekly" | "monthly" | "quarterly" | "yearly";
+      targetHours?: number | null;
+      targetAmount?: number | null;
+      targetType?: "hours" | "amount";
+      dueDate?: string | null;
       completed?: boolean;
     };
 
     if (!body.goalId) return NextResponse.json({ error: "goalId is required" }, { status: 400 });
 
-    const goal = store.goals.get(body.goalId);
-    if (!goal || goal.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(goals).where(eq(goals.id, body.goalId));
+    if (!existing || existing.workspaceId !== session.workspaceId) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
     }
 
     if (body.projectId) {
-      const project = store.projects.get(body.projectId);
+      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
       if (!project || project.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
     }
 
-    goal.name = body.name ?? goal.name;
-    goal.projectId = body.projectId ?? goal.projectId;
-    goal.targetHours = body.targetHours ?? goal.targetHours;
-    goal.dueDate = body.dueDate ?? goal.dueDate;
-    goal.completed = body.completed ?? goal.completed;
+    const updates: Partial<typeof goals.$inferInsert> = {};
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.projectId !== undefined) updates.projectId = body.projectId;
+    if (body.assignedUserId !== undefined) updates.assignedUserId = body.assignedUserId;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.recurrence !== undefined) updates.recurrence = body.recurrence;
+    if (body.targetHours !== undefined) updates.targetHours = body.targetHours;
+    if (body.targetAmount !== undefined) updates.targetAmount = body.targetAmount;
+    if (body.targetType !== undefined) updates.targetType = body.targetType;
+    if (body.dueDate !== undefined) updates.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+    if (body.completed !== undefined) updates.completed = body.completed;
 
+    const [goal] = await db.update(goals).set(updates).where(eq(goals.id, body.goalId)).returning();
     return NextResponse.json({ ok: true, goal });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
   }
 }
 
@@ -100,20 +132,17 @@ export async function DELETE(req: NextRequest) {
     const goalId = req.nextUrl.searchParams.get("goalId");
     if (!goalId) return NextResponse.json({ error: "goalId is required" }, { status: 400 });
 
-    const goal = store.goals.get(goalId);
-    if (!goal || goal.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(goals).where(eq(goals.id, goalId));
+    if (!existing || existing.workspaceId !== session.workspaceId) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
     }
 
-    store.goals.delete(goalId);
-    for (const entry of store.entries.values()) {
-      if (entry.workspaceId === session.workspaceId && entry.goalId === goalId) {
-        entry.goalId = undefined;
-      }
-    }
+    await db.delete(goals).where(eq(goals.id, goalId));
+
+    await db.update(timeEntries).set({ goalId: null }).where(and(eq(timeEntries.workspaceId, session.workspaceId), eq(timeEntries.goalId, goalId)));
 
     return NextResponse.json({ ok: true, deletedGoalId: goalId });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
   }
 }

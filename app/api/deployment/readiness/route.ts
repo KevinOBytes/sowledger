@@ -10,6 +10,11 @@ function hasUpstash() {
 }
 
 export async function GET() {
+  // Disable detailed readiness checks outside development to avoid leaking operational info.
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ ok: false }, { status: 404 });
+  }
+
   const checks = {
     appUrl: Boolean(env.NEXT_PUBLIC_APP_URL),
     authCookieSecret: Boolean(env.AUTH_COOKIE_SECRET && env.AUTH_COOKIE_SECRET.length >= 24),

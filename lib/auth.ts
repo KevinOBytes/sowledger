@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { env } from "./env";
+import { isAdminEmail } from "./admin";
 import {
   createInvitation,
   ensureMembership,
@@ -8,11 +9,29 @@ import {
   ensureWorkspace,
   findPendingInvitation,
   getMembership,
-  store,
   type WorkspaceRole,
 } from "./store";
+import { db } from "./db";
+import { users, memberships, workspaces, magicLinks, invitations } from "./db/schema";
+import { eq, and } from "drizzle-orm";
 
-const AUTH_COOKIE_NAME = "timely_session";
+export class UnauthorizedError extends Error {
+  readonly status = 401;
+  constructor(message: string) {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+export class ForbiddenError extends Error {
+  readonly status = 403;
+  constructor(message: string) {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
+const AUTH_COOKIE_NAME = "billabled_session";
 
 type SessionPayload = {
   sub: string;
@@ -37,35 +56,60 @@ function encode(payload: SessionPayload) {
   return `${raw}.${sign(raw)}`;
 }
 
-function decode(token: string): SessionPayload {
+async function decode(token: string): Promise<SessionPayload> {
   const [raw, mac] = token.split(".");
-  if (!raw || !mac) throw new Error("Malformed token");
+  if (!raw || !mac) throw new UnauthorizedError("Malformed token");
 
   const expected = sign(raw);
-  if (!timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) throw new Error("Invalid token signature");
+  const macBuf = Buffer.from(mac, "hex");
+  const expectedBuf = Buffer.from(expected, "hex");
+  if (macBuf.length !== expectedBuf.length || !timingSafeEqual(macBuf, expectedBuf)) {
+    throw new UnauthorizedError("Invalid token signature");
+  }
 
   const payload = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as SessionPayload;
-  if (payload.exp < Date.now()) throw new Error("Expired token");
+  if (payload.exp < Date.now()) throw new UnauthorizedError("Expired token");
 
-  const membership = getMembership(payload.sub, payload.workspaceId);
-  if (!membership) throw new Error("Membership revoked");
+  const membership = await getMembership(payload.sub, payload.workspaceId);
+  if (!membership) throw new UnauthorizedError("Membership revoked");
 
-  return { ...payload, role: membership.role };
+  return { ...payload, role: membership.role as WorkspaceRole };
 }
 
 function hashMagic(tokenSecret: string) {
   return createHash("sha256").update(`${tokenSecret}:${secret()}`).digest("hex");
 }
 
-export function createMagicLink(email: string, workspaceSlug: string) {
+export async function createMagicLink(email: string) {
+  const normEmail = email.trim().toLowerCase();
+  
+  // Find their existing workspace if they have one
+  let resolvedSlug = "";
+  const [userResult] = await db.select().from(users).where(eq(users.email, normEmail));
+  
+  if (userResult) {
+    const mems = await db.select().from(memberships).where(eq(memberships.userId, userResult.id));
+    if (mems.length > 0) {
+       const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, mems[0].workspaceId));
+       if (ws) resolvedSlug = ws.slug;
+    }
+  }
+  
+  // If no existing workspace, dynamically generate one
+  if (!resolvedSlug) {
+      resolvedSlug = normEmail.split("@")[0].replace(/[^a-z0-9-]/g, "") + "-workspace";
+  }
+
   const tokenId = crypto.randomUUID();
   const tokenSecret = randomBytes(24).toString("base64url");
   const tokenHash = hashMagic(tokenSecret);
-  store.magicLinks.set(tokenId, {
+  
+  await db.insert(magicLinks).values({
     tokenId,
     tokenHash,
-    email: email.toLowerCase(),
-    workspaceSlug: workspaceSlug.toLowerCase(),
+    email: normEmail,
+    workspaceSlug: resolvedSlug,
+    // expires in 20 minutes
     expiresAt: Date.now() + 1000 * 60 * 20,
     usedAt: null,
   });
@@ -74,7 +118,7 @@ export function createMagicLink(email: string, workspaceSlug: string) {
   return Buffer.from(serialized).toString("base64url");
 }
 
-export function inviteUser(input: { email: string; workspaceId: string; role: WorkspaceRole; invitedByUserId: string }) {
+export async function inviteUser(input: { email: string; workspaceId: string; role: WorkspaceRole; invitedByUserId: string }) {
   return createInvitation({
     email: input.email.trim().toLowerCase(),
     workspaceId: input.workspaceId,
@@ -84,46 +128,60 @@ export function inviteUser(input: { email: string; workspaceId: string; role: Wo
   });
 }
 
-export function consumeMagicLink(token: string) {
+export async function consumeMagicLink(token: string) {
   const parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as { tid: string; sec: string };
-  const record = store.magicLinks.get(parsed.tid);
+  const [record] = await db.select().from(magicLinks).where(eq(magicLinks.tokenId, parsed.tid));
+  
   if (!record) throw new Error("Magic link not found");
   if (record.usedAt) throw new Error("Magic link already used");
   if (record.expiresAt < Date.now()) throw new Error("Magic link expired");
 
   const computed = hashMagic(parsed.sec);
-  if (!timingSafeEqual(Buffer.from(record.tokenHash), Buffer.from(computed))) throw new Error("Magic link validation failed");
+  const hashBuf = Buffer.from(record.tokenHash, "hex");
+  const computedBuf = Buffer.from(computed, "hex");
+  if (hashBuf.length !== computedBuf.length || !timingSafeEqual(hashBuf, computedBuf)) {
+    throw new UnauthorizedError("Magic link validation failed");
+  }
 
-  record.usedAt = Date.now();
-  store.magicLinks.set(record.tokenId, record);
+  await db.update(magicLinks).set({ usedAt: Date.now() }).where(eq(magicLinks.tokenId, record.tokenId));
 
-  const user = ensureUser(record.email);
-  const workspace = ensureWorkspace(record.workspaceSlug);
+  const user = await ensureUser(record.email);
+  const workspace = await ensureWorkspace(record.workspaceSlug);
 
-  const existingMembership = getMembership(user.id, workspace.id);
+  const existingMembership = await getMembership(user.id, workspace.id);
   if (existingMembership) {
+    // Ensure @kevinbytes.com users always retain owner-level access.
+    if (isAdminEmail(user.email) && existingMembership.role !== "owner") {
+      await db.update(memberships).set({ role: "owner" }).where(and(eq(memberships.userId, user.id), eq(memberships.workspaceId, workspace.id)));
+      existingMembership.role = "owner";
+    }
     return { user, workspace, membership: existingMembership };
   }
 
-  const hasAnyMember = store.memberships.some((item) => item.workspaceId === workspace.id);
+  // @kevinbytes.com users always get owner role on first join.
+  if (isAdminEmail(user.email)) {
+    const adminMembership = await ensureMembership(user.id, workspace.id, "owner");
+    return { user, workspace, membership: adminMembership };
+  }
+
+  const hasAnyMember = (await db.select().from(memberships).where(eq(memberships.workspaceId, workspace.id))).length > 0;
   if (!hasAnyMember && env.ALLOW_BOOTSTRAP_OWNER) {
-    const bootstrap = ensureMembership(user.id, workspace.id, "owner");
+    const bootstrap = await ensureMembership(user.id, workspace.id, "owner");
     return { user, workspace, membership: bootstrap };
   }
 
   if (env.ALLOW_SELF_REGISTRATION) {
-    const member = ensureMembership(user.id, workspace.id, "member");
+    const member = await ensureMembership(user.id, workspace.id, "member");
     return { user, workspace, membership: member };
   }
 
-  const invite = findPendingInvitation(user.email, workspace.id);
+  const invite = await findPendingInvitation(user.email, workspace.id);
   if (!invite) {
     throw new Error("Registration disabled: user must be invited by workspace manager/owner.");
   }
 
-  invite.acceptedAt = Date.now();
-  store.invitations.set(invite.id, invite);
-  const membership = ensureMembership(user.id, workspace.id, invite.role);
+  await db.update(invitations).set({ acceptedAt: Date.now() }).where(eq(invitations.id, invite.id));
+  const membership = await ensureMembership(user.id, workspace.id, invite.role as WorkspaceRole);
   return { user, workspace, membership };
 }
 
@@ -151,11 +209,13 @@ export async function clearSessionCookie() {
 export async function requireSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
-  if (!token) throw new Error("Not authenticated");
-  return decode(token);
+  if (!token) throw new UnauthorizedError("Not authenticated");
+  return await decode(token);
 }
 
+export { isAdminEmail } from "./admin";
+
 export function requireRole(role: WorkspaceRole, actualRole: WorkspaceRole) {
-  const weights: Record<WorkspaceRole, number> = { member: 1, manager: 2, owner: 3 };
-  if (weights[actualRole] < weights[role]) throw new Error(`Requires ${role} role`);
+  const weights: Record<WorkspaceRole, number> = { client: 0, member: 1, manager: 2, owner: 3 };
+  if (weights[actualRole] < weights[role]) throw new ForbiddenError(`Requires ${role} role`);
 }

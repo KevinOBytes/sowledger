@@ -7,7 +7,7 @@ export type DraftTimer = {
   lastSeenAt: string;
 };
 
-const DB_NAME = "timelyLocal";
+const DB_NAME = "billabledLocal";
 const STORE_NAME = "draftTimers";
 
 async function openDb(): Promise<IDBDatabase> {
@@ -45,6 +45,21 @@ export const db = {
         tx.onerror = () => reject(tx.error);
       });
       connection.close();
+    },
+    async getAll(): Promise<DraftTimer[]> {
+      const connection = await openDb();
+      return new Promise((resolve, reject) => {
+        const tx = connection.transaction(STORE_NAME, "readonly");
+        const request = tx.objectStore(STORE_NAME).getAll();
+        request.onsuccess = () => {
+          resolve(request.result as DraftTimer[]);
+          connection.close();
+        };
+        request.onerror = () => {
+          reject(request.error);
+          connection.close();
+        };
+      });
     },
   },
 };

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { createTimeEntry, enforceAuthKey } from "@/lib/security";
-import { store } from "@/lib/store";
+import { createTimeEntry } from "@/lib/security";
+import { db } from "@/lib/db";
+import { projects, goals, userActions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
-    await enforceAuthKey(req);
     const session = await requireSession();
     requireRole("member", session.role);
 
@@ -17,45 +18,66 @@ export async function POST(req: NextRequest) {
       projectId?: string;
       goalId?: string;
       tags?: string[];
-      billable?: boolean;
+      actionId?: string;
     };
 
     if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
 
     if (body.projectId) {
-      const project = store.projects.get(body.projectId);
+      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
       if (!project || project.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
     }
 
     if (body.goalId) {
-      const goal = store.goals.get(body.goalId);
+      const [goal] = await db.select().from(goals).where(eq(goals.id, body.goalId));
       if (!goal || goal.workspaceId !== session.workspaceId) {
         return NextResponse.json({ error: "Invalid goalId" }, { status: 400 });
       }
     }
 
-    const entry = createTimeEntry({
+    let actionName: string | undefined;
+    let hourlyRate: number | undefined;
+
+    if (body.actionId) {
+      const [uAction] = await db.select().from(userActions).where(eq(userActions.id, body.actionId));
+      if (!uAction || uAction.workspaceId !== session.workspaceId || uAction.userId !== session.sub) {
+        return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
+      }
+      actionName = uAction.name;
+      hourlyRate = uAction.hourlyRate || undefined;
+    }
+
+    const entry = await createTimeEntry({
       workspaceId: session.workspaceId,
       userId: session.sub,
       taskId: body.taskId,
-      projectId: body.projectId,
-      goalId: body.goalId,
+      projectId: body.projectId || null,
+      goalId: body.goalId || null,
       tags: normalizeTags(body.tags),
-      billable: Boolean(body.billable),
-      startedAt: new Date().toISOString(),
+      startedAt: new Date(),
       stoppedAt: null,
       durationSeconds: null,
-      description: body.description,
+      description: body.description || null,
       status: "draft",
       source: "web",
       collaborators: body.collaborators ?? [],
       expenses: [],
+      action: actionName || null,
+      hourlyRate: hourlyRate || null,
     });
 
     return NextResponse.json({ ok: true, entry });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 403 });
+    const err = error as Record<string, unknown>;
+    const status =
+      typeof err?.status === "number"
+        ? err.status
+        : typeof err?.statusCode === "number"
+        ? err.statusCode
+        : 500;
+    const message = typeof err?.message === "string" ? err.message : "Internal Server Error";
+    return NextResponse.json({ error: message }, { status });
   }
 }
