@@ -2,25 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, and } from "drizzle-orm";
 
-function getAuthStatus(error: unknown): number {
+function getErrorStatus(error: unknown, fallback = 500): number {
   const err: unknown = error;
   if (err && ((err as Record<string, unknown>).code === "FORBIDDEN" || (err as Record<string, unknown>).status === 403 || (err as Record<string, unknown>).message === "Forbidden")) {
     return 403;
   }
-  return 401;
+  if (err && ((err as Record<string, unknown>).code === "UNAUTHORIZED" || (err as Record<string, unknown>).status === 401)) {
+    return 401;
+  }
+  return fallback;
 }
 
 export async function GET() {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
+    await ensureWorkspaceSchema();
 
     const data = await db.select().from(projects).where(eq(projects.workspaceId, session.workspaceId));
     return NextResponse.json({ ok: true, projects: data });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
+    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
   }
 }
 
@@ -28,6 +33,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
+    await ensureWorkspaceSchema();
 
     const body = await req.json() as {
       name?: string;
@@ -76,7 +82,7 @@ export async function POST(req: NextRequest) {
     const [project] = await db.insert(projects).values(newProject).returning();
     return NextResponse.json({ ok: true, project });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
+    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
   }
 }
 
@@ -84,6 +90,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
+    await ensureWorkspaceSchema();
 
     const body = await req.json() as {
       projectId?: string;
@@ -137,7 +144,7 @@ export async function PATCH(req: NextRequest) {
     const [project] = await db.update(projects).set(updates).where(eq(projects.id, body.projectId)).returning();
     return NextResponse.json({ ok: true, project });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
   }
 }
 
@@ -145,6 +152,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
+    await ensureWorkspaceSchema();
 
     const projectId = req.nextUrl.searchParams.get("projectId");
     if (!projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
@@ -169,6 +177,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true, deletedProjectId: projectId });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
+    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
   }
 }

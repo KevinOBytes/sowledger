@@ -2,16 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workspaceTags } from "@/lib/db/schema";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, and } from "drizzle-orm";
+
+function getErrorStatus(error: unknown, fallback = 500): number {
+  const err = error as Record<string, unknown> | null;
+  if (!err) return fallback;
+  if (err.code === "FORBIDDEN" || err.status === 403 || err.message === "Forbidden") return 403;
+  if (err.code === "UNAUTHORIZED" || err.status === 401) return 401;
+  return fallback;
+}
 
 export async function GET() {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
+    await ensureWorkspaceSchema();
     const data = await db.select().from(workspaceTags).where(eq(workspaceTags.workspaceId, session.workspaceId));
     return NextResponse.json({ ok: true, tags: data });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
   }
 }
 
@@ -19,6 +29,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
+    await ensureWorkspaceSchema();
 
     const body = await req.json() as {
       name?: string;
@@ -47,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, tag });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
   }
 }
 
@@ -55,6 +66,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
+    await ensureWorkspaceSchema();
 
     const body = await req.json() as {
       tagId?: string;
@@ -82,7 +94,7 @@ export async function PATCH(req: NextRequest) {
     const [tag] = await db.update(workspaceTags).set(updates).where(eq(workspaceTags.id, body.tagId)).returning();
     return NextResponse.json({ ok: true, tag });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
   }
 }
 
@@ -90,6 +102,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
+    await ensureWorkspaceSchema();
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
@@ -101,6 +114,6 @@ export async function DELETE(req: NextRequest) {
     await db.delete(workspaceTags).where(eq(workspaceTags.id, id));
     return NextResponse.json({ ok: true });
   } catch (error) {
-     return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
   }
 }

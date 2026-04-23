@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { projects as projectsTable, projectTasks as tasksTable } from "@/lib/db/schema";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import { FolderKanban, Archive } from "lucide-react";
@@ -10,23 +11,51 @@ export const metadata = { title: "Projects – Billabled" };
 
 export default async function ProjectsPage() {
   const session = await requireSession();
-  
-  const rawProjects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId)).orderBy(desc(projectsTable.createdAt));
-  const projects = rawProjects.map(p => ({
-    id: p.id,
-    name: p.name,
-    status: p.status,
-    billingModel: p.billingModel,
-    percentComplete: p.percentComplete || 0
-  }));
-    
-  const rawTasks = await db.select().from(tasksTable).where(eq(tasksTable.workspaceId, session.workspaceId));
-  const tasks = rawTasks.map(t => ({
-    id: t.id,
-    projectId: t.projectId,
-    status: t.status,
-    parentId: t.parentId
-  }));
+
+  let projects: Array<{
+    id: string;
+    name: string;
+    status: "active" | "archived";
+    billingModel: "hourly" | "fixed_fee" | "hybrid";
+    percentComplete: number;
+  }> = [];
+  let tasks: Array<{
+    id: string;
+    projectId: string;
+    status: "todo" | "in_progress" | "review" | "done";
+    parentId: string | null;
+  }> = [];
+  let loadError: string | null = null;
+
+  try {
+    await ensureWorkspaceSchema();
+
+    const rawProjects = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.workspaceId, session.workspaceId))
+      .orderBy(desc(projectsTable.createdAt));
+    projects = rawProjects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      billingModel: p.billingModel,
+      percentComplete: p.percentComplete || 0,
+    }));
+
+    const rawTasks = await db
+      .select()
+      .from(tasksTable)
+      .where(eq(tasksTable.workspaceId, session.workspaceId));
+    tasks = rawTasks.map((t) => ({
+      id: t.id,
+      projectId: t.projectId,
+      status: t.status,
+      parentId: t.parentId,
+    }));
+  } catch (error) {
+    loadError = error instanceof Error ? error.message : "Unable to load projects right now.";
+  }
 
   return (
     <main className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">
@@ -34,13 +63,31 @@ export default async function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white">Projects Pipeline</h1>
           <p className="mt-2 text-sm text-slate-400">Select a project to view its Kanban board and tasks.</p>
+          {!loadError && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 font-medium text-cyan-300">
+                {projects.filter((project) => project.status === "active").length} Active
+              </span>
+              <span className="rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1 font-medium text-slate-300">
+                {projects.filter((project) => project.status === "archived").length} Archived
+              </span>
+              <span className="rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1 font-medium text-slate-300">
+                {tasks.length} Tasks
+              </span>
+            </div>
+          )}
         </div>
         <div className="shrink-0 flex items-start self-end sm:self-auto relative z-50">
           <CreateProjectButton />
         </div>
       </div>
 
-      {projects.length === 0 ? (
+      {loadError ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+          <h2 className="text-lg font-semibold">Projects are temporarily unavailable</h2>
+          <p className="mt-2 text-sm text-amber-100/90">{loadError}</p>
+        </div>
+      ) : projects.length === 0 ? (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-16 text-center flex flex-col items-center">
             <FolderKanban className="w-16 h-16 text-slate-700 mb-4" />
             <h3 className="text-xl font-medium text-white">No active projects</h3>
