@@ -1,6 +1,6 @@
-# User Stories: Timely Professional Platform
+# User Stories: Billabled Professional Platform
 
-The following user stories represent the core use cases and capabilities of the newly professionalized Timely platform, focusing on comprehensive entity management, intelligent resource allocation, and strict forensic-grade timekeeping.
+The following user stories represent the core use cases and capabilities of the newly professionalized Billabled platform, focusing on comprehensive entity management, intelligent resource allocation, and strict forensic-grade timekeeping.
 
 ## Client & Entity Management
 1. **As an agency owner**, I want to manage multiple clients and their contact information in a centralized portal, so I can easily associate new projects to the correct billing entities without duplicate data entry.

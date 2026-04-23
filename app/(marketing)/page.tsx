@@ -1,6 +1,15 @@
 "use client";
 
 import { motion, useScroll, useTransform } from "framer-motion";
+import {
+  ArrowRight,
+  BarChart3,
+  Check,
+  ShieldCheck,
+  Sparkles,
+  Webhook,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useRef, useEffect, useState } from "react";
 import { STRIPE_PLANS } from "@/lib/billing-plans";
@@ -54,6 +63,41 @@ function BackgroundText() {
     </div>
   );
 }
+
+type FeatureCard = {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  eyebrow: string;
+  gradient: string;
+};
+
+const FEATURE_CARDS: FeatureCard[] = [
+  {
+    title: "In-Depth Reporting",
+    description:
+      "Generate polished, export-ready reports that reveal where your team actually spends time and where profitability leaks.",
+    icon: BarChart3,
+    eyebrow: "Analytics",
+    gradient: "from-cyan-500/20 via-sky-500/10 to-transparent",
+  },
+  {
+    title: "Approvals Flow",
+    description:
+      "Capture manager approvals before invoicing with immutable audit trails to keep teams aligned and accountable.",
+    icon: ShieldCheck,
+    eyebrow: "Compliance",
+    gradient: "from-emerald-500/20 via-teal-500/10 to-transparent",
+  },
+  {
+    title: "API & Webhooks",
+    description:
+      "Connect Billabled to your stack with robust webhooks and APIs that sync tasks, projects, and billing data in real-time.",
+    icon: Webhook,
+    eyebrow: "Integrations",
+    gradient: "from-indigo-500/20 via-violet-500/10 to-transparent",
+  },
+];
 
 export default function MarketingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -110,14 +154,40 @@ export default function MarketingPage() {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-              className="flex justify-center gap-4"
+              className="flex flex-col items-center justify-center gap-4 sm:flex-row"
             >
               <Link
                 href="/login"
-                className="rounded-full bg-white px-8 py-4 text-base font-semibold text-black transition-transform hover:scale-105"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-4 text-base font-semibold text-black transition-transform hover:scale-105"
               >
                 Sign up for free
+                <ArrowRight className="h-4 w-4" />
               </Link>
+              <Link
+                href="#pricing"
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-8 py-4 text-base font-semibold text-white transition-colors hover:border-cyan-400/50 hover:bg-cyan-500/10"
+              >
+                View pricing
+              </Link>
+            </motion.div>
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+              className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-slate-300"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-cyan-400" />
+                Advanced billing intelligence
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Check className="h-4 w-4 text-cyan-400" />
+                SOC-ready audit trails
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Check className="h-4 w-4 text-cyan-400" />
+                Multi-team scale
+              </span>
             </motion.div>
           </motion.div>
         </section>
@@ -155,20 +225,49 @@ export default function MarketingPage() {
           <div className="mx-auto max-w-6xl">
             <div className="mb-20 text-center">
               <h2 className="text-4xl font-bold tracking-tight sm:text-6xl">Everything you need.</h2>
+              <p className="mx-auto mt-4 max-w-2xl text-base text-slate-400 sm:text-lg">
+                Feature blocks now include visual cues so each capability is scannable at a glance.
+              </p>
             </div>
             <div className="grid gap-6 md:grid-cols-3">
-              <div className="col-span-1 flex min-h-[300px] flex-col justify-end rounded-3xl border border-white/10 bg-slate-900/50 p-8 shadow-xl backdrop-blur-sm transition-transform hover:-translate-y-2 hover:bg-slate-900/80">
-                <h3 className="mb-2 text-2xl font-bold">In-Depth Reporting</h3>
-                <p className="text-slate-400">Generate stunning, exportable reports to understand exactly where yours and your team&apos;s time is going.</p>
-              </div>
-              <div className="col-span-1 flex min-h-[300px] flex-col justify-end rounded-3xl border border-white/10 bg-slate-900/50 p-8 shadow-xl backdrop-blur-sm transition-transform hover:-translate-y-2 hover:bg-slate-900/80">
-                <h3 className="mb-2 text-2xl font-bold">Approvals Flow</h3>
-                <p className="text-slate-400">Ensure timesheets are manager-approved before invoicing. Built-in auditing guarantees accountability.</p>
-              </div>
-              <div className="col-span-1 flex min-h-[300px] flex-col justify-end rounded-3xl border border-white/10 bg-slate-900/50 p-8 shadow-xl backdrop-blur-sm transition-transform hover:-translate-y-2 hover:bg-slate-900/80">
-                <h3 className="mb-2 text-2xl font-bold">API & Webhooks</h3>
-                <p className="text-slate-400">Integrate deeply into your existing ecosystem. We seamlessly sync with Slack, Discord, and internal tools.</p>
-              </div>
+              {FEATURE_CARDS.map((feature, index) => {
+                const Icon = feature.icon;
+
+                return (
+                  <motion.div
+                    key={feature.title}
+                    initial={{ y: 24, opacity: 0 }}
+                    whileInView={{ y: 0, opacity: 1 }}
+                    viewport={{ once: true, amount: 0.4 }}
+                    transition={{ duration: 0.45, delay: index * 0.08 }}
+                    className="group col-span-1 flex min-h-[340px] flex-col rounded-3xl border border-white/10 bg-slate-900/50 p-8 shadow-xl backdrop-blur-sm transition-all hover:-translate-y-2 hover:border-cyan-400/40 hover:bg-slate-900/80"
+                  >
+                    <div className="mb-5 flex items-center justify-between">
+                      <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
+                        {feature.eyebrow}
+                      </span>
+                      <div className="rounded-xl border border-white/20 bg-white/10 p-2.5 text-cyan-300 transition-colors group-hover:border-cyan-400/50 group-hover:bg-cyan-500/10">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                    </div>
+                    <div className="relative mb-6 overflow-hidden rounded-2xl border border-white/10 bg-[#030812] p-4">
+                      <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient}`} />
+                      <div className="relative space-y-3">
+                        <div className="h-2.5 w-5/6 rounded-full bg-white/25" />
+                        <div className="h-2.5 w-3/5 rounded-full bg-white/15" />
+                        <div className="flex items-center gap-2 pt-2">
+                          <div className="h-9 w-9 rounded-lg border border-white/20 bg-white/10 p-2 text-cyan-300">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="h-9 flex-1 rounded-lg border border-white/20 bg-white/10" />
+                        </div>
+                      </div>
+                    </div>
+                    <h3 className="mb-2 text-2xl font-bold">{feature.title}</h3>
+                    <p className="text-slate-400">{feature.description}</p>
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
         </section>
