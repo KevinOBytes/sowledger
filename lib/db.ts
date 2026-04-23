@@ -27,7 +27,9 @@ export function getDb(): DbClient {
   return client;
 }
 
-export const db: DbClient = new Proxy({} as DbClient, {
+const dbProxyTarget = {} as DbClient;
+
+export const db: DbClient = new Proxy(dbProxyTarget, {
   get(_target, prop, receiver) {
     const client = getDb() as unknown as Record<string | symbol, unknown>;
     const value = Reflect.get(client, prop, receiver);

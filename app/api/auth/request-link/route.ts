@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMagicLink } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { isValidEmail } from "@/lib/validators";
 import { Resend } from "resend";
 
 export async function POST(req: NextRequest) {
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
     const email = body.email?.trim().toLowerCase();
     if (!email) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
+    }
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: "email is invalid" }, { status: 400 });
     }
 
     const token = await createMagicLink(email);
@@ -38,7 +42,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      error: "Email delivery is not configured",
+      error: "Email delivery is not configured. Please set RESEND_API_KEY in production.",
     }, { status: 503 });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);

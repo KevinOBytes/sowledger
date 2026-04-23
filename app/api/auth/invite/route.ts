@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ForbiddenError, inviteUser, requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
+import { isValidEmail } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,6 +10,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json() as { email?: string; role?: "client" | "member" | "manager" };
     const email = body.email?.trim().toLowerCase();
     if (!email) return NextResponse.json({ error: "email is required" }, { status: 400 });
+    if (!isValidEmail(email)) return NextResponse.json({ error: "email is invalid" }, { status: 400 });
     const role = body.role ?? "member";
     if (!["client", "member", "manager"].includes(role)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });

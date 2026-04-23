@@ -4,7 +4,7 @@ import { env } from "./env";
 import { UnauthorizedError } from "./auth";
 import { db } from "./db";
 import { webhooks, lockPeriods, timeEntries, auditLogs } from "./db/schema";
-import { eq, and, gte, lt, ne, sql } from "drizzle-orm";
+import { eq, and, gte, lt, ne, sql, isNotNull } from "drizzle-orm";
 
 const timerStopCounters = new Map<string, { windowStart: number; count: number }>();
 
@@ -75,6 +75,7 @@ export async function enforceDailyHoursLimit(userId: string, businessDate: Date,
     eq(timeEntries.userId, userId),
     gte(timeEntries.startedAt, dayStart),
     lt(timeEntries.startedAt, dayEnd),
+    isNotNull(timeEntries.durationSeconds),
   ];
   if (excludeEntryId) {
     filters.push(ne(timeEntries.id, excludeEntryId));
