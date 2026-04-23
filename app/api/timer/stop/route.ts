@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "endedAt must be greater than or equal to startedAt" }, { status: 400 });
     }
 
+    if (endedAt.getTime() > Date.now()) {
+      return NextResponse.json({ error: "endedAt cannot be in the future" }, { status: 400 });
+    }
+
     const durationSeconds = Math.max(1, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
 
     await ensurePeriodUnlocked(session.workspaceId, startedAt, endedAt);

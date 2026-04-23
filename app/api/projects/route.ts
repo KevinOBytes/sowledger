@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
       isPrivate?: boolean;
     };
 
-    if (!body.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
+    const normalizedName = body.name?.trim();
+    if (!normalizedName) return NextResponse.json({ error: "name is required" }, { status: 400 });
+    if (normalizedName.length > 120) return NextResponse.json({ error: "name must be 120 chars or fewer" }, { status: 400 });
 
     const { checkWorkspaceLimits } = await import("@/lib/billing");
     const limits = await checkWorkspaceLimits(session.workspaceId, "projects");
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
       clientId: body.clientId || null,
-      name: body.name,
+      name: normalizedName,
       description: body.description || null,
       color: body.color || "#3b82f6",
       billingModel: body.billingModel ?? "hourly",
@@ -109,7 +111,15 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updates: Partial<typeof projects.$inferInsert> = {};
-    if (body.name !== undefined) updates.name = body.name;
+    if (body.name !== undefined) {
+      if (typeof body.name !== "string") {
+        return NextResponse.json({ error: "name must be a string" }, { status: 400 });
+      }
+      const normalizedName = body.name.trim();
+      if (!normalizedName) return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
+      if (normalizedName.length > 120) return NextResponse.json({ error: "name must be 120 chars or fewer" }, { status: 400 });
+      updates.name = normalizedName;
+    }
     if (body.clientId !== undefined) updates.clientId = body.clientId;
     if (body.description !== undefined) updates.description = body.description;
     if (body.color !== undefined) updates.color = body.color;

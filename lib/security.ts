@@ -4,7 +4,7 @@ import { env } from "./env";
 import { UnauthorizedError } from "./auth";
 import { db } from "./db";
 import { webhooks, lockPeriods, timeEntries, auditLogs } from "./db/schema";
-import { eq, and, gt, lt } from "drizzle-orm";
+import { eq, and, gte, lt, ne, sql, isNotNull } from "drizzle-orm";
 
 const timerStopCounters = new Map<string, { windowStart: number; count: number }>();
 
@@ -27,7 +27,12 @@ export async function dispatchWebhook(workspaceId: string, eventType: string, pa
 }
 
 export async function enforceAuthKey(req: NextRequest) {
-  if (!env.AUTH_SHARED_KEY) return;
+  if (!env.AUTH_SHARED_KEY) {
+    if (env.NODE_ENV === "production") {
+      throw new UnauthorizedError("AUTH_SHARED_KEY must be configured");
+    }
+    return;
+  }
   const key = req.headers.get("x-auth-key");
   if (!key || key !== env.AUTH_SHARED_KEY) throw new UnauthorizedError("Invalid auth key");
 }
@@ -66,18 +71,24 @@ export async function enforceDailyHoursLimit(userId: string, businessDate: Date,
   ));
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  const query = db.select().from(timeEntries).where(and(
+  const filters = [
     eq(timeEntries.userId, userId),
-    gt(timeEntries.startedAt, dayStart),
-    lt(timeEntries.startedAt, dayEnd)
-  ));
+    gte(timeEntries.startedAt, dayStart),
+    lt(timeEntries.startedAt, dayEnd),
+    isNotNull(timeEntries.durationSeconds),
+  ];
+  if (excludeEntryId) {
+    filters.push(ne(timeEntries.id, excludeEntryId));
+  }
 
-  const entries = await query;
-  
-  const total = entries.reduce((acc, entry) => {
-    if (!entry.durationSeconds || entry.id === excludeEntryId) return acc;
-    return acc + entry.durationSeconds;
-  }, 0);
+  const [result] = await db
+    .select({
+      totalSeconds: sql<number>`coalesce(sum(${timeEntries.durationSeconds}), 0)`,
+    })
+    .from(timeEntries)
+    .where(and(...filters));
+
+  const total = Number(result?.totalSeconds ?? 0);
 
   if (total + nextSeconds > 86400) throw new Error("Impossible time: cannot exceed 24 hours in a day");
 }
