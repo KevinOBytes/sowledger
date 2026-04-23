@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Building2Icon, Archive, FolderKanban, Edit2, CheckIcon, XIcon, Globe, Mail } from "lucide-react";
+import { Building2Icon, Archive, FolderKanban, Edit2, CheckIcon, XIcon, Mail } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 

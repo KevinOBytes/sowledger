@@ -1,24 +1,26 @@
-require("dotenv").config({ path: ".env.local" });
-const { drizzle } = require("drizzle-orm/neon-http");
-const { neon } = require("@neondatabase/serverless");
-const { projects, projectTasks } = require("./lib/db/schema");
-
 async function run() {
   try {
+    const { config } = await import("dotenv");
+    config({ path: ".env.local" });
+
+    const { drizzle } = await import("drizzle-orm/neon-http");
+    const { neon } = await import("@neondatabase/serverless");
+    const { projects, projectTasks } = await import("./lib/db/schema");
+
     const sql = neon(process.env.DATABASE_URL);
     const db = drizzle(sql);
-    
-    console.log("querying projects...");
-    const p = await db.select().from(projects).limit(5);
-    console.log("projects:", p.length);
-    
-    console.log("querying tasks...");
-    const t = await db.select().from(projectTasks).limit(5);
-    console.log("tasks:", t.length);
 
-  } catch (e) {
+    console.log("querying projects...");
+    const projectRows = await db.select().from(projects).limit(5);
+    console.log("projects:", projectRows.length);
+
+    console.log("querying tasks...");
+    const taskRows = await db.select().from(projectTasks).limit(5);
+    console.log("tasks:", taskRows.length);
+  } catch (error) {
     console.error("ERROR:");
-    console.error(e);
+    console.error(error);
   }
 }
-run();
+
+void run();

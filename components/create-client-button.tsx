@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusIcon, Loader2Icon, XIcon, Building2Icon } from "lucide-react";
+import { PlusIcon, XIcon, Building2Icon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function CreateClientButton() {
