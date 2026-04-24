@@ -64,8 +64,8 @@ The highest-risk launch issues found in this pass were fixed before deployment: 
 
 ### R-3: Public API abuse controls depend on Upstash in production
 - Severity: Medium until verified
-- Evidence: Proxy rate limiting uses Upstash when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set; otherwise it falls back to process-local counters.
-- Required verification: Confirm Upstash env is present in production readiness.
+- Evidence: Proxy rate limiting uses Upstash/Vercel KV when `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN` or `KV_REST_API_URL`/`KV_REST_API_TOKEN` are set; otherwise it falls back to process-local counters.
+- Required verification: Confirm Upstash or Vercel KV env is present in production readiness.
 
 ### R-4: Workspace isolation should remain part of CI review
 - Severity: Medium
