@@ -96,4 +96,24 @@ test.describe('Authenticated Flows (Free Plan)', () => {
     });
     expect(project.ok()).toBeTruthy();
   });
+
+  test('Test 10c: internal accounts receive owner role and Business limits', async ({ page }) => {
+    const workspace = `internal-e2e-${Date.now()}`;
+    const login = await page.goto(`/api/test/login?plan=free&role=member&email=kevin%40tkoresearch.com&workspace=${workspace}&clean=true`);
+    const loginData = await login?.json();
+    expect(loginData?.success).toBe(true);
+
+    const me = await page.request.get('/api/auth/me');
+    expect(me.ok()).toBeTruthy();
+    const meData = await me.json();
+    expect(meData.session.email).toBe('kevin@tkoresearch.com');
+    expect(meData.session.role).toBe('owner');
+
+    const billing = await page.request.get('/api/billing');
+    expect(billing.ok()).toBeTruthy();
+    const billingData = await billing.json();
+    expect(billingData.plan).toBe('enterprise');
+    expect(billingData.planSource).toBe('internal');
+    expect(billingData.limits.projects).toBeGreaterThanOrEqual(200);
+  });
 });

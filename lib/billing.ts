@@ -1,7 +1,8 @@
 import { db } from "./db";
-import { workspaces, memberships, projects, goals } from "./db/schema";
-import { eq, sql } from "drizzle-orm";
-import { STRIPE_PLANS } from "./billing-plans";
+import { workspaces, memberships, projects, goals, users } from "./db/schema";
+import { eq, inArray, sql } from "drizzle-orm";
+import { STRIPE_PLANS, type StripePlanId } from "./billing-plans";
+import { isInternalHighestAccessEmail } from "./internal-accounts";
 
 export type PlanLimits = {
   maxMembers: number;
@@ -10,17 +11,35 @@ export type PlanLimits = {
   canUseWebhooks: boolean;
 };
 
+export async function workspaceHasInternalHighestAccess(workspaceId: string) {
+  const workspaceMembers = await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.workspaceId, workspaceId));
+  const userIds = workspaceMembers.map((membership) => membership.userId);
+  if (userIds.length === 0) return false;
+
+  const memberUsers = await db.select({ email: users.email }).from(users).where(inArray(users.id, userIds));
+  return memberUsers.some((user) => isInternalHighestAccessEmail(user.email));
+}
+
+export async function resolveWorkspacePlan(workspaceId: string): Promise<{ plan: StripePlanId; source: "stripe" | "internal"; storedPlan: StripePlanId }> {
+  const [ws] = await db.select({ plan: workspaces.plan }).from(workspaces).where(eq(workspaces.id, workspaceId));
+  if (!ws) throw new Error("Workspace not found");
+
+  const storedPlan = (ws.plan in STRIPE_PLANS ? ws.plan : "free") as StripePlanId;
+  if (await workspaceHasInternalHighestAccess(workspaceId)) {
+    return { plan: "enterprise", source: "internal", storedPlan };
+  }
+  return { plan: storedPlan, source: "stripe", storedPlan };
+}
+
 export async function checkWorkspaceLimits(
   workspaceId: string,
   feature: "members" | "projects" | "invoices" | "webhooks" | "goals"
 ) {
-  const [ws] = await db.select({ plan: workspaces.plan }).from(workspaces).where(eq(workspaces.id, workspaceId));
-  if (!ws) throw new Error("Workspace not found");
-
-  const planData = STRIPE_PLANS[ws.plan as keyof typeof STRIPE_PLANS] || STRIPE_PLANS.free;
+  const plan = await resolveWorkspacePlan(workspaceId);
+  const planData = STRIPE_PLANS[plan.plan];
 
   if (feature === "invoices" && !planData.features.includes("invoicing")) return { allowed: false, error: "Invoices require the Starter plan." };
-  if (feature === "webhooks" && !planData.features.includes("webhooks") && ws.plan !== "smb" && ws.plan !== "enterprise") return { allowed: false, error: "Webhooks require the Studio plan." };
+  if (feature === "webhooks" && !planData.features.includes("webhooks") && plan.plan !== "smb" && plan.plan !== "enterprise") return { allowed: false, error: "Webhooks require the Studio plan." };
 
   if (feature === "members") {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(memberships).where(eq(memberships.workspaceId, workspaceId));

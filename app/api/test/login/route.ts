@@ -17,9 +17,10 @@ export async function GET(request: Request) {
   const role = (["client", "member", "manager", "owner"].includes(roleParam) ? roleParam : "owner") as "client" | "member" | "manager" | "owner";
   
   try {
-    const email = "test-e2e@example.com";
+    const email = searchParams.get("email")?.trim().toLowerCase() || "test-e2e@example.com";
     const user = await ensureUser(email);
-    const workspace = await ensureWorkspace("test-workspace-e2e");
+    const workspaceSlug = searchParams.get("workspace")?.trim().toLowerCase() || "test-workspace-e2e";
+    const workspace = await ensureWorkspace(workspaceSlug);
     await ensureMembership(user.id, workspace.id, "owner");
     const { memberships } = await import("@/lib/db/schema");
     await db.update(memberships).set({ role }).where(and(eq(memberships.userId, user.id), eq(memberships.workspaceId, workspace.id)));

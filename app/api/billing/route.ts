@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { workspaces, memberships, projects } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { STRIPE_PLANS } from "@/lib/billing-plans";
+import { resolveWorkspacePlan } from "@/lib/billing";
 
 export async function GET() {
   try {
@@ -15,11 +16,14 @@ export async function GET() {
     const [membersResult] = await db.select({ count: sql<number>`count(*)` }).from(memberships).where(eq(memberships.workspaceId, session.workspaceId));
     const [projectsResult] = await db.select({ count: sql<number>`count(*)` }).from(projects).where(eq(projects.workspaceId, session.workspaceId));
 
-    const planData = STRIPE_PLANS[ws.plan as keyof typeof STRIPE_PLANS] || STRIPE_PLANS.free;
+    const resolvedPlan = await resolveWorkspacePlan(session.workspaceId);
+    const planData = STRIPE_PLANS[resolvedPlan.plan] || STRIPE_PLANS.free;
 
     return NextResponse.json({ 
       ok: true, 
-      plan: ws.plan,
+      plan: resolvedPlan.plan,
+      storedPlan: ws.plan,
+      planSource: resolvedPlan.source,
       isOwner: session.role === "owner",
       usage: {
         members: membersResult.count,

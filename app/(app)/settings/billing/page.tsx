@@ -17,6 +17,8 @@ type Plan = {
 
 type BillingData = {
   plan: "free" | "pro" | "smb" | "enterprise";
+  storedPlan?: "free" | "pro" | "smb" | "enterprise";
+  planSource?: "stripe" | "internal";
   isOwner: boolean;
   usage: { members: number; projects: number };
   limits: { members: number; projects: number; storageMB: number; goals: number };
@@ -119,7 +121,10 @@ export default function BillingPage() {
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Plans and subscription</h1>
               <p className="mt-2 max-w-2xl text-sm text-slate-500">Flat workspace pricing keeps the first paid step easy to approve. Stripe checkout is still plan based, so the client never passes raw price IDs.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
+              {data.planSource === "internal" && (
+                <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">Internal Business access</span>
+              )}
               <Link href="/settings" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700">Settings</Link>
               {data.isOwner && data.plan !== "free" && (
                 <button onClick={handlePortal} disabled={processing === "portal"} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
