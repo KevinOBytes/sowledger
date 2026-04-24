@@ -5,6 +5,10 @@ test.describe('Mobile Web Support', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
+    const manifest = await page.request.get('/manifest.webmanifest');
+    expect(manifest.ok()).toBeTruthy();
+    expect((await manifest.json()).display).toBe('standalone');
+
     await page.goto('/login');
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
