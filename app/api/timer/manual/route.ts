@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     // Security constraints
     await ensurePeriodUnlocked(session.workspaceId, startedAt, stoppedAt);
-    await enforceDailyHoursLimit(session.sub, startedAt, durationSeconds);
+    await enforceDailyHoursLimit(session.workspaceId, session.sub, startedAt, durationSeconds);
 
     if (body.projectId) {
       const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));

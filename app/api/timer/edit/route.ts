@@ -78,7 +78,7 @@ export async function PATCH(req: NextRequest) {
 
     await ensurePeriodUnlocked(session.workspaceId, nextStartedAt, nextStoppedAt);
     const nextDurationSeconds = Math.max(1, Math.floor((nextStoppedAt.getTime() - nextStartedAt.getTime()) / 1000));
-    await enforceDailyHoursLimit(entry.userId, nextStartedAt, nextDurationSeconds, entry.id);
+    await enforceDailyHoursLimit(entry.workspaceId, entry.userId, nextStartedAt, nextDurationSeconds, entry.id);
 
     const updates: Partial<typeof timeEntries.$inferInsert> = {};
     updates.startedAt = nextStartedAt;

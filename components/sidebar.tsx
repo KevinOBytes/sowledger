@@ -175,7 +175,7 @@ export function Sidebar() {
             className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#163c36] px-3 py-2.5 text-sm font-bold text-white transition hover:bg-[#23544b]"
           >
             <Plus className="h-4 w-4" />
-            Quick entry
+            Quick time entry
           </button>
           <Link href="/support/api" className="mb-2 flex items-center gap-3 rounded-2xl bg-teal-50 px-3 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100">
             <Code2 className="h-4 w-4" />

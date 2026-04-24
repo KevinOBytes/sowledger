@@ -60,7 +60,13 @@ export async function ensurePeriodUnlocked(workspaceId: string, startedAt: Date,
   }
 }
 
-export async function enforceDailyHoursLimit(userId: string, businessDate: Date, nextSeconds: number, excludeEntryId?: string) {
+export type TimeWindowSegment = {
+  startedAt: Date;
+  stoppedAt: Date;
+  durationSeconds: number;
+};
+
+function utcDayRange(businessDate: Date) {
   const dayStart = new Date(Date.UTC(
     businessDate.getUTCFullYear(),
     businessDate.getUTCMonth(),
@@ -70,8 +76,17 @@ export async function enforceDailyHoursLimit(userId: string, businessDate: Date,
     0,
   ));
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  return { dayStart, dayEnd };
+}
 
+function utcDayKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+export async function getDailyLoggedSeconds(workspaceId: string, userId: string, businessDate: Date, excludeEntryId?: string) {
+  const { dayStart, dayEnd } = utcDayRange(businessDate);
   const filters = [
+    eq(timeEntries.workspaceId, workspaceId),
     eq(timeEntries.userId, userId),
     gte(timeEntries.startedAt, dayStart),
     lt(timeEntries.startedAt, dayEnd),
@@ -89,16 +104,20 @@ export async function enforceDailyHoursLimit(userId: string, businessDate: Date,
     .where(and(...filters));
 
   const total = Number(result?.totalSeconds ?? 0);
+  return Number.isFinite(total) ? total : 0;
+}
 
+export async function enforceDailyHoursLimit(workspaceId: string, userId: string, businessDate: Date, nextSeconds: number, excludeEntryId?: string) {
+  const total = await getDailyLoggedSeconds(workspaceId, userId, businessDate, excludeEntryId);
   if (total + nextSeconds > 86400) throw new Error("Impossible time: cannot exceed 24 hours in a day");
 }
 
-export function splitTimeWindowByUtcDay(startedAt: Date, stoppedAt: Date) {
+export function splitTimeWindowByUtcDay(startedAt: Date, stoppedAt: Date): TimeWindowSegment[] {
   if (stoppedAt <= startedAt) {
     return [{ startedAt, stoppedAt, durationSeconds: 1 }];
   }
 
-  const segments: Array<{ startedAt: Date; stoppedAt: Date; durationSeconds: number }> = [];
+  const segments: TimeWindowSegment[] = [];
   let cursor = new Date(startedAt);
 
   while (cursor < stoppedAt) {
@@ -122,10 +141,48 @@ export function splitTimeWindowByUtcDay(startedAt: Date, stoppedAt: Date) {
   return segments;
 }
 
-export async function enforceDailyHoursLimitForWindow(userId: string, startedAt: Date, stoppedAt: Date, excludeEntryId?: string) {
+export async function enforceDailyHoursLimitForWindow(workspaceId: string, userId: string, startedAt: Date, stoppedAt: Date, excludeEntryId?: string) {
   for (const segment of splitTimeWindowByUtcDay(startedAt, stoppedAt)) {
-    await enforceDailyHoursLimit(userId, segment.startedAt, segment.durationSeconds, excludeEntryId);
+    await enforceDailyHoursLimit(workspaceId, userId, segment.startedAt, segment.durationSeconds, excludeEntryId);
   }
+}
+
+export async function fitTimeWindowSegmentsToDailyLimit(params: {
+  workspaceId: string;
+  userId: string;
+  segments: TimeWindowSegment[];
+  excludeEntryId?: string;
+}) {
+  const fittedSegments: TimeWindowSegment[] = [];
+  const dayTotals = new Map<string, number>();
+  let trimmedSeconds = 0;
+
+  for (const segment of params.segments) {
+    const key = utcDayKey(segment.startedAt);
+    let usedSeconds = dayTotals.get(key);
+    if (usedSeconds === undefined) {
+      usedSeconds = await getDailyLoggedSeconds(params.workspaceId, params.userId, segment.startedAt, params.excludeEntryId);
+    }
+
+    const availableSeconds = Math.max(0, Math.floor(86400 - usedSeconds));
+    const allowedSeconds = Math.min(segment.durationSeconds, availableSeconds);
+    const removedSeconds = Math.max(0, segment.durationSeconds - allowedSeconds);
+    trimmedSeconds += removedSeconds;
+
+    if (allowedSeconds > 0) {
+      fittedSegments.push({
+        startedAt: segment.startedAt,
+        stoppedAt: allowedSeconds === segment.durationSeconds
+          ? segment.stoppedAt
+          : new Date(segment.startedAt.getTime() + allowedSeconds * 1000),
+        durationSeconds: allowedSeconds,
+      });
+    }
+
+    dayTotals.set(key, usedSeconds + allowedSeconds);
+  }
+
+  return { segments: fittedSegments, trimmedSeconds };
 }
 
 function signAudit(diff: string, eventType: string) {

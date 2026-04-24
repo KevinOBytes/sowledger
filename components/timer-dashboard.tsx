@@ -32,6 +32,12 @@ type ScheduledBlock = {
   status: "planned" | "in_progress" | "completed" | "skipped" | "canceled";
   createdAt?: string;
 };
+type StopTimerResponse = {
+  error?: string;
+  durationSeconds?: number;
+  adjustedForDailyLimit?: boolean;
+  message?: string;
+};
 
 function fmt(seconds: number) {
   const h = Math.floor(seconds / 3600);
@@ -174,12 +180,18 @@ export function TimerDashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entryId }),
     });
-    const data = await response.json();
+    const data = await response.json() as StopTimerResponse;
     if (!response.ok) {
       toast.error("Could not stop timer", { description: data.error });
       return;
     }
-    toast.success("Time logged", { description: fmt(data.durationSeconds ?? 0) });
+    if (data.adjustedForDailyLimit) {
+      toast.warning("Timer stopped with an adjustment", {
+        description: data.message ?? `Logged ${fmt(data.durationSeconds ?? 0)} without exceeding the 24-hour day limit.`,
+      });
+    } else {
+      toast.success("Time logged", { description: fmt(data.durationSeconds ?? 0) });
+    }
     await refresh();
   }
 
@@ -238,6 +250,7 @@ export function TimerDashboard() {
     }
     toast.success("Work block scheduled");
     setPlanningOpen(false);
+    await refresh();
   }
 
   const focusedElapsed = focusedTimer ? Math.max(0, Math.floor((now - new Date(focusedTimer.startedAt).getTime()) / 1000)) : 0;
