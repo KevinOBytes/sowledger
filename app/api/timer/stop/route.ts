@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { appendAuditLog, enforceDailyHoursLimit, enforceStopRateLimit, ensurePeriodUnlocked } from "@/lib/security";
+import { appendAuditLog, createTimeEntry, enforceDailyHoursLimitForWindow, enforceStopRateLimit, ensurePeriodUnlocked, splitTimeWindowByUtcDay } from "@/lib/security";
 import { db } from "@/lib/db";
 import { scheduledWorkBlocks, timeEntries } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -34,17 +34,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "endedAt cannot be in the future" }, { status: 400 });
     }
 
-    const durationSeconds = Math.max(1, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
+    const segments = splitTimeWindowByUtcDay(startedAt, endedAt);
+    const durationSeconds = segments.reduce((sum, segment) => sum + segment.durationSeconds, 0);
+    const [firstSegment, ...continuationSegments] = segments;
+    if (!firstSegment) return NextResponse.json({ error: "Unable to calculate timer duration" }, { status: 400 });
 
     await ensurePeriodUnlocked(session.workspaceId, startedAt, endedAt);
-    await enforceDailyHoursLimit(session.sub, startedAt, durationSeconds);
+    await enforceDailyHoursLimitForWindow(session.sub, startedAt, endedAt, entry.id);
 
     const stoppedAtIso = endedAt.toISOString();
     
     await db.update(timeEntries).set({
-      stoppedAt: endedAt,
-      durationSeconds,
+      stoppedAt: firstSegment.stoppedAt,
+      durationSeconds: firstSegment.durationSeconds,
     }).where(eq(timeEntries.id, entry.id));
+
+    const continuationEntries = [];
+    for (const segment of continuationSegments) {
+      continuationEntries.push(await createTimeEntry({
+        workspaceId: entry.workspaceId,
+        userId: entry.userId,
+        scheduledBlockId: null,
+        taskId: entry.taskId,
+        projectId: entry.projectId,
+        goalId: entry.goalId,
+        tags: entry.tags,
+        startedAt: segment.startedAt,
+        stoppedAt: segment.stoppedAt,
+        durationSeconds: segment.durationSeconds,
+        description: entry.description,
+        status: entry.status,
+        source: entry.source,
+        collaborators: entry.collaborators,
+        expenses: entry.expenses,
+        action: entry.action,
+        hourlyRate: entry.hourlyRate,
+      }));
+    }
 
     if (entry.scheduledBlockId) {
       await db.update(scheduledWorkBlocks).set({
@@ -58,14 +84,35 @@ export async function POST(req: NextRequest) {
       workspaceId: session.workspaceId,
       timeEntryId: entry.id,
       actorUserId: session.sub,
-      eventType: "timer_stopped",
+      eventType: continuationEntries.length > 0 ? "timer_stopped_split" : "timer_stopped",
       diff: {
-        stoppedAt: { before: null, after: stoppedAtIso },
-        durationSeconds: { before: null, after: durationSeconds },
+        stoppedAt: { before: null, after: firstSegment.stoppedAt.toISOString() },
+        durationSeconds: { before: null, after: firstSegment.durationSeconds },
+        continuationEntryIds: { before: [], after: continuationEntries.map((continued) => continued.id) },
       },
     });
 
-    return NextResponse.json({ ok: true, entryId: entry.id, durationSeconds });
+    for (const continued of continuationEntries) {
+      await appendAuditLog({
+        workspaceId: session.workspaceId,
+        timeEntryId: continued.id,
+        actorUserId: session.sub,
+        eventType: "timer_continued_after_midnight",
+        diff: {
+          sourceEntryId: { before: null, after: entry.id },
+          stoppedAt: { before: null, after: continued.stoppedAt?.toISOString() ?? stoppedAtIso },
+          durationSeconds: { before: null, after: continued.durationSeconds },
+        },
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      entryId: entry.id,
+      entryIds: [entry.id, ...continuationEntries.map((continued) => continued.id)],
+      durationSeconds,
+      splitAcrossDays: continuationEntries.length > 0,
+    });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 403 });
   }

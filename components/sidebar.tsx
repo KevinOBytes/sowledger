@@ -122,13 +122,13 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-72 flex-col border-r border-slate-200 bg-white/95 shadow-[16px_0_50px_rgba(15,23,42,0.06)] backdrop-blur md:flex">
-        <div className="border-b border-slate-100 px-6 py-5">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-72 flex-col border-r border-stone-200/80 bg-[#fffdf8]/95 shadow-[16px_0_50px_rgba(65,52,37,0.08)] backdrop-blur md:flex">
+        <div className="border-b border-stone-200/70 px-6 py-5">
           <Link href="/dashboard" className="flex items-center transition hover:opacity-80">
             <Image src="/logo.png" alt="Billabled" width={30} height={30} className="mr-3 rounded-lg" unoptimized />
             <div>
-              <p className="text-lg font-semibold tracking-tight text-slate-950">Billabled</p>
-              <p className="text-xs font-medium text-slate-400">Plan, track, invoice</p>
+              <p className="text-lg font-semibold tracking-tight text-[#17211d]">Billabled</p>
+              <p className="text-xs font-medium text-stone-500">Plan, track, invoice</p>
             </div>
           </Link>
         </div>
@@ -136,7 +136,7 @@ export function Sidebar() {
         <nav className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
           {navSections.map((section) => (
             <div key={section.label} className="mb-5">
-              <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{section.label}</p>
+              <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-stone-400">{section.label}</p>
               <div className="space-y-1">
                 {section.items.map((item) => {
                   const isActive = routeIsActive(pathname, item);
@@ -147,12 +147,12 @@ export function Sidebar() {
                       href={item.href}
                       className={`group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${
                         isActive
-                          ? "bg-slate-950 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                          ? "bg-[#163c36] text-white shadow-sm shadow-teal-950/10"
+                          : "text-stone-600 hover:bg-[#f2ece2] hover:text-[#17211d]"
                       }`}
                     >
                       <span className="flex items-center gap-3">
-                        <Icon className={`h-4 w-4 ${isActive ? "text-cyan-300" : "text-slate-400 group-hover:text-cyan-700"}`} />
+                        <Icon className={`h-4 w-4 ${isActive ? "text-teal-200" : "text-stone-400 group-hover:text-teal-700"}`} />
                         {item.name}
                       </span>
                       {item.showBadge && unreadCount > 0 && (
@@ -168,30 +168,30 @@ export function Sidebar() {
           ))}
         </nav>
 
-        <div className="border-t border-slate-100 p-4">
+        <div className="border-t border-stone-200/70 p-4">
           <button
             type="button"
             onClick={() => setManualOpen(true)}
-            className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800"
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#163c36] px-3 py-2.5 text-sm font-bold text-white transition hover:bg-[#23544b]"
           >
             <Plus className="h-4 w-4" />
             Quick entry
           </button>
-          <Link href="/support/api" className="mb-2 flex items-center gap-3 rounded-2xl bg-cyan-50 px-3 py-2.5 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-100">
+          <Link href="/support/api" className="mb-2 flex items-center gap-3 rounded-2xl bg-teal-50 px-3 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100">
             <Code2 className="h-4 w-4" />
             API guide
           </Link>
           <Link
             href="/api/auth/logout"
-            className="group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
+            className="group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold text-stone-500 transition hover:bg-rose-50 hover:text-rose-600"
           >
-            <LogOut className="h-4 w-4 text-slate-400 group-hover:text-rose-500" />
+            <LogOut className="h-4 w-4 text-stone-400 group-hover:text-rose-500" />
             Sign out
           </Link>
         </div>
       </aside>
 
-      <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around border-t border-slate-200 bg-white/95 px-2 py-3 pb-safe shadow-[0_-12px_35px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
+      <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around border-t border-stone-200 bg-[#fffdf8]/95 px-2 py-3 pb-safe shadow-[0_-12px_35px_rgba(65,52,37,0.08)] backdrop-blur md:hidden">
         {mobileNav.map((item) => {
           const isActive = routeIsActive(pathname, item);
           const Icon = item.icon;
@@ -200,7 +200,7 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={`relative flex flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 transition ${
-                isActive ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"
+                isActive ? "bg-[#163c36] text-white" : "text-stone-500 hover:text-[#17211d]"
               }`}
             >
               <Icon className="h-5 w-5" />
@@ -216,7 +216,7 @@ export function Sidebar() {
       <button
         type="button"
         onClick={() => setManualOpen(true)}
-        className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 text-white shadow-xl shadow-slate-950/20 transition hover:bg-slate-800 md:hidden"
+        className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#163c36] text-white shadow-xl shadow-teal-950/20 transition hover:bg-[#23544b] md:hidden"
         aria-label="Quick time entry"
       >
         <Plus className="h-6 w-6" />

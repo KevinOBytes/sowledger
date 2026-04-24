@@ -55,25 +55,25 @@ export function ResourcePlanner() {
     <div className="space-y-8">
       {/* Overview Stats */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-slate-800 bg-[#0B101E] p-6 shadow-sm">
+        <div className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
            <div className="flex items-center gap-3">
-             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400">
+             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
                <Users className="h-5 w-5" />
              </div>
              <div>
-               <p className="text-sm font-medium text-slate-400">Total Team</p>
-               <h3 className="text-2xl font-bold text-white">{members.length}</h3>
+               <p className="text-sm font-medium text-stone-500">Total team</p>
+               <h3 className="text-2xl font-bold text-[#17211d]">{members.length}</h3>
              </div>
            </div>
         </div>
-        <div className="rounded-2xl border border-slate-800 bg-[#0B101E] p-6 shadow-sm">
+        <div className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
            <div className="flex items-center gap-3">
-             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400">
+             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
                <Clock className="h-5 w-5" />
              </div>
              <div>
-               <p className="text-sm font-medium text-slate-400">Total Backlog Output</p>
-               <h3 className="text-2xl font-bold text-white">
+               <p className="text-sm font-medium text-stone-500">Total backlog output</p>
+               <h3 className="text-2xl font-bold text-[#17211d]">
                   {memberBuckets.reduce((sum, b) => sum + b.totalHours, 0) + unassignedHours} hrs
                </h3>
              </div>
@@ -86,37 +86,37 @@ export function ResourcePlanner() {
           {memberBuckets.map((bucket) => {
              const isOverloaded = bucket.totalHours > 40; // visual warning if > 40h assigned
              return (
-               <div key={bucket.id} className={`rounded-2xl border bg-[#0B101E] overflow-hidden ${isOverloaded ? 'border-rose-500/50' : 'border-slate-800'}`}>
-                 <div className="border-b border-slate-800 bg-slate-900/40 p-4 flex items-center justify-between">
+               <div key={bucket.id} className={`overflow-hidden rounded-[28px] border bg-white shadow-sm ${isOverloaded ? 'border-rose-200' : 'border-stone-200'}`}>
+                 <div className="flex items-center justify-between border-b border-stone-100 bg-stone-50/70 p-4">
                     <div>
-                        <h4 className="font-semibold text-white">{bucket.displayName || bucket.email.split('@')[0]}</h4>
-                        <p className="text-xs text-slate-400">{bucket.email}</p>
+                        <h4 className="font-semibold text-[#17211d]">{bucket.displayName || bucket.email.split('@')[0]}</h4>
+                        <p className="text-xs text-stone-500">{bucket.email}</p>
                     </div>
-                    <div className={`px-2 py-1 rounded-md text-sm font-bold flex items-center gap-1 ${isOverloaded ? 'bg-rose-500/10 text-rose-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
+                    <div className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${isOverloaded ? 'bg-rose-50 text-rose-700' : 'bg-teal-50 text-teal-700'}`}>
                         {isOverloaded && <AlertTriangle className="h-3 w-3" />}
                         {bucket.totalHours} hrs {bucket.assignedTasks.length > 0 && ` / ${bucket.assignedTasks.length} act`} {bucket.assignedGoals.length > 0 && ` / ${bucket.assignedGoals.length} goals`}
                     </div>
                  </div>
                  <div className="p-4 space-y-3">
                      {bucket.assignedTasks.length === 0 && bucket.assignedGoals.length === 0 && (
-                         <div className="text-sm text-slate-500 italic py-4 text-center border border-dashed border-slate-800 rounded-lg">No active assignments or goals</div>
+                         <div className="rounded-2xl border border-dashed border-stone-200 py-4 text-center text-sm italic text-stone-500">No active assignments or goals</div>
                      )}
                      
                      {/* Goals Section */}
                      {bucket.assignedGoals.length > 0 && (
                          <div className="mb-4">
-                             <h5 className="text-[10px] uppercase font-bold text-slate-500 mb-2 tracking-wider">Active Goals</h5>
+                             <h5 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-stone-400">Active goals</h5>
                              <div className="space-y-2">
                                  {bucket.assignedGoals.map((g: WorkspaceGoal) => (
-                                     <div key={g.id} className="flex justify-between items-start gap-4 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 shadow-sm">
+                                     <div key={g.id} className="flex items-start justify-between gap-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-2.5 shadow-sm">
                                          <div>
-                                            <p className="text-sm text-indigo-300 font-medium line-clamp-2">{g.name}</p>
+                                            <p className="line-clamp-2 text-sm font-medium text-teal-900">{g.name}</p>
                                             <div className="flex items-center gap-2 mt-1">
-                                                {g.recurrence !== 'none' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-indigo-900/50 text-indigo-300 tracking-wider flex items-center gap-1">{g.recurrence}</span>}
-                                                {g.dueDate && <span className="text-[10px] text-slate-400 font-medium">Due: {new Date(g.dueDate).toLocaleDateString()}</span>}
+                                                {g.recurrence !== 'none' && <span className="flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-teal-700">{g.recurrence}</span>}
+                                                {g.dueDate && <span className="text-[10px] font-medium text-stone-500">Due: {new Date(g.dueDate).toLocaleDateString()}</span>}
                                             </div>
                                          </div>
-                                         <span className="text-xs font-mono font-bold text-indigo-400 shrink-0">{g.targetType === 'hours' ? `${g.targetHours || 0}h` : `$${g.targetAmount || 0}`}</span>
+                                         <span className="shrink-0 font-mono text-xs font-bold text-teal-700">{g.targetType === 'hours' ? `${g.targetHours || 0}h` : `$${g.targetAmount || 0}`}</span>
                                      </div>
                                  ))}
                              </div>
@@ -126,19 +126,19 @@ export function ResourcePlanner() {
                      {/* Tasks Section */}
                      {bucket.assignedTasks.length > 0 && (
                          <div>
-                             <h5 className="text-[10px] uppercase font-bold text-slate-500 mb-2 tracking-wider">Assigned Tasks</h5>
+                             <h5 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-stone-400">Assigned tasks</h5>
                              <div className="space-y-2">
                      {bucket.assignedTasks.map((t) => (
-                         <div key={t.id} className="flex flex-col gap-1 p-3 rounded-xl bg-slate-900 border border-white/5 shadow-sm">
+                         <div key={t.id} className="flex flex-col gap-1 rounded-2xl border border-stone-200 bg-stone-50 p-3 shadow-sm">
                              <div className="flex justify-between items-start gap-4">
-                               <p className="text-sm text-slate-200 font-medium line-clamp-2">{t.title}</p>
-                               <span className="text-xs font-mono text-slate-400 shrink-0">{t.estimatedHours || 0}h</span>
+                               <p className="line-clamp-2 text-sm font-medium text-[#17211d]">{t.title}</p>
+                               <span className="shrink-0 font-mono text-xs text-stone-500">{t.estimatedHours || 0}h</span>
                              </div>
                              <div className="flex items-center gap-2 mt-2">
-                                <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-slate-300 tracking-wider">
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-stone-600">
                                     {t.status.replace("_", " ")}
                                 </span>
-                                {t.dueDate && <span className="text-[10px] text-slate-500 font-medium">Due: {String(t.dueDate)}</span>}
+                                {t.dueDate && <span className="text-[10px] font-medium text-stone-500">Due: {String(t.dueDate)}</span>}
                              </div>
                          </div>
                      ))}
@@ -151,40 +151,40 @@ export function ResourcePlanner() {
           })}
 
           {/* Unassigned Workload */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 overflow-hidden opacity-80">
-             <div className="border-b border-slate-800 p-4 flex items-center justify-between">
+          <div className="overflow-hidden rounded-[28px] border border-dashed border-stone-300 bg-white/70">
+             <div className="flex items-center justify-between border-b border-stone-200 p-4">
                 <div>
-                    <h4 className="font-semibold text-slate-300">Unassigned Backlog</h4>
-                    <p className="text-xs text-slate-500">Tasks needing owners</p>
+                    <h4 className="font-semibold text-[#17211d]">Unassigned backlog</h4>
+                    <p className="text-xs text-stone-500">Tasks needing owners</p>
                 </div>
-                <div className="px-2 py-1 rounded-md text-sm font-bold bg-slate-800 text-slate-400">
+                <div className="rounded-full bg-stone-100 px-3 py-1 text-sm font-bold text-stone-600">
                     {unassignedHours} hrs
                 </div>
              </div>
              <div className="p-4 space-y-3">
                  {unassignedTasks.length === 0 && goals.filter(g => !g.assignedUserId).length === 0 && (
-                     <div className="text-sm text-slate-600 italic py-4 text-center">Backlog is completely empty!</div>
+                     <div className="py-4 text-center text-sm italic text-stone-500">Backlog is completely empty!</div>
                  )}
 
                  {/* Unassigned Goals */}
                  {goals.filter(g => !g.assignedUserId).map(g => (
-                     <div key={g.id} className="flex justify-between items-start gap-4 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 shadow-sm">
+                     <div key={g.id} className="flex items-start justify-between gap-4 rounded-2xl border border-teal-100 bg-teal-50/50 p-3 shadow-sm">
                          <div>
-                             <p className="text-sm text-indigo-300 font-medium line-clamp-2">{g.name}</p>
-                             <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Goal</p>
+                             <p className="line-clamp-2 text-sm font-medium text-teal-900">{g.name}</p>
+                             <p className="mt-1 text-[10px] uppercase tracking-widest text-stone-500">Goal</p>
                          </div>
                      </div>
                  ))}
 
                  {/* Unassigned Tasks */}
                  {unassignedTasks.slice(0, 10).map((t) => (
-                     <div key={t.id} className="flex justify-between items-start gap-4 p-3 rounded-xl bg-[#050914] border border-white/5">
-                         <p className="text-sm text-slate-400 font-medium line-clamp-1">{t.title}</p>
-                         <span className="text-xs font-mono text-slate-500 shrink-0">{t.estimatedHours || 0}h</span>
+                     <div key={t.id} className="flex items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-3">
+                         <p className="line-clamp-1 text-sm font-medium text-stone-700">{t.title}</p>
+                         <span className="shrink-0 font-mono text-xs text-stone-500">{t.estimatedHours || 0}h</span>
                      </div>
                  ))}
                  {unassignedTasks.length > 10 && (
-                     <div className="text-xs text-center font-medium text-slate-500 pt-2">+ {unassignedTasks.length - 10} more unassigned tasks</div>
+                     <div className="pt-2 text-center text-xs font-medium text-stone-500">+ {unassignedTasks.length - 10} more unassigned tasks</div>
                  )}
              </div>
           </div>

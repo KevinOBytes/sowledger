@@ -18,7 +18,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans">
         <DatadogInit />
         {children}
-        <Toaster theme="dark" position="bottom-right" />
+        <Toaster theme="light" richColors position="bottom-right" />
       </body>
     </html>
   );

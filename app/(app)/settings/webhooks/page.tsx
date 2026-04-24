@@ -92,7 +92,7 @@ export default function WebhooksPage() {
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50">
             <Webhook className="h-8 w-8 text-cyan-700" />
           </div>
-          <h2 className="mb-3 text-2xl font-bold text-slate-950">Advanced integrations</h2>
+          <h2 className="mb-3 text-2xl font-bold text-[#17211d]">Advanced integrations</h2>
           <p className="mb-8 text-slate-500">
             Move to Studio for $29/workspace/month to unlock real-time webhooks, API keys, and usage tracking.
           </p>
@@ -109,39 +109,41 @@ export default function WebhooksPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-6">
-      <div className="mb-8">
+      <div className="mb-8 rounded-[32px] border border-stone-200 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-3">
-          <Webhook className="h-8 w-8 text-cyan-500" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+            <Webhook className="h-6 w-6" />
+          </div>
           <h1 className="text-3xl font-bold tracking-tight">Webhooks</h1>
         </div>
-        <p className="mt-2 text-slate-400">
+        <p className="mt-3 max-w-2xl text-stone-500">
           Subscribe to workspace events in real-time. Dispatches JSON payloads to your HTTPS endpoints.
         </p>
       </div>
 
-      <div className="mb-8 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden shadow-xl">
-        <div className="grid grid-cols-12 gap-4 border-b border-slate-800 bg-slate-800/50 p-4 text-sm font-semibold text-slate-300">
+      <div className="mb-8 overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
+        <div className="grid grid-cols-12 gap-4 border-b border-stone-100 bg-stone-50 p-4 text-sm font-semibold text-stone-600">
           <div className="col-span-6">Endpoint URL</div>
           <div className="col-span-5">Subscribed Events</div>
           <div className="col-span-1 text-right"></div>
         </div>
         
-        <div className="divide-y divide-slate-800">
+        <div className="divide-y divide-stone-100">
           {webhooks.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">
+            <div className="p-8 text-center text-sm text-stone-500">
               No webhook integrations currently active.
             </div>
           ) : (
             webhooks.map((w) => (
-              <div key={w.id} className="grid grid-cols-12 items-center gap-4 p-4 text-sm text-slate-200 hover:bg-slate-800/30">
-                <div className="col-span-6 truncate font-mono text-cyan-400">{w.url}</div>
+              <div key={w.id} className="grid grid-cols-12 items-center gap-4 p-4 text-sm text-stone-700 hover:bg-stone-50">
+                <div className="col-span-6 truncate font-mono text-teal-700">{w.url}</div>
                 <div className="col-span-5 flex flex-wrap gap-1">
                   {w.events.map(ev => (
-                    <span key={ev} className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-300">{ev}</span>
+                    <span key={ev} className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{ev}</span>
                   ))}
                 </div>
                 <div className="col-span-1 flex justify-end">
-                  <button onClick={() => deleteWebhook(w.id)} className="text-slate-500 hover:text-rose-400">
+                  <button onClick={() => deleteWebhook(w.id)} className="text-stone-400 hover:text-rose-500">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -151,23 +153,23 @@ export default function WebhooksPage() {
         </div>
       </div>
 
-      <form onSubmit={createWebhook} className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner sm:flex-row sm:items-end">
-        <label className="flex flex-[2] flex-col gap-1.5 text-sm font-medium text-slate-300">
+      <form onSubmit={createWebhook} className="flex flex-col gap-4 rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:flex-row sm:items-end">
+        <label className="flex flex-[2] flex-col gap-1.5 text-sm font-medium text-stone-700">
           HTTPS Payload URL
           <input 
             type="url"
             required
             placeholder="https://hooks.slack.com/services/..."
-            className="rounded-lg border border-slate-700 bg-slate-950 p-2.5 outline-none focus:border-cyan-500"
+            className="rounded-2xl border border-stone-200 bg-stone-50 p-2.5 text-[#17211d] outline-none focus:border-teal-500 focus:bg-white"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
         </label>
-        <label className="flex flex-1 flex-col gap-1.5 text-sm font-medium text-slate-300">
+        <label className="flex flex-1 flex-col gap-1.5 text-sm font-medium text-stone-700">
           Events (csv)
           <input 
             type="text"
-            className="rounded-lg border border-slate-700 bg-slate-950 p-2.5 outline-none focus:border-cyan-500"
+            className="rounded-2xl border border-stone-200 bg-stone-50 p-2.5 text-[#17211d] outline-none focus:border-teal-500 focus:bg-white"
             value={events}
             onChange={(e) => setEvents(e.target.value)}
           />
@@ -175,12 +177,12 @@ export default function WebhooksPage() {
         <button 
           type="submit" 
           disabled={!url}
-          className="flex h-[42px] items-center justify-center gap-2 rounded-lg bg-cyan-600 px-6 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-50 sm:w-auto"
+          className="flex h-[42px] items-center justify-center gap-2 rounded-2xl bg-[#163c36] px-6 text-sm font-semibold text-white transition hover:bg-[#23544b] disabled:opacity-50 sm:w-auto"
         >
           <Plus className="h-4 w-4" /> Subscribe
         </button>
       </form>
-      {status && <p className="mt-4 text-sm text-rose-400">{status}</p>}
+      {status && <p className="mt-4 text-sm text-rose-600">{status}</p>}
     </div>
   );
 }

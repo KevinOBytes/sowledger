@@ -41,6 +41,8 @@ type SessionPayload = {
   exp: number;
 };
 
+const roleWeights: Record<WorkspaceRole, number> = { client: 0, member: 1, manager: 2, owner: 3 };
+
 function secret() {
   const value = env.AUTH_COOKIE_SECRET;
   if (!value || value.length < 24) throw new Error("AUTH_COOKIE_SECRET must be at least 24 chars");
@@ -70,10 +72,43 @@ async function decode(token: string): Promise<SessionPayload> {
   const payload = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as SessionPayload;
   if (payload.exp < Date.now()) throw new UnauthorizedError("Expired token");
 
-  const membership = await getMembership(payload.sub, payload.workspaceId);
+  let membership = await getMembership(payload.sub, payload.workspaceId);
   if (!membership) throw new UnauthorizedError("Membership revoked");
+  membership = await repairSetupRole(payload.email, membership);
 
   return { ...payload, role: membership.role as WorkspaceRole };
+}
+
+async function workspaceHasManager(workspaceId: string) {
+  const records = await db.select({ role: memberships.role }).from(memberships).where(eq(memberships.workspaceId, workspaceId));
+  return records.some((record) => record.role === "manager" || record.role === "owner");
+}
+
+async function updateMembershipRole(userId: string, workspaceId: string, role: WorkspaceRole) {
+  const [membership] = await db
+    .update(memberships)
+    .set({ role })
+    .where(and(eq(memberships.userId, userId), eq(memberships.workspaceId, workspaceId)))
+    .returning();
+  return membership;
+}
+
+async function repairSetupRole(email: string, membership: typeof memberships.$inferSelect) {
+  if (isAdminEmail(email) && membership.role !== "owner") {
+    return await updateMembershipRole(membership.userId, membership.workspaceId, "owner") ?? membership;
+  }
+
+  if (roleWeights[membership.role as WorkspaceRole] >= roleWeights.manager || !env.ALLOW_BOOTSTRAP_OWNER) {
+    return membership;
+  }
+
+  // A workspace with no manager/owner is otherwise impossible to set up.
+  // Promote the signed-in member only when bootstrap mode is enabled and no elevated role exists.
+  if (!(await workspaceHasManager(membership.workspaceId))) {
+    return await updateMembershipRole(membership.userId, membership.workspaceId, "owner") ?? membership;
+  }
+
+  return membership;
 }
 
 function hashMagic(tokenSecret: string) {
@@ -150,12 +185,12 @@ export async function consumeMagicLink(token: string) {
 
   const existingMembership = await getMembership(user.id, workspace.id);
   if (existingMembership) {
-    // Ensure @kevinbytes.com users always retain owner-level access.
-    if (isAdminEmail(user.email) && existingMembership.role !== "owner") {
-      await db.update(memberships).set({ role: "owner" }).where(and(eq(memberships.userId, user.id), eq(memberships.workspaceId, workspace.id)));
-      existingMembership.role = "owner";
+    const invite = await findPendingInvitation(user.email, workspace.id);
+    if (invite && roleWeights[invite.role as WorkspaceRole] > roleWeights[existingMembership.role as WorkspaceRole]) {
+      await db.update(invitations).set({ acceptedAt: Date.now() }).where(eq(invitations.id, invite.id));
+      return { user, workspace, membership: await updateMembershipRole(user.id, workspace.id, invite.role as WorkspaceRole) ?? existingMembership };
     }
-    return { user, workspace, membership: existingMembership };
+    return { user, workspace, membership: await repairSetupRole(user.email, existingMembership) };
   }
 
   // @kevinbytes.com users always get owner role on first join.
@@ -216,6 +251,5 @@ export async function requireSession() {
 export { isAdminEmail } from "./admin";
 
 export function requireRole(role: WorkspaceRole, actualRole: WorkspaceRole) {
-  const weights: Record<WorkspaceRole, number> = { client: 0, member: 1, manager: 2, owner: 3 };
-  if (weights[actualRole] < weights[role]) throw new ForbiddenError(`Requires ${role} role`);
+  if (roleWeights[actualRole] < roleWeights[role]) throw new ForbiddenError(`Requires ${role} role`);
 }

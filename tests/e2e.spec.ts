@@ -80,4 +80,20 @@ test.describe('Authenticated Flows (Free Plan)', () => {
     await expect(page.getByRole('button', { name: 'Log time' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Plan work/i })).toBeVisible();
   });
+
+  test('Test 10b: first setup repairs a workspace with no manager', async ({ page }) => {
+    const login = await page.goto('/api/test/login?plan=free&role=member&clean=true');
+    const loginData = await login?.json();
+    expect(loginData?.success).toBe(true);
+
+    const me = await page.request.get('/api/auth/me');
+    expect(me.ok()).toBeTruthy();
+    const meData = await me.json();
+    expect(meData.session.role).toBe('owner');
+
+    const project = await page.request.post('/api/projects', {
+      data: { name: `Setup Recovery ${Date.now()}` },
+    });
+    expect(project.ok()).toBeTruthy();
+  });
 });

@@ -93,6 +93,41 @@ export async function enforceDailyHoursLimit(userId: string, businessDate: Date,
   if (total + nextSeconds > 86400) throw new Error("Impossible time: cannot exceed 24 hours in a day");
 }
 
+export function splitTimeWindowByUtcDay(startedAt: Date, stoppedAt: Date) {
+  if (stoppedAt <= startedAt) {
+    return [{ startedAt, stoppedAt, durationSeconds: 1 }];
+  }
+
+  const segments: Array<{ startedAt: Date; stoppedAt: Date; durationSeconds: number }> = [];
+  let cursor = new Date(startedAt);
+
+  while (cursor < stoppedAt) {
+    const nextDay = new Date(Date.UTC(
+      cursor.getUTCFullYear(),
+      cursor.getUTCMonth(),
+      cursor.getUTCDate() + 1,
+      0,
+      0,
+      0,
+    ));
+    const segmentEnd = nextDay < stoppedAt ? nextDay : stoppedAt;
+    segments.push({
+      startedAt: new Date(cursor),
+      stoppedAt: new Date(segmentEnd),
+      durationSeconds: Math.max(1, Math.floor((segmentEnd.getTime() - cursor.getTime()) / 1000)),
+    });
+    cursor = segmentEnd;
+  }
+
+  return segments;
+}
+
+export async function enforceDailyHoursLimitForWindow(userId: string, startedAt: Date, stoppedAt: Date, excludeEntryId?: string) {
+  for (const segment of splitTimeWindowByUtcDay(startedAt, stoppedAt)) {
+    await enforceDailyHoursLimit(userId, segment.startedAt, segment.durationSeconds, excludeEntryId);
+  }
+}
+
 function signAudit(diff: string, eventType: string) {
   const secret = env.AUDIT_SIGNING_SECRET ?? env.AUTH_COOKIE_SECRET;
   if (!secret) {

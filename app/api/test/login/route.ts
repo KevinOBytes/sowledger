@@ -3,7 +3,7 @@ import { ensureUser, ensureWorkspace, ensureMembership } from "@/lib/store";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { workspaces } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export async function GET(request: Request) {
   if (process.env.NODE_ENV === "production") {
@@ -13,12 +13,16 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const planParam = searchParams.get("plan") || "free";
   const plan = planParam as "free" | "pro" | "smb" | "enterprise";
+  const roleParam = searchParams.get("role") || "owner";
+  const role = (["client", "member", "manager", "owner"].includes(roleParam) ? roleParam : "owner") as "client" | "member" | "manager" | "owner";
   
   try {
     const email = "test-e2e@example.com";
     const user = await ensureUser(email);
     const workspace = await ensureWorkspace("test-workspace-e2e");
     await ensureMembership(user.id, workspace.id, "owner");
+    const { memberships } = await import("@/lib/db/schema");
+    await db.update(memberships).set({ role }).where(and(eq(memberships.userId, user.id), eq(memberships.workspaceId, workspace.id)));
     
     // Set the requested plan for paywall testing
     await db.update(workspaces).set({ plan }).where(eq(workspaces.id, workspace.id));
@@ -40,7 +44,7 @@ export async function GET(request: Request) {
       sub: user.id,
       email: user.email,
       workspaceId: workspace.id,
-      role: "owner"
+      role,
     });
     
     return NextResponse.json({ success: true, userId: user.id, workspaceId: workspace.id });

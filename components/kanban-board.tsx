@@ -5,10 +5,10 @@ import { Plus, GripVertical, CheckCircle2, Circle, HelpCircle, Lock, Paperclip, 
 import { ProjectTask, KanbanColumn } from "@/lib/store";
 
 const COLUMNS: { id: KanbanColumn; title: string, color: string }[] = [
-  { id: "todo", title: "To Do", color: "text-slate-400" },
-  { id: "in_progress", title: "In Progress", color: "text-cyan-400" },
-  { id: "review", title: "Review", color: "text-violet-400" },
-  { id: "done", title: "Done", color: "text-emerald-400" },
+  { id: "todo", title: "To Do", color: "text-stone-500" },
+  { id: "in_progress", title: "In Progress", color: "text-teal-700" },
+  { id: "review", title: "Review", color: "text-amber-700" },
+  { id: "done", title: "Done", color: "text-emerald-700" },
 ];
 
 export function KanbanBoard({ projectId }: { projectId: string }) {
@@ -190,20 +190,20 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
         return (
           <div 
             key={col.id} 
-            className="flex w-80 shrink-0 flex-col rounded-2xl bg-slate-900/40 p-4 border border-white/5"
+            className="flex w-80 shrink-0 flex-col rounded-[28px] border border-stone-200 bg-white/90 p-4 shadow-sm"
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, col.id)}
           >
             <div className="flex items-center justify-between mb-4 px-2">
                 <div className="flex items-center gap-2">
                     <span className={`text-sm font-semibold tracking-wide uppercase ${col.color}`}>{col.title}</span>
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-xs font-medium text-slate-400">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-100 text-xs font-medium text-stone-500">
                         {colTasks.length}
                     </span>
                 </div>
                 <button 
                   onClick={() => setAddingToCol(col.id)}
-                  className="rounded hover:bg-white/10 p-1 text-slate-400 hover:text-white transition-colors"
+                  className="rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-teal-700"
                 >
                     <Plus className="h-4 w-4" />
                 </button>
@@ -216,46 +216,46 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                         draggable
                         onDragStart={(e) => handleDragStart(e, t.id)}
                         onClick={() => setSelectedTask(t)}
-                        className={`group cursor-grab active:cursor-grabbing rounded-xl border border-white/5 bg-slate-800/80 p-4 shadow-sm hover:border-cyan-500/30 hover:bg-slate-800 transition-all ${draggedTaskId === t.id ? 'opacity-50 border-cyan-500' : ''}`}
+                        className={`group cursor-grab rounded-2xl border border-stone-200 bg-[#fffdf8] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md active:cursor-grabbing ${draggedTaskId === t.id ? 'border-teal-500 opacity-50' : ''}`}
                     >
                         <div className="flex items-start justify-between">
-                            <p className="text-sm font-medium text-slate-200">{t.title}</p>
+                            <p className="text-sm font-medium text-[#17211d]">{t.title}</p>
                             <div className="flex items-center gap-2">
                                 {isBlocked(t) && (
                                    <Lock className="h-3 w-3 text-rose-500" />
                                 )}
-                                <button onClick={() => deleteBtn(t.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400">
+                                <button onClick={() => deleteBtn(t.id)} className="text-stone-400 opacity-0 hover:text-red-500 group-hover:opacity-100">
                                     <HelpCircle className="h-4 w-4 hidden" />
                                     <span className="text-xs">✕</span>
                                 </button>
                             </div>
                         </div>
                         {t.description && (
-                            <p className="mt-2 text-xs text-slate-400 line-clamp-2">{t.description}</p>
+                            <p className="mt-2 line-clamp-2 text-xs text-stone-500">{t.description}</p>
                         )}
                         {t.attachments && t.attachments.length > 0 && (
-                            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                            <div className="mt-3 flex items-center gap-1.5 text-xs text-stone-500">
                                 <Paperclip className="h-3.5 w-3.5" />
                                 {t.attachments.length} attachment{t.attachments.length !== 1 && 's'}
                             </div>
                         )}
-                        <div className="mt-4 flex items-center justify-between pt-2 border-t border-white/5">
+                        <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-2">
                              <div className="flex items-center gap-1.5 opacity-60">
-                                <GripVertical className="h-3.5 w-3.5 text-slate-500" />
-                                <span className="text-[10px] text-slate-500 font-mono">DRAG</span>
+                                <GripVertical className="h-3.5 w-3.5 text-stone-400" />
+                                <span className="font-mono text-[10px] text-stone-400">DRAG</span>
                              </div>
-                             {col.id === "done" ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-600" />}
+                             {col.id === "done" ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Circle className="h-4 w-4 text-stone-300" />}
                         </div>
                     </div>
                 ))}
 
                 {addingToCol === col.id && (
-                    <div className="rounded-xl border border-cyan-500/50 bg-slate-800 p-3 shadow-lg">
+                    <div className="rounded-2xl border border-teal-200 bg-teal-50 p-3 shadow-lg shadow-teal-900/5">
                         <input 
                           autoFocus
                           type="text" 
                           placeholder="What needs to be done?"
-                          className="w-full bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
+                          className="w-full bg-transparent text-sm text-[#17211d] placeholder-stone-500 focus:outline-none"
                           value={newTaskTitle}
                           onChange={e => setNewTaskTitle(e.target.value)}
                           onKeyDown={e => {
@@ -264,8 +264,8 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                           }}
                         />
                         <div className="mt-3 flex items-center justify-end gap-2">
-                           <button onClick={() => setAddingToCol(null)} className="text-xs text-slate-400 hover:text-white">Cancel</button>
-                           <button onClick={() => handleAddTask(col.id)} className="rounded bg-cyan-600 px-3 py-1 text-xs font-semibold text-white hover:bg-cyan-500">Save</button>
+                           <button onClick={() => setAddingToCol(null)} className="text-xs text-stone-500 hover:text-stone-800">Cancel</button>
+                           <button onClick={() => handleAddTask(col.id)} className="rounded-full bg-[#163c36] px-3 py-1 text-xs font-semibold text-white hover:bg-[#23544b]">Save</button>
                         </div>
                     </div>
                 )}
@@ -275,11 +275,11 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
       })}
 
       {selectedTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/50 p-6">
-              <h2 className="text-xl font-bold text-white">{selectedTask.title}</h2>
-              <button onClick={() => setSelectedTask(null)} className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4 backdrop-blur-sm">
+          <div className="animate-in fade-in zoom-in flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-stone-200 bg-[#fffdf8] shadow-2xl shadow-stone-950/20 duration-200">
+            <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50/70 p-6">
+              <h2 className="text-xl font-bold text-[#17211d]">{selectedTask.title}</h2>
+              <button onClick={() => setSelectedTask(null)} className="rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-800">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -287,45 +287,45 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
             <div className="flex-1 space-y-8 overflow-y-auto p-6">
               {/* Info Section */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
-                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Status</p>
-                   <p className="font-semibold text-white uppercase tracking-wider text-sm">{selectedTask.status.replace("_", " ")}</p>
+                <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Status</p>
+                   <p className="text-sm font-semibold uppercase tracking-wider text-[#17211d]">{selectedTask.status.replace("_", " ")}</p>
                 </div>
-                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
-                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Estimated Hours</p>
-                   <p className="font-semibold text-white">{selectedTask.estimatedHours ? `${selectedTask.estimatedHours} hrs` : "--"}</p>
+                <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Estimated hours</p>
+                   <p className="font-semibold text-[#17211d]">{selectedTask.estimatedHours ? `${selectedTask.estimatedHours} hrs` : "--"}</p>
                 </div>
               </div>
 
               {selectedTask.description && (
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-300">Description</h3>
-                  <p className="text-sm text-slate-400 whitespace-pre-wrap leading-relaxed">{selectedTask.description}</p>
+                  <h3 className="mb-2 text-sm font-semibold text-stone-700">Description</h3>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-600">{selectedTask.description}</p>
                 </div>
               )}
 
               {/* Attachments Section */}
-              <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
-                  <Paperclip className="h-4 w-4 text-cyan-400" />
+              <div className="rounded-2xl border border-stone-200 bg-white p-5">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[#17211d]">
+                  <Paperclip className="h-4 w-4 text-teal-700" />
                   Project Assets & Attachments
                 </h3>
                 
                 <div className="mb-5 space-y-2">
                   {!selectedTask.attachments || selectedTask.attachments.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-slate-700 p-6 text-center text-slate-500">
+                    <div className="rounded-2xl border border-dashed border-stone-300 p-6 text-center text-stone-500">
                       <p className="text-sm">No assets attached to this task yet.</p>
                     </div>
                   ) : (
                     selectedTask.attachments.map((att, idx) => (
-                      <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 p-3 transition hover:border-cyan-500/30">
+                      <div key={idx} className="flex items-center justify-between rounded-2xl border border-stone-200 bg-stone-50 p-3 transition hover:border-teal-200">
                         <div className="flex items-center gap-3 overflow-hidden">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-950/30 text-cyan-500">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
                             <LinkIcon className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-white">{att.name}</p>
-                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate text-xs text-cyan-400 hover:text-cyan-300">
+                            <p className="truncate text-sm font-medium text-[#17211d]">{att.name}</p>
+                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate text-xs text-teal-700 hover:text-teal-600">
                               {att.url} <ExternalLink className="h-3 w-3" />
                             </a>
                           </div>
@@ -333,7 +333,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                         <button 
                           onClick={() => handleRemoveAttachment(idx)}
                           disabled={isPatching}
-                          className="shrink-0 p-2 text-slate-500 hover:text-rose-400 disabled:opacity-50"
+                          className="shrink-0 p-2 text-stone-400 hover:text-rose-500 disabled:opacity-50"
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -343,25 +343,25 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                 </div>
 
                 {/* Add new attachment form */}
-                <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-950/50 p-4 sm:flex-row sm:items-end">
+                <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:flex-row sm:items-end">
                   <div className="flex-1 space-y-1">
-                    <label className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Asset Name</label>
+                    <label className="text-[10px] font-medium uppercase tracking-wider text-stone-500">Asset name</label>
                     <input 
                       type="text" 
                       placeholder="e.g. Figma UI Mockup"
                       value={newAttachmentName}
                       onChange={e => setNewAttachmentName(e.target.value)}
-                      className="w-full rounded bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-cyan-500"
+                      className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-[#17211d] placeholder-stone-400 outline-none focus:ring-1 focus:ring-teal-500"
                     />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <label className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Public URL</label>
+                    <label className="text-[10px] font-medium uppercase tracking-wider text-stone-500">Public URL</label>
                     <input 
                       type="url" 
                       placeholder="https://"
                       value={newAttachmentUrl}
                       onChange={e => setNewAttachmentUrl(e.target.value)}
-                      className="w-full rounded bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-cyan-500"
+                      className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-[#17211d] placeholder-stone-400 outline-none focus:ring-1 focus:ring-teal-500"
                       onKeyDown={e => {
                         if (e.key === "Enter") handleAddAttachment();
                       }}
@@ -370,7 +370,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                   <button 
                     onClick={handleAddAttachment}
                     disabled={!newAttachmentName.trim() || !newAttachmentUrl.trim() || isPatching}
-                    className="h-9 shrink-0 rounded bg-cyan-600 px-4 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-50 sm:h-[38px]"
+                    className="h-9 shrink-0 rounded-xl bg-[#163c36] px-4 text-sm font-semibold text-white transition hover:bg-[#23544b] disabled:opacity-50 sm:h-[38px]"
                   >
                     Attach Asset
                   </button>
