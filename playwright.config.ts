@@ -16,6 +16,11 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'mobile-safari',
+      testMatch: /mobile\.spec\.ts/,
+      use: { ...devices['iPhone 15'] },
+    },
   ],
   webServer: {
     command: 'PORT=3008 npm run dev',

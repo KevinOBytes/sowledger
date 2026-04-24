@@ -191,7 +191,7 @@ export function Sidebar() {
         </div>
       </aside>
 
-      <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around border-t border-stone-200 bg-[#fffdf8]/95 px-2 py-3 pb-safe shadow-[0_-12px_35px_rgba(65,52,37,0.08)] backdrop-blur md:hidden">
+      <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around border-t border-stone-200 bg-[#fffdf8]/95 px-2 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-12px_35px_rgba(65,52,37,0.08)] backdrop-blur md:hidden">
         {mobileNav.map((item) => {
           const isActive = routeIsActive(pathname, item);
           const Icon = item.icon;

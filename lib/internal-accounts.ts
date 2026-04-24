@@ -2,6 +2,7 @@ export const INTERNAL_HIGHEST_ACCESS_EMAILS = [
   "kevin@tkoresearch.com",
   "kevin@kevinbytes.com",
   "kevo214@gmail.com",
+  "rebeccacht@gmail.com",
   "rebeccagrapsy@gmail.com",
 ] as const;
 
