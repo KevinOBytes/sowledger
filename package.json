@@ -16,10 +16,10 @@
     "@sentry/nextjs": "^10.46.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.3.1",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
-    "next": "16.2.0",
+    "next": "16.2.4",
     "next-themes": "^0.4.6",
     "pg": "^8.20.0",
     "react": "19.2.4",
@@ -42,5 +42,10 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "resend": {
+      "svix": "1.92.2"
+    }
   }
 }
