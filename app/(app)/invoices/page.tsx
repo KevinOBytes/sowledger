@@ -86,7 +86,7 @@ export default function InvoicesPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-slate-400">
+      <div className="flex flex-1 items-center justify-center bg-[#f6f3ee] p-8 text-slate-500">
         <div className="flex flex-col items-center">
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-cyan-500"></div>
           <p>Tallying financials...</p>
@@ -97,20 +97,20 @@ export default function InvoicesPage() {
 
   if (requiresUpgrade) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center p-8">
-        <div className="max-w-md text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-900/30">
-            <Receipt className="h-8 w-8 text-cyan-400" />
+      <div className="flex flex-1 flex-col items-center justify-center bg-[#f6f3ee] p-8">
+        <div className="max-w-md rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50">
+            <Receipt className="h-8 w-8 text-cyan-700" />
           </div>
-          <h2 className="mb-3 text-2xl font-bold text-white">Invoicing is a Pro feature</h2>
-          <p className="mb-8 text-slate-400">
-            Upgrade to the Pro plan to start generating professional invoices from your approved billables.
+          <h2 className="mb-3 text-2xl font-bold text-slate-950">Invoicing is a Starter feature</h2>
+          <p className="mb-8 text-slate-500">
+            Move to Starter for $9/workspace/month to turn approved billable time into invoices and exports.
           </p>
           <a
             href="/settings/billing"
             className="inline-flex rounded-xl bg-cyan-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-cyan-500"
           >
-            Upgrade to Pro
+            Move to Starter
           </a>
         </div>
       </div>

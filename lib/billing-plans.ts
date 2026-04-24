@@ -2,40 +2,47 @@ export const STRIPE_PLANS = {
   free: {
     planId: "free",
     name: "Free",
-    description: "For freelancers and individuals getting started.",
+    description: "Try the full workflow on a small workspace before committing.",
     price: 0,
     priceId: "", // Free tier has no price ID
-    features: ["time-tracking"],
-    limits: { members: 3, projects: 5, storageMB: 100, goals: 3 },
+    features: ["time-tracking", "manual-logging"],
+    limits: { members: 1, projects: 2, storageMB: 100, goals: 1 },
   },
   pro: {
     planId: "pro",
-    name: "Pro",
-    description: "Unlimited tracking and basic invoicing for solopreneurs.",
-    price: 15, // $15 / month
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO || "price_dummy_pro",
-    features: ["time-tracking", "invoicing"],
-    limits: { members: 5, projects: 20, storageMB: 1000, goals: 20 },
+    name: "Starter",
+    description: "Flat workspace pricing for solo operators who need invoices, exports, and planned work.",
+    price: 9, // $9 / month flat workspace
+    priceId: process.env.STRIPE_PRO_PRICE_ID || "price_dummy_pro",
+    features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "invoicing"],
+    limits: { members: 2, projects: 10, storageMB: 1000, goals: 10 },
   },
   smb: {
     planId: "smb",
-    name: "SMB",
-    description: "Advanced tools and custom approvals for small teams.",
-    price: 49, // $49 / month
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_SMB || "price_dummy_smb",
-    features: ["time-tracking", "invoicing", "approvals"],
-    limits: { members: 20, projects: 50, storageMB: 5000, goals: 50 },
+    name: "Studio",
+    description: "Small-team operations with approvals, API keys, webhooks, and complete exports.",
+    price: 29, // $29 / month flat workspace
+    priceId: process.env.STRIPE_SMB_PRICE_ID || "price_dummy_smb",
+    features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "api", "webhooks", "invoicing", "approvals"],
+    limits: { members: 5, projects: 50, storageMB: 5000, goals: 50 },
   },
   enterprise: {
     planId: "enterprise",
-    name: "Enterprise",
-    description: "Custom schema and unlimited scale for large orgs.",
-    price: 199, // $199 / month 
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE || "price_dummy_enterprise",
-    features: ["time-tracking", "invoicing", "approvals", "advanced-reports", "saml"],
-    limits: { members: 9999, projects: 9999, storageMB: 999999, goals: 9999 },
+    name: "Business",
+    description: "Growing firms that need more seats, audit depth, advanced API usage, and priority support.",
+    price: 79, // $79 / month flat workspace
+    priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID || "price_dummy_enterprise",
+    features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "api", "webhooks", "invoicing", "approvals", "advanced-reports", "saml"],
+    limits: { members: 20, projects: 200, storageMB: 25000, goals: 200 },
   },
 };
+
+export type StripePlanId = keyof typeof STRIPE_PLANS;
+
+export function getPaidPlanById(planId: string) {
+  if (planId !== "pro" && planId !== "smb" && planId !== "enterprise") return null;
+  return STRIPE_PLANS[planId];
+}
 
 export function getPlanByPriceId(priceId: string) {
   return Object.values(STRIPE_PLANS).find((plan) => plan.priceId === priceId) || STRIPE_PLANS.free;

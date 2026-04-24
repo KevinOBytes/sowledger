@@ -48,45 +48,45 @@ export async function ProjectFinancials({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-      <div className="rounded-2xl border border-white/5 bg-[#0a0f1c] p-5 flex flex-col justify-between">
-         <div className="flex items-center gap-2 text-slate-400 mb-2">
-            <Clock className="w-4 h-4 text-cyan-400" />
+    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5">
+         <div className="mb-2 flex items-center gap-2 text-slate-500">
+            <Clock className="h-4 w-4 text-cyan-700" />
             <span className="text-sm font-medium">Logged Hours</span>
          </div>
-         <div className="text-2xl font-bold text-white">
+         <div className="text-2xl font-bold text-slate-950">
             {totalHours.toFixed(1)} <span className="text-sm text-slate-500 font-normal">hrs</span>
          </div>
       </div>
 
-      <div className="rounded-2xl border border-white/5 bg-[#0a0f1c] p-5 flex flex-col justify-between">
-         <div className="flex items-center gap-2 text-slate-400 mb-2">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
+      <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5">
+         <div className="mb-2 flex items-center gap-2 text-slate-500">
+            <TrendingUp className="h-4 w-4 text-emerald-700" />
             <span className="text-sm font-medium">Unbilled Time</span>
          </div>
-         <div className="text-2xl font-bold text-white">
+         <div className="text-2xl font-bold text-slate-950">
             {unbilledHours.toFixed(1)} <span className="text-sm text-slate-500 font-normal">hrs</span>
          </div>
       </div>
 
-      <div className="rounded-2xl border border-white/5 bg-[#0a0f1c] p-5 flex flex-col justify-between">
-         <div className="flex items-center gap-2 text-slate-400 mb-2">
-            <DollarSign className="w-4 h-4 text-indigo-400" />
+      <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5">
+         <div className="mb-2 flex items-center gap-2 text-slate-500">
+            <DollarSign className="h-4 w-4 text-indigo-700" />
             <span className="text-sm font-medium">Accrued Value</span>
          </div>
-         <div className="text-2xl font-bold text-white">
+         <div className="text-2xl font-bold text-slate-950">
             ${totalBilledAmount.toFixed(2)}
          </div>
       </div>
 
-      <div className={`rounded-2xl border p-5 flex flex-col justify-between ${overBudget ? 'border-rose-500/30 bg-rose-500/5' : nearBudget ? 'border-amber-500/30 bg-amber-500/5' : 'border-white/5 bg-[#0a0f1c]'}`}>
-         <div className="flex items-center gap-2 text-slate-400 mb-2">
+      <div className={`flex flex-col justify-between rounded-2xl border p-5 ${overBudget ? "border-rose-200 bg-rose-50" : nearBudget ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+         <div className="mb-2 flex items-center gap-2 text-slate-500">
             {overBudget ? <AlertTriangle className="w-4 h-4 text-rose-500" /> : nearBudget ? <AlertTriangle className="w-4 h-4 text-amber-500" /> : <div className="w-4 h-4 rounded-full border-2 border-emerald-500/50" />}
             <span className="text-sm font-medium">Budget ({project.budgetType === "hours" ? "Hours" : project.budgetType === "fees" ? "Fees" : "None"})</span>
          </div>
-         <div className="text-2xl font-bold text-white">
+         <div className="text-2xl font-bold text-slate-950">
             {project.budgetType === "none" ? (
-               <span className="text-slate-600">No limit</span>
+               <span className="text-slate-500">No limit</span>
             ) : (
                <>
                  <span className={overBudget ? 'text-rose-400' : ''}>{budgetUsagePercent.toFixed(0)}%</span> 
@@ -96,7 +96,7 @@ export async function ProjectFinancials({ projectId }: { projectId: string }) {
             )}
          </div>
          {project.budgetType !== "none" && (
-             <div className="w-full bg-black/40 rounded-full h-1.5 mt-3 overflow-hidden">
+             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
                  <div 
                     className={`h-full rounded-full ${overBudget ? 'bg-rose-500' : nearBudget ? 'bg-amber-500' : 'bg-emerald-500'}`}
                     style={{ width: `${Math.min(budgetUsagePercent, 100)}%` }}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { createTimeEntry } from "@/lib/security";
 import { db } from "@/lib/db";
-import { projects, goals, userActions } from "@/lib/db/schema";
+import { projects, goals, userActions, scheduledWorkBlocks } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       goalId?: string;
       tags?: string[];
       actionId?: string;
+      scheduledBlockId?: string;
     };
 
     if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
@@ -49,9 +50,17 @@ export async function POST(req: NextRequest) {
       hourlyRate = uAction.hourlyRate || undefined;
     }
 
+    if (body.scheduledBlockId) {
+      const [block] = await db.select().from(scheduledWorkBlocks).where(eq(scheduledWorkBlocks.id, body.scheduledBlockId));
+      if (!block || block.workspaceId !== session.workspaceId || block.userId !== session.sub) {
+        return NextResponse.json({ error: "Invalid scheduledBlockId" }, { status: 400 });
+      }
+    }
+
     const entry = await createTimeEntry({
       workspaceId: session.workspaceId,
       userId: session.sub,
+      scheduledBlockId: body.scheduledBlockId || null,
       taskId: body.taskId,
       projectId: body.projectId || null,
       goalId: body.goalId || null,
@@ -67,6 +76,14 @@ export async function POST(req: NextRequest) {
       action: actionName || null,
       hourlyRate: hourlyRate || null,
     });
+
+    if (body.scheduledBlockId) {
+      await db.update(scheduledWorkBlocks).set({
+        status: "in_progress",
+        linkedTimeEntryId: entry.id,
+        updatedAt: new Date(),
+      }).where(eq(scheduledWorkBlocks.id, body.scheduledBlockId));
+    }
 
     return NextResponse.json({ ok: true, entry });
   } catch (error) {

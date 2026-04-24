@@ -1,44 +1,21 @@
-import { createHash } from "node:crypto";
-import { NextResponse } from "next/server";
-import { requireSession, requireRole } from "@/lib/auth";
-import { toCsv } from "@/lib/security";
-import { db } from "@/lib/db";
-import { timeEntries } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+import { requireRole, requireSession } from "@/lib/auth";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
+import { createExportResponse, loadExportData } from "@/lib/export-data";
+
+export async function GET(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
+    await ensureWorkspaceSchema();
 
-    const entries = await db.select().from(timeEntries).where(eq(timeEntries.workspaceId, session.workspaceId));
-
-    const rows = entries.map((entry) => ({
-      id: entry.id,
-      userId: entry.userId,
-      taskId: entry.taskId,
-      projectId: entry.projectId ?? "",
-      goalId: entry.goalId ?? "",
-      tags: entry.tags.join("|"),
-      startedAtUtc: entry.startedAt.toISOString(),
-      stoppedAtUtc: entry.stoppedAt ? entry.stoppedAt.toISOString() : "",
-      durationSeconds: entry.durationSeconds ?? 0,
-      status: entry.status,
-      source: entry.source,
-      expenses: JSON.stringify(entry.expenses),
-    }));
-
-    const csv = toCsv(rows);
-    const digest = createHash("sha256").update(csv).digest("hex");
-    return new NextResponse(csv, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename=billabled-${new Date().toISOString().slice(0, 10)}.csv`,
-        "x-billabled-export-sha256": digest,
-      },
-    });
+    const params = Object.fromEntries(req.nextUrl.searchParams.entries());
+    const format = params.format === "json" ? "json" : "csv";
+    const data = await loadExportData(session.workspaceId, params);
+    return createExportResponse(data, format, `billabled-${new Date().toISOString().slice(0, 10)}`);
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 403 });
+    const status = (error as { status?: number; statusCode?: number }).status ?? (error as { statusCode?: number }).statusCode ?? 403;
+    return NextResponse.json({ error: (error as Error).message }, { status });
   }
 }

@@ -6,76 +6,50 @@ import { eq, desc } from "drizzle-orm";
 import { CreateClientButton } from "@/components/create-client-button";
 import { ClientsPageClient } from "@/components/clients-page-client";
 
-export const metadata = { title: "Clients – Billabled" };
+export const metadata = { title: "Clients - Billabled" };
 
 export default async function ClientsPage() {
   const session = await requireSession();
-
-  let clientsData: Array<{
-    id: string;
-    name: string;
-    email: string | null;
-    status: "active" | "archived";
-  }> = [];
+  let clientsData: Array<{ id: string; name: string; email: string | null; status: "active" | "archived" }> = [];
   let projectsData: Array<{ id: string; clientId: string | null }> = [];
   let loadError: string | null = null;
 
   try {
     await ensureWorkspaceSchema();
-
-    clientsData = await db
-      .select({
-        id: clientsTable.id,
-        name: clientsTable.name,
-        email: clientsTable.email,
-        status: clientsTable.status,
-      })
-      .from(clientsTable)
-      .where(eq(clientsTable.workspaceId, session.workspaceId))
-      .orderBy(desc(clientsTable.createdAt));
-
-    // Fetch all projects to count association per client
-    projectsData = await db
-      .select({
-        id: projectsTable.id,
-        clientId: projectsTable.clientId,
-      })
-      .from(projectsTable)
-      .where(eq(projectsTable.workspaceId, session.workspaceId));
+    clientsData = await db.select({ id: clientsTable.id, name: clientsTable.name, email: clientsTable.email, status: clientsTable.status }).from(clientsTable).where(eq(clientsTable.workspaceId, session.workspaceId)).orderBy(desc(clientsTable.createdAt));
+    projectsData = await db.select({ id: projectsTable.id, clientId: projectsTable.clientId }).from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId));
   } catch (error) {
     loadError = error instanceof Error ? error.message : "Unable to load clients right now.";
   }
 
   return (
-    <main className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Clients</h1>
-          <p className="mt-2 text-sm text-slate-400">Manage your clients and associated projects in one place.</p>
+    <main className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Manage</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Clients</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Keep client records connected to projects, billing, and export-ready time history.</p>
+            </div>
+            <CreateClientButton />
+          </div>
           {!loadError && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 font-medium text-cyan-300">
-                {clientsData.filter((client) => client.status === "active").length} Active
-              </span>
-              <span className="rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1 font-medium text-slate-300">
-                {projectsData.length} Linked Projects
-              </span>
+            <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold">
+              <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700">{clientsData.filter((client) => client.status === "active").length} active</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{projectsData.length} linked projects</span>
             </div>
           )}
-        </div>
-        <div className="shrink-0 flex items-start self-end sm:self-auto relative z-50">
-          <CreateClientButton />
-        </div>
+        </header>
+        {loadError ? (
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
+            <h2 className="text-lg font-semibold">Clients are temporarily unavailable</h2>
+            <p className="mt-2 text-sm">{loadError}</p>
+          </div>
+        ) : (
+          <ClientsPageClient initialClients={clientsData} projects={projectsData} />
+        )}
       </div>
-
-      {loadError ? (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
-          <h2 className="text-lg font-semibold">Clients are temporarily unavailable</h2>
-          <p className="mt-2 text-sm text-amber-100/90">{loadError}</p>
-        </div>
-      ) : (
-        <ClientsPageClient initialClients={clientsData} projects={projectsData} />
-      )}
     </main>
   );
 }

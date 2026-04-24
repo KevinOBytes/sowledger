@@ -1,32 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
 } from "recharts";
-import { DownloadIcon, CalendarIcon } from "lucide-react";
+import { CalendarIcon, DownloadIcon, LineChart, Timer, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
+
+import { ManualTimeDialog } from "@/components/manual-time-dialog";
 
 type ReportData = {
   ok: boolean;
+  scope: "mine" | "team";
   totalHours: number;
   totalBillableAmount: number;
+  plannedHours: number;
+  manualHours: number;
+  timerHours: number;
+  utilization: number | null;
+  missedBlocks: number;
   dailyTrend: { date: string; hours: number }[];
   projectDistribution: { projectId: string; name: string; hours: number }[];
   userDistribution: { userId: string; email: string; hours: number }[];
 };
 
-const COLORS = ["#0ea5e9", "#10b981", "#8b5cf6", "#f43f5e", "#f59e0b", "#14b8a6"];
+const COLORS = ["#0891b2", "#0f766e", "#d97706", "#4f46e5", "#be123c", "#64748b"];
 
 function get30DaysAgo() {
   const d = new Date();
@@ -34,232 +43,218 @@ function get30DaysAgo() {
   return d.toISOString().split("T")[0];
 }
 
+function metric(value: number, suffix = "") {
+  return `${value.toFixed(value >= 10 ? 0 : 1)}${suffix}`;
+}
+
 export function ReportsPageClient() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
-
+  const [scope, setScope] = useState<"mine" | "team">("mine");
   const [startDate, setStartDate] = useState(get30DaysAgo());
   const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
+  const [manualOpen, setManualOpen] = useState(false);
+
+  async function fetchReports() {
+    setLoading(true);
+    try {
+      const query = new URLSearchParams({ scope });
+      if (startDate) query.append("start", startDate);
+      if (endDate) query.append("end", endDate);
+      const res = await fetch(`/api/reports?${query.toString()}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Unable to load analytics");
+      setData(json);
+    } catch (error) {
+      if (scope === "team") setScope("mine");
+      toast.error("Analytics unavailable", { description: error instanceof Error ? error.message : "Unknown error" });
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchReports() {
-      setLoading(true);
-      try {
-        const query = new URLSearchParams();
-        if (startDate) query.append("start", startDate);
-        if (endDate) query.append("end", endDate);
-
-        const res = await fetch(`/api/reports?${query.toString()}`);
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchReports();
-  }, [startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, startDate, endDate]);
 
-  function exportCSV() {
-    if (!data) return;
+  useEffect(() => {
+    const onTimeSaved = () => {
+      fetchReports().catch(() => null);
+    };
+    window.addEventListener("billabled:time-saved", onTimeSaved);
+    return () => window.removeEventListener("billabled:time-saved", onTimeSaved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, startDate, endDate]);
 
-    let csv = "Report Breakdown\n\n";
-    csv += `Total Hours,${data.totalHours.toFixed(2)}\n`;
-    csv += `Total Billable,${data.totalBillableAmount.toFixed(2)}\n\n`;
+  const utilizationLabel = useMemo(() => {
+    if (!data || data.utilization == null) return "No plan yet";
+    return `${Math.round(data.utilization * 100)}%`;
+  }, [data]);
 
-    csv += "Project Distribution\n";
-    csv += "Project,Hours\n";
-    data.projectDistribution.forEach(p => {
-      csv += `"${p.name}",${p.hours.toFixed(2)}\n`;
-    });
-    csv += "\n";
-
-    csv += "User Distribution\n";
-    csv += "User,Hours\n";
-    data.userDistribution.forEach(u => {
-      csv += `"${u.email}",${u.hours.toFixed(2)}\n`;
-    });
-    csv += "\n";
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `report_${startDate}_to_${endDate}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  function exportAnalytics() {
+    const query = new URLSearchParams({ format: "csv", start: startDate, end: endDate, include: "projects,timeEntries,users,schedule" });
+    window.location.href = `/api/export/csv?${query.toString()}`;
   }
 
   if (loading && !data) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-[#f6f3ee] p-8 text-slate-500">
         <div className="flex flex-col items-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-cyan-500"></div>
-          <p>Aggregating enterprise telemetry...</p>
+          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-cyan-600" />
+          <p>Loading analytics...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col p-4 sm:p-8 max-w-7xl mx-auto w-full">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-end mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Workforce Intelligence</h1>
-          <p className="text-slate-400">High-level analytics and capacity telemetry.</p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-4 bg-slate-900 border border-slate-800 p-2 rounded-xl shadow-lg">
-          <div className="flex items-center gap-2 px-2 text-sm text-slate-400">
-            <CalendarIcon className="w-4 h-4" />
-          </div>
-          <input 
-            type="date" 
-            title="Start Date"
-            value={startDate} 
-            onChange={(e) => setStartDate(e.target.value)}
-            className="bg-slate-800 border-none text-white text-sm rounded outline-none p-1.5 focus:ring-1 focus:ring-emerald-500"
-          />
-          <span className="text-slate-600">to</span>
-          <input 
-            type="date" 
-            title="End Date"
-            value={endDate} 
-            onChange={(e) => setEndDate(e.target.value)}
-            className="bg-slate-800 border-none text-white text-sm rounded outline-none p-1.5 focus:ring-1 focus:ring-emerald-500"
-          />
-          
-          <button 
-            onClick={exportCSV} 
-            disabled={!data}
-            className="ml-auto sm:ml-4 flex items-center gap-2 rounded-lg bg-emerald-500/10 px-4 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/20 transition disabled:opacity-50"
-          >
-            <DownloadIcon className="h-4 w-4" />
-            Export CSV
-          </button>
-        </div>
-      </div>
-
-      {!data ? (
-        <div className="p-8 text-center text-rose-400">Failed to load report data.</div>
-      ) : (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className={`transition-opacity duration-200 ${loading ? 'opacity-50' : 'opacity-100'}`}
-        >
-          <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl relative overflow-hidden group hover:border-cyan-500/20 hover:shadow-cyan-900/10 transition-all duration-300">
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500" />
-              <h2 className="text-sm font-medium text-slate-400 relative z-10">Total Logged Hours</h2>
-              <div className="mt-2 text-4xl font-bold text-white relative z-10">
-                {data.totalHours.toFixed(1)} <span className="text-xl font-normal text-slate-500">hrs</span>
-              </div>
+    <main className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Analytics</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Work performance and billable output</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Track planned vs actual work, manual vs timer entries, utilization, project allocation, and export-ready billing signals.</p>
             </div>
-            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl relative overflow-hidden group hover:border-emerald-500/20 hover:shadow-emerald-900/10 transition-all duration-300">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500" />
-              <h2 className="text-sm font-medium text-slate-400 relative z-10">Total Billable Pipeline</h2>
-              <div className="mt-2 text-4xl font-bold text-emerald-400 relative z-10">
-                ${data.totalBillableAmount.toFixed(2)}
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={() => setManualOpen(true)} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700">Log time</button>
+              <button onClick={exportAnalytics} disabled={!data} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
+                <DownloadIcon className="h-4 w-4" />Export CSV
+              </button>
             </div>
           </div>
 
-          <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl flex flex-col hover:border-white/10 hover:shadow-cyan-900/5 transition-all duration-300">
-              <h2 className="mb-6 text-lg font-semibold text-white">Daily Execution Trend</h2>
-              <div className="flex-1 min-h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.dailyTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip
-                      cursor={{ fill: "#1e293b" }}
-                      contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "12px", backdropFilter: "blur(12px)" }}
-                    />
-                    <Bar dataKey="hours" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+          <div className="mt-5 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex rounded-full bg-white p-1 shadow-sm">
+              {(["mine", "team"] as const).map((option) => (
+                <button key={option} onClick={() => setScope(option)} className={`rounded-full px-4 py-2 text-sm font-bold capitalize transition ${scope === option ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>
+                  {option === "mine" ? "My analytics" : "Team analytics"}
+                </button>
+              ))}
             </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-500"><CalendarIcon className="h-4 w-4" />Date range</div>
+              <input type="date" title="Start Date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-cyan-500" />
+              <span className="text-slate-400">to</span>
+              <input type="date" title="End Date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-cyan-500" />
+            </div>
+          </div>
+        </header>
 
-            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl p-6 shadow-xl flex flex-col hover:border-white/10 hover:shadow-emerald-900/5 transition-all duration-300">
-              <h2 className="mb-6 text-lg font-semibold text-white">Resource Allocation by Project</h2>
-              <div className="flex-1 min-h-[300px] w-full">
-                {data.projectDistribution.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={data.projectDistribution}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={120}
-                        paddingAngle={5}
-                        dataKey="hours"
-                      >
-                        {data.projectDistribution.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="rgba(0,0,0,0)" />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "12px" }}
-                      />
-                      <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex h-full items-center justify-center text-slate-500">
-                    No project data mapped
+        {!data ? (
+          <div className="rounded-[32px] border border-slate-200 bg-white p-10 text-center text-rose-600 shadow-sm">Failed to load analytics.</div>
+        ) : (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className={`space-y-6 transition-opacity ${loading ? "opacity-60" : "opacity-100"}`}>
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-slate-500">Logged hours</p>
+                <p className="mt-2 text-3xl font-semibold">{metric(data.totalHours, "h")}</p>
+              </div>
+              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-slate-500">Planned hours</p>
+                <p className="mt-2 text-3xl font-semibold">{metric(data.plannedHours, "h")}</p>
+              </div>
+              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-slate-500">Utilization</p>
+                <p className="mt-2 text-3xl font-semibold text-cyan-700">{utilizationLabel}</p>
+              </div>
+              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-slate-500">Manual vs timer</p>
+                <p className="mt-2 text-3xl font-semibold">{metric(data.manualHours, "h")}</p>
+                <p className="text-sm text-slate-500">manual / {metric(data.timerHours, "h")} timer</p>
+              </div>
+              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-slate-500">Billable pipeline</p>
+                <p className="mt-2 text-3xl font-semibold text-emerald-700">${data.totalBillableAmount.toFixed(0)}</p>
+                <p className="text-sm text-amber-700">{data.missedBlocks} missed planned block(s)</p>
+              </div>
+            </section>
+
+            <section className="grid gap-6 lg:grid-cols-2">
+              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold">Daily execution trend</h2>
+                    <p className="text-sm text-slate-500">Actual logged hours by day.</p>
                   </div>
-                )}
+                  <LineChart className="h-5 w-5 text-cyan-700" />
+                </div>
+                <div className="min-h-[320px] w-full">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={data.dailyTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                      <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px" }} />
+                      <Bar dataKey="hours" fill="#0891b2" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl shadow-xl overflow-hidden hover:border-white/10 transition-all duration-300">
-                <div className="px-6 py-4 border-b border-white/5 bg-black/20">
-                    <h3 className="font-semibold text-white">Top Projects</h3>
+
+              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold">Project distribution</h2>
+                    <p className="text-sm text-slate-500">Where billable capacity is going.</p>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-cyan-700" />
                 </div>
-                <div className="divide-y divide-white/5">
-                    {data.projectDistribution.slice().sort((a,b) => b.hours - a.hours).map((p) => (
-                        <div key={p.projectId} className="px-6 py-3 flex justify-between items-center hover:bg-white/[0.02] transition">
-                            <span className="text-slate-300 font-medium">{p.name}</span>
-                            <span className="text-emerald-400 font-mono">{p.hours.toFixed(1)}h</span>
-                        </div>
-                    ))}
-                    {data.projectDistribution.length === 0 && (
-                        <div className="px-6 py-8 text-center text-slate-500">No project activity.</div>
-                    )}
+                <div className="min-h-[320px] w-full">
+                  {data.projectDistribution.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={320}>
+                      <PieChart>
+                        <Pie data={data.projectDistribution} cx="50%" cy="50%" innerRadius={78} outerRadius={118} paddingAngle={4} dataKey="hours">
+                          {data.projectDistribution.map((project, index) => <Cell key={project.projectId} fill={COLORS[index % COLORS.length]} stroke="transparent" />)}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px" }} />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-center text-slate-500">
+                      <Timer className="mb-3 h-8 w-8 text-slate-400" />
+                      <p className="font-semibold text-slate-700">No project data yet.</p>
+                      <button onClick={() => setManualOpen(true)} className="mt-3 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white">Log first block</button>
+                    </div>
+                  )}
                 </div>
-            </div>
-            
-            <div className="rounded-3xl border border-white/5 bg-white/[0.015] backdrop-blur-3xl shadow-xl overflow-hidden hover:border-white/10 transition-all duration-300">
-                <div className="px-6 py-4 border-b border-white/5 bg-black/20">
-                    <h3 className="font-semibold text-white">Top Contributors</h3>
+              </div>
+            </section>
+
+            <section className="grid gap-6 lg:grid-cols-2">
+              <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 px-6 py-4"><h3 className="font-semibold">Top projects</h3></div>
+                <div className="divide-y divide-slate-100">
+                  {data.projectDistribution.slice().sort((a, b) => b.hours - a.hours).map((project) => (
+                    <div key={project.projectId} className="flex items-center justify-between px-6 py-3">
+                      <span className="font-semibold text-slate-700">{project.name}</span>
+                      <span className="font-mono font-bold text-cyan-700">{project.hours.toFixed(1)}h</span>
+                    </div>
+                  ))}
+                  {data.projectDistribution.length === 0 && <div className="px-6 py-8 text-center text-slate-500">No project activity.</div>}
                 </div>
-                <div className="divide-y divide-white/5">
-                    {data.userDistribution.slice().sort((a,b) => b.hours - a.hours).map((u) => (
-                        <div key={u.userId} className="px-6 py-3 flex justify-between items-center hover:bg-white/[0.02] transition">
-                            <span className="text-slate-300 font-medium">{u.email}</span>
-                            <span className="text-cyan-400 font-mono">{u.hours.toFixed(1)}h</span>
-                        </div>
-                    ))}
-                    {data.userDistribution.length === 0 && (
-                        <div className="px-6 py-8 text-center text-slate-500">No user activity.</div>
-                    )}
+              </div>
+
+              <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 px-6 py-4"><h3 className="font-semibold">Contributors</h3></div>
+                <div className="divide-y divide-slate-100">
+                  {data.userDistribution.slice().sort((a, b) => b.hours - a.hours).map((user) => (
+                    <div key={user.userId} className="flex items-center justify-between px-6 py-3">
+                      <span className="font-semibold text-slate-700">{user.email}</span>
+                      <span className="font-mono font-bold text-cyan-700">{user.hours.toFixed(1)}h</span>
+                    </div>
+                  ))}
+                  {data.userDistribution.length === 0 && <div className="px-6 py-8 text-center text-slate-500">No contributor activity.</div>}
                 </div>
-            </div>
-          </div>
-          
-        </motion.div>
-      )}
-    </div>
+              </div>
+            </section>
+          </motion.div>
+        )}
+      </div>
+      <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} onSaved={fetchReports} />
+    </main>
   );
 }

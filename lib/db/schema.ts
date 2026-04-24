@@ -100,6 +100,7 @@ export const timeEntries = pgTable("time_entries", {
   id: varchar("id", { length: 255 }).primaryKey(),
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  scheduledBlockId: varchar("scheduled_block_id", { length: 255 }),
   taskId: varchar("task_id", { length: 255 }).notNull(),
   projectId: varchar("project_id", { length: 255 }),
   goalId: varchar("goal_id", { length: 255 }),
@@ -188,6 +189,51 @@ export const webhooks = pgTable("webhooks", {
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   url: varchar("url", { length: 1024 }).notNull(),
   events: jsonb("events").$type<string[]>().default([]).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const scheduledWorkBlocks = pgTable("scheduled_work_blocks", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id", { length: 255 }),
+  taskId: varchar("task_id", { length: 255 }),
+  actionId: varchar("action_id", { length: 255 }),
+  linkedTimeEntryId: varchar("linked_time_entry_id", { length: 255 }),
+  title: varchar("title", { length: 255 }).notNull(),
+  notes: text("notes"),
+  tags: jsonb("tags").$type<string[]>().default([]).notNull(),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at").notNull(),
+  status: varchar("status", { enum: ["planned", "in_progress", "completed", "skipped", "canceled"] }).notNull().default("planned"),
+  createdByUserId: varchar("created_by_user_id", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const apiKeys = pgTable("api_keys", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  keyHash: varchar("key_hash", { length: 255 }).notNull().unique(),
+  keyPrefix: varchar("key_prefix", { length: 32 }).notNull(),
+  scopes: jsonb("scopes").$type<string[]>().default([]).notNull(),
+  createdByUserId: varchar("created_by_user_id", { length: 255 }).notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  expiresAt: timestamp("expires_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const apiKeyRequests = pgTable("api_key_requests", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  apiKeyId: varchar("api_key_id", { length: 255 }).notNull(),
+  method: varchar("method", { length: 10 }).notNull(),
+  path: varchar("path", { length: 1024 }).notNull(),
+  status: real("status").notNull(),
+  ipHash: varchar("ip_hash", { length: 255 }),
+  userAgent: varchar("user_agent", { length: 512 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

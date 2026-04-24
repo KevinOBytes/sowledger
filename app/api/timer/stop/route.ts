@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { appendAuditLog, enforceDailyHoursLimit, enforceStopRateLimit, ensurePeriodUnlocked } from "@/lib/security";
 import { db } from "@/lib/db";
-import { timeEntries } from "@/lib/db/schema";
+import { scheduledWorkBlocks, timeEntries } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
@@ -45,6 +45,14 @@ export async function POST(req: NextRequest) {
       stoppedAt: endedAt,
       durationSeconds,
     }).where(eq(timeEntries.id, entry.id));
+
+    if (entry.scheduledBlockId) {
+      await db.update(scheduledWorkBlocks).set({
+        status: "completed",
+        linkedTimeEntryId: entry.id,
+        updatedAt: new Date(),
+      }).where(eq(scheduledWorkBlocks.id, entry.scheduledBlockId));
+    }
 
     await appendAuditLog({
       workspaceId: session.workspaceId,

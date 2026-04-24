@@ -3,7 +3,6 @@ import { requireSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // Ensure the user is actually authenticated before rendering the shell
   try {
     const session = await requireSession();
     if (session.role === "client") {
@@ -14,9 +13,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-[#050914] text-slate-200">
+    <div className="flex min-h-screen bg-[#f6f3ee] text-slate-950">
       <Sidebar />
-      <div className="flex-1 relative md:ml-72 w-full pb-[80px] md:pb-0 overflow-x-hidden">
+      <div className="relative w-full flex-1 overflow-x-hidden pb-[80px] md:ml-72 md:pb-0">
         {children}
       </div>
     </div>

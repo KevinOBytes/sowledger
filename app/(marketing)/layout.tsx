@@ -13,6 +13,12 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
           <span className="text-lg font-bold tracking-tight">Billabled</span>
         </Link>
         <div className="flex items-center gap-4">
+          <Link href="/support" className="text-sm font-medium text-slate-300 transition hover:text-white">
+            Support
+          </Link>
+          <Link href="/support/api" className="hidden text-sm font-medium text-slate-300 transition hover:text-white sm:inline">
+            API
+          </Link>
           <Link href="/login" className="text-sm font-medium text-slate-300 transition hover:text-white">
             Log in
           </Link>
@@ -26,6 +32,10 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
       </header>
       <main className="flex-1">{children}</main>
       <footer className="border-t border-white/5 bg-[#050914] py-12 text-center text-sm text-slate-500">
+        <div className="mb-4 flex justify-center gap-5">
+          <Link href="/support" className="hover:text-slate-300">Support</Link>
+          <Link href="/support/api" className="hover:text-slate-300">API docs</Link>
+        </div>
         <p>&copy; {new Date().getFullYear()} Billabled Inc. All rights reserved.</p>
       </footer>
     </div>

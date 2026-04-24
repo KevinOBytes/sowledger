@@ -48,7 +48,8 @@ export function ProjectActions({ projectId, status }: { projectId: string; statu
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700"
+        aria-label="Project actions"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
@@ -61,16 +62,16 @@ export function ProjectActions({ projectId, status }: { projectId: string; statu
               initial={{ opacity: 0, scale: 0.95, y: -10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-xl border border-white/10 bg-slate-900 shadow-2xl backdrop-blur-xl"
+              className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
             >
               <div className="flex flex-col p-1">
                 <button
                   onClick={toggleArchive}
                   disabled={loading}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   {loading ? (
-                    <Loader2Icon className="h-4 w-4 animate-spin text-cyan-400" />
+                    <Loader2Icon className="h-4 w-4 animate-spin text-cyan-700" />
                   ) : status === "active" ? (
                     <Archive className="h-4 w-4 text-slate-400" />
                   ) : (
@@ -78,11 +79,11 @@ export function ProjectActions({ projectId, status }: { projectId: string; statu
                   )}
                   {status === "active" ? "Archive Project" : "Restore Project"}
                 </button>
-                <div className="my-1 h-px bg-white/10" />
+                <div className="my-1 h-px bg-slate-100" />
                 <button
                   onClick={deleteProject}
                   disabled={loading}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
                 >
                   {loading ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   Delete Project

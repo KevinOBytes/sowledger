@@ -26,10 +26,15 @@ export async function GET() {
         projects: projectsResult.count,
       },
       limits: planData.limits,
-      prices: {
-        pro: STRIPE_PLANS.pro.priceId,
-        smb: STRIPE_PLANS.smb.priceId,
-      }
+      plans: Object.values(STRIPE_PLANS).map((plan) => ({
+        planId: plan.planId,
+        name: plan.name,
+        description: plan.description,
+        price: plan.price,
+        features: plan.features,
+        limits: plan.limits,
+        configured: !plan.priceId || !plan.priceId.startsWith("price_dummy"),
+      })),
     });
 
   } catch {

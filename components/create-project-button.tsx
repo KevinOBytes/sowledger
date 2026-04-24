@@ -1,23 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusIcon, Loader2Icon, XIcon, BuildingIcon, ClockIcon, DollarSignIcon } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { BuildingIcon, ClockIcon, DollarSignIcon, PlusIcon, XIcon } from "lucide-react";
+
+type ClientOption = { id: string; name: string };
 
 export function CreateProjectButton() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  
-  // Step/Wizard State
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Data State
-  const [clients, setClients] = useState<{id: string; name: string}[]>([]);
-  
-  // Form State
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [name, setName] = useState("");
   const [clientId, setClientId] = useState("");
   const [billingModel, setBillingModel] = useState<"hourly" | "fixed_fee">("hourly");
@@ -25,51 +20,12 @@ export function CreateProjectButton() {
   const [budgetAmount, setBudgetAmount] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      // Fetch clients for the dropdown
-      fetch("/api/clients")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.ok) setClients(data.clients);
-        })
-        .catch(console.error);
-    }
+    if (!isOpen) return;
+    fetch("/api/clients")
+      .then((res) => res.json())
+      .then((data) => setClients(data.clients ?? []))
+      .catch(() => null);
   }, [isOpen]);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          name: name.trim(), 
-          clientId: clientId || undefined,
-          billingModel,
-          budgetType,
-          budgetAmount: budgetAmount ? parseFloat(budgetAmount) : undefined
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create project");
-      }
-
-      setIsOpen(false);
-      resetForm();
-      router.refresh();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   function resetForm() {
     setName("");
@@ -81,183 +37,86 @@ export function CreateProjectButton() {
     setError("");
   }
 
+  function close() {
+    setIsOpen(false);
+    resetForm();
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (step === 1) {
+      setStep(2);
+      return;
+    }
+    if (!name.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), clientId: clientId || undefined, billingModel, budgetType, budgetAmount: budgetAmount ? Number.parseFloat(budgetAmount) : undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create project");
+      close();
+      router.refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <>
-      <motion.button
-        onClick={() => setIsOpen(true)}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 transition hover:from-cyan-400 hover:to-cyan-500"
-      >
-        <PlusIcon strokeWidth={2.5} className="h-4 w-4" />
+      <button onClick={() => setIsOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800">
+        <PlusIcon className="h-4 w-4" />
         New Project
-      </motion.button>
+      </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => { setIsOpen(false); resetForm(); }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-            />
-            
-            {/* Modal */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/5 bg-slate-800/50 p-6">
-                <div>
-                  <h2 className="text-xl font-bold text-white">Create New Project</h2>
-                  <p className="text-sm text-slate-400">Step {step} of 2</p>
-                </div>
-                <button 
-                  onClick={() => { setIsOpen(false); resetForm(); }}
-                  title="Close"
-                  aria-label="Close modal"
-                  className="rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-white transition"
-                >
-                  <XIcon className="h-5 w-5" />
-                </button>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-[28px] border border-slate-200 bg-white text-slate-950 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight">Create New Project</h2>
+                <p className="text-sm text-slate-500">Step {step} of 2</p>
               </div>
+              <button onClick={close} title="Close" aria-label="Close modal" className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><XIcon className="h-5 w-5" /></button>
+            </div>
 
-              {/* Body */}
-              <form onSubmit={step === 2 ? submit : (e) => { e.preventDefault(); setStep(2); }} className="p-6">
-                
-                {step === 1 && (
-                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
-                    
-                    <div>
-                      <label htmlFor="projectName" className="mb-1.5 block text-sm font-medium text-slate-300">Project Name</label>
-                      <input
-                        id="projectName"
-                        autoFocus
-                        type="text"
-                        placeholder="e.g. Acme Website Redesign"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-slate-300">Client <span className="text-slate-500 font-normal">(Optional)</span></label>
-                      <div className="relative">
-                        <BuildingIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                        <select
-                           aria-label="Select Client"
-                           value={clientId}
-                           onChange={(e) => setClientId(e.target.value)}
-                           className="w-full appearance-none rounded-xl border border-white/10 bg-black/20 pl-10 pr-4 py-3 text-sm text-white focus:border-cyan-500 focus:outline-none transition"
-                        >
-                          <option value="" className="bg-slate-900">No Client (Internal)</option>
-                          {clients.map(c => (
-                            <option key={c.id} value={c.id} className="bg-slate-900">{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                  </motion.div>
-                )}
-
-                {step === 2 && (
-                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-                    
-                    <div className="space-y-3">
-                      <label className="block text-sm font-medium text-slate-300">Billing Model</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setBillingModel("hourly")}
-                          className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${billingModel === "hourly" ? "border-cyan-500 bg-cyan-500/10 text-cyan-400" : "border-white/10 bg-black/20 text-slate-400 hover:border-white/20"}`}
-                        >
-                          <ClockIcon className="h-5 w-5" />
-                          <div>
-                            <p className="text-sm font-semibold">Time & Materials</p>
-                            <p className="text-xs opacity-80 mt-1">Bill by the hour</p>
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setBillingModel("fixed_fee")}
-                          className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${billingModel === "fixed_fee" ? "border-emerald-500 bg-emerald-500/10 text-emerald-400" : "border-white/10 bg-black/20 text-slate-400 hover:border-white/20"}`}
-                        >
-                          <DollarSignIcon className="h-5 w-5" />
-                          <div>
-                            <p className="text-sm font-semibold">Fixed Fee</p>
-                            <p className="text-xs opacity-80 mt-1">Set project total</p>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="block text-sm font-medium text-slate-300">Budget Constraint <span className="text-slate-500 font-normal">(Optional)</span></label>
-                      <div className="flex gap-2">
-                        <select
-                           aria-label="Select Budget Type"
-                           value={budgetType}
-                           onChange={(e) => setBudgetType(e.target.value as "hours" | "fees" | "none")}
-                           className="w-1/3 rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white focus:border-cyan-500 focus:outline-none transition"
-                        >
-                          <option value="none">No Budget</option>
-                          <option value="hours">Total Hours</option>
-                          <option value="fees">Total Fees</option>
-                        </select>
-                        {budgetType !== "none" && (
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder={budgetType === "hours" ? "e.g. 100 hrs" : "e.g. $5,000"}
-                            value={budgetAmount}
-                            onChange={(e) => setBudgetAmount(e.target.value)}
-                            className="flex-1 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition"
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                  </motion.div>
-                )}
-
-                {/* Footer Controls */}
-                <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+            <form onSubmit={submit} className="space-y-6 p-6">
+              {step === 1 ? (
+                <>
+                  <label htmlFor="projectName" className="block text-sm font-bold text-slate-700">Project Name<input id="projectName" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Website Redesign" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
+                  <label className="block text-sm font-bold text-slate-700">Client <span className="font-normal text-slate-400">(Optional)</span><span className="relative mt-1 block"><BuildingIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select aria-label="Select Client" value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No Client (Internal)</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></span></label>
+                </>
+              ) : (
+                <>
                   <div>
-                    {error && <p className="text-xs text-rose-400 font-medium">{error}</p>}
+                    <p className="mb-2 text-sm font-bold text-slate-700">Billing Model</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button type="button" onClick={() => setBillingModel("hourly")} className={`rounded-2xl border p-4 text-left transition ${billingModel === "hourly" ? "border-cyan-300 bg-cyan-50 text-cyan-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}><ClockIcon className="mb-2 h-5 w-5" /><p className="font-bold">Time & Materials</p><p className="text-xs">Bill by the hour</p></button>
+                      <button type="button" onClick={() => setBillingModel("fixed_fee")} className={`rounded-2xl border p-4 text-left transition ${billingModel === "fixed_fee" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}><DollarSignIcon className="mb-2 h-5 w-5" /><p className="font-bold">Fixed Fee</p><p className="text-xs">Set project total</p></button>
+                    </div>
                   </div>
-                  <div className="flex gap-3">
-                    {step === 2 && (
-                       <button
-                         type="button"
-                         onClick={() => { setStep(1); setError(""); }}
-                         className="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
-                       >
-                         Back
-                       </button>
-                    )}
-                    <button
-                      type="submit"
-                      disabled={loading || (step === 1 && !name.trim())}
-                      className="flex items-center justify-center min-w-[100px] gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-cyan-500 transition disabled:opacity-50"
-                    >
-                      {loading ? <Loader2Icon className="h-4 w-4 animate-spin" /> : step === 1 ? "Next" : "Create Project"}
-                    </button>
+                  <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+                    <label className="text-sm font-bold text-slate-700">Budget Type<select aria-label="Select Budget Type" value={budgetType} onChange={(e) => setBudgetType(e.target.value as "hours" | "fees" | "none")} className="mt-1 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="none">No Budget</option><option value="hours">Total Hours</option><option value="fees">Total Fees</option></select></label>
+                    <label className="text-sm font-bold text-slate-700">Amount<input disabled={budgetType === "none"} type="number" min="0" value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} placeholder={budgetType === "hours" ? "e.g. 100 hrs" : "e.g. $5,000"} className="mt-1 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-cyan-500 disabled:opacity-50" /></label>
                   </div>
-                </div>
+                </>
+              )}
 
-              </form>
-            </motion.div>
+              {error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p>}
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-5">
+                {step === 2 && <button type="button" onClick={() => setStep(1)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Back</button>}
+                <button type="submit" disabled={loading || (step === 1 && !name.trim())} className="rounded-2xl bg-cyan-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-cyan-500 disabled:opacity-50">{loading ? "Saving..." : step === 1 ? "Next" : "Create Project"}</button>
+              </div>
+            </form>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </>
   );
 }

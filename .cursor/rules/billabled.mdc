@@ -1,0 +1,6 @@
+---
+description: Billabled project rules for AI coding assistants
+alwaysApply: true
+---
+
+Follow `AGENTS.md` as the source of truth for this repository. Preserve workspace isolation, the connected Billabled workflow, the light operational design system, and the validation gates documented there.

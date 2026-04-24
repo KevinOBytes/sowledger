@@ -1,30 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { timeEntries, projects, users } from "@/lib/db/schema";
-import { eq, and, gte, lte, inArray } from "drizzle-orm";
+import { timeEntries, projects, users, scheduledWorkBlocks } from "@/lib/db/schema";
+import { eq, and, gte, inArray, lt } from "drizzle-orm";
+
+function endExclusive(value: string) {
+  const date = new Date(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    date.setDate(date.getDate() + 1);
+  }
+  return date;
+}
 
 export async function GET(req: NextRequest) {
   try {
     const session = await requireSession();
-    requireRole("manager", session.role);
     const searchParams = req.nextUrl.searchParams;
     const startDate = searchParams.get("start");
     const endDate = searchParams.get("end");
+    const scope = searchParams.get("scope") ?? "mine";
+    const projectId = searchParams.get("projectId");
+
+    if (scope === "team") {
+      requireRole("manager", session.role);
+    } else {
+      requireRole("member", session.role);
+    }
 
     const conditions = [eq(timeEntries.workspaceId, session.workspaceId)];
+    if (scope !== "team") {
+      conditions.push(eq(timeEntries.userId, session.sub));
+    }
+    if (projectId) {
+      conditions.push(eq(timeEntries.projectId, projectId));
+    }
     if (startDate) {
       conditions.push(gte(timeEntries.startedAt, new Date(startDate)));
     }
     if (endDate) {
-      conditions.push(lte(timeEntries.stoppedAt, new Date(endDate)));
+      conditions.push(lt(timeEntries.startedAt, endExclusive(endDate)));
     }
 
     const filtered = await db.select().from(timeEntries).where(and(...conditions));
+    const scheduleConditions = [eq(scheduledWorkBlocks.workspaceId, session.workspaceId)];
+    if (scope !== "team") scheduleConditions.push(eq(scheduledWorkBlocks.userId, session.sub));
+    if (projectId) scheduleConditions.push(eq(scheduledWorkBlocks.projectId, projectId));
+    if (startDate) scheduleConditions.push(gte(scheduledWorkBlocks.startsAt, new Date(startDate)));
+    if (endDate) scheduleConditions.push(lt(scheduledWorkBlocks.startsAt, endExclusive(endDate)));
+    const scheduled = await db.select().from(scheduledWorkBlocks).where(and(...scheduleConditions));
     
     // Process aggregations
     let totalDurationSeconds = 0;
     let totalBillableAmount = 0;
+    let manualSeconds = 0;
+    let timerSeconds = 0;
 
     const byDate: Record<string, number> = {};
     const byProject: Record<string, number> = {};
@@ -34,6 +63,8 @@ export async function GET(req: NextRequest) {
       if (!entry.durationSeconds) continue;
       
       totalDurationSeconds += entry.durationSeconds;
+      if (entry.source === "manual") manualSeconds += entry.durationSeconds;
+      if (entry.source === "web") timerSeconds += entry.durationSeconds;
 
       if (entry.hourlyRate) {
         totalBillableAmount += (entry.durationSeconds / 3600) * entry.hourlyRate;
@@ -79,10 +110,21 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const plannedSeconds = scheduled.reduce((sum, block) => {
+      return sum + Math.max(0, (new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000);
+    }, 0);
+    const missedBlocks = scheduled.filter((block) => block.status === "planned" && new Date(block.endsAt).getTime() < Date.now()).length;
+
     return NextResponse.json({
       ok: true,
+      scope,
       totalHours: totalDurationSeconds / 3600,
       totalBillableAmount,
+      plannedHours: plannedSeconds / 3600,
+      manualHours: manualSeconds / 3600,
+      timerHours: timerSeconds / 3600,
+      utilization: plannedSeconds > 0 ? totalDurationSeconds / plannedSeconds : null,
+      missedBlocks,
       dailyTrend,
       projectDistribution,
       userDistribution,

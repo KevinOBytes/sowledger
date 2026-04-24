@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { timeEntries } from "@/lib/db/schema";
+import { projects, timeEntries } from "@/lib/db/schema";
 import { eq, and, isNotNull, isNull } from "drizzle-orm";
 
 export async function GET() {
@@ -10,7 +10,22 @@ export async function GET() {
     requireRole("member", session.role);
 
     // Get all running timers for the current user in this workspace
-    const activeEntries = await db.select().from(timeEntries).where(and(
+    const activeEntries = await db.select({
+      id: timeEntries.id,
+      workspaceId: timeEntries.workspaceId,
+      userId: timeEntries.userId,
+      scheduledBlockId: timeEntries.scheduledBlockId,
+      taskId: timeEntries.taskId,
+      projectId: timeEntries.projectId,
+      projectName: projects.name,
+      goalId: timeEntries.goalId,
+      action: timeEntries.action,
+      tags: timeEntries.tags,
+      startedAt: timeEntries.startedAt,
+    })
+    .from(timeEntries)
+    .leftJoin(projects, eq(timeEntries.projectId, projects.id))
+    .where(and(
         eq(timeEntries.workspaceId, session.workspaceId),
         eq(timeEntries.userId, session.sub),
         isNotNull(timeEntries.startedAt),

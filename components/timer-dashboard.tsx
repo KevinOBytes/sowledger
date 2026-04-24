@@ -1,746 +1,412 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { db } from "@/lib/client/local-db";
-import { isAdminEmail } from "@/lib/admin";
-import { ProfileMenu } from "@/components/profile-menu";
-import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import { ArrowRight, CalendarClock, CheckCircle2, Clock, FastForward, ListChecks, Play, Plus, Square, TimerReset } from "lucide-react";
 import { toast } from "sonner";
-import { Play, Square, Plus, ChevronDown, Check, Activity, Clock, Settings2, Folder, Target, Briefcase } from "lucide-react";
 
-type CurrencyPayload = { payload?: { rates?: Record<string, number> } };
-type SessionState = { email: string; role: string; workspaceId: string; sub?: string } | null;
+import { ManualTimeDialog } from "@/components/manual-time-dialog";
+
 type Project = { id: string; name: string };
-type Goal = { id: string; name: string };
-type Action = { id: string; name: string; hourlyRate?: number };
-
+type Action = { id: string; name: string; hourlyRate?: number | null };
 type ActiveTimer = {
   id: string;
+  scheduledBlockId?: string | null;
   taskId: string;
-  projectId?: string;
-  goalId?: string;
-  actionId?: string;
+  projectId?: string | null;
+  projectName?: string | null;
+  action?: string | null;
   tags?: string[];
   startedAt: string;
 };
+type ScheduledBlock = {
+  id: string;
+  title: string;
+  projectId: string | null;
+  taskId: string | null;
+  actionId: string | null;
+  notes: string | null;
+  tags: string[];
+  startsAt: string;
+  endsAt: string;
+  status: "planned" | "in_progress" | "completed" | "skipped" | "canceled";
+  createdAt?: string;
+};
 
-/** Format seconds as HH:MM:SS */
 function fmt(seconds: number) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-/** SVG ring showing pomodoro progress (0–1) */
-function PomodoroRing({ progress, isRunning }: { progress: number; isRunning: boolean }) {
-  const r = 90;
-  const circ = 2 * Math.PI * r;
-  const dash = circ * (1 - progress);
-  return (
-    <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full -rotate-90">
-      <circle cx="100" cy="100" r={r} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="4" />
-      <motion.circle
-        cx="100" cy="100" r={r} fill="none"
-        stroke={isRunning ? "url(#ringGrad)" : "rgba(100,116,139,0.3)"}
-        strokeWidth="6"
-        strokeLinecap="round"
-        strokeDasharray={circ}
-        animate={{ strokeDashoffset: dash }}
-        transition={{ duration: 0.5, ease: "linear" }}
-      />
-      <defs>
-        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#8b5cf6" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
+function timeRange(block: ScheduledBlock) {
+  const start = new Date(block.startsAt);
+  const end = new Date(block.endsAt);
+  return `${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+}
+
+function toLocalInput(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
 export function TimerDashboard() {
-  const [workspaceSlug] = useState("default-workspace");
-  const [session, setSession] = useState<SessionState>(null);
-  
-  // Timer State
+  const [now, setNow] = useState(() => Date.now());
   const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
-  const [now, setNow] = useState(Date.now());
-  const [pomodoroMinutes, setPomodoroMinutes] = useState(0);
-  const [rates, setRates] = useState<Record<string, number>>({});
-  
-  // Builder Context states
+  const [blocks, setBlocks] = useState<ScheduledBlock[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [actions, setActions] = useState<Action[]>([]);
   const [taskId, setTaskId] = useState("TASK-1");
   const [projectId, setProjectId] = useState("");
-  const [goalId, setGoalId] = useState("");
   const [actionId, setActionId] = useState("");
-  const [tags, setTags] = useState("focus");
-  
-  // Data lists
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [actions, setActions] = useState<Action[]>([]);
-  const [workspaceTags, setWorkspaceTags] = useState<string[]>([]);
-  
-  // UI states
-  const [showConfig, setShowConfig] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
-  const [newGoalName, setNewGoalName] = useState("");
-  const projectNameById = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, project.name])), [projects]);
-  const goalNameById = useMemo(() => Object.fromEntries(goals.map((goal) => [goal.id, goal.name])), [goals]);
+  const [notes, setNotes] = useState("");
+  const [tags, setTags] = useState("");
+  const [manualOpen, setManualOpen] = useState(false);
+  const [selectedBlock, setSelectedBlock] = useState<ScheduledBlock | null>(null);
+  const [planningOpen, setPlanningOpen] = useState(false);
+  const [planTitle, setPlanTitle] = useState("Focus block");
+  const [planStart, setPlanStart] = useState(() => toLocalInput(new Date(Date.now() + 30 * 60 * 1000)));
+  const [planEnd, setPlanEnd] = useState(() => toLocalInput(new Date(Date.now() + 90 * 60 * 1000)));
 
-  const pomodoroTotal = pomodoroMinutes * 60;
-  
-  // Tick
+  const projectNameById = useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects]);
+  const focusedTimer = activeTimers[0] ?? null;
+  const onboardingSteps = [
+    { label: "Create your first project", done: projects.length > 0, href: "/projects" },
+    { label: "Schedule a work block", done: blocks.length > 0, action: () => setPlanningOpen(true) },
+    { label: "Start or stop a live timer", done: activeTimers.length > 0, action: () => startTimer() },
+    { label: "Log manual time", done: false, action: () => { setSelectedBlock(null); setManualOpen(true); } },
+    { label: "Review analytics and exports", done: false, href: "/reports" },
+  ];
+
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  async function refreshSession() {
-    try {
-      const response = await fetch("/api/auth/me");
-      const data = await response.json();
-      if (response.ok) setSession(data.session);
-      else setSession(null);
-    } catch {
-      setSession(null);
+  async function refresh() {
+    const [activeRes, scheduleRes, projectsRes, actionsRes] = await Promise.all([
+      fetch("/api/timer/active").catch(() => null),
+      fetch("/api/schedule?status=planned").catch(() => null),
+      fetch("/api/projects").catch(() => null),
+      fetch("/api/user/actions").catch(() => null),
+    ]);
+    if (activeRes?.ok) {
+      const data = await activeRes.json();
+      const timers = (data.activeEntries ?? []) as ActiveTimer[];
+      timers.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+      setActiveTimers(timers);
     }
+    if (scheduleRes?.ok) {
+      const data = await scheduleRes.json();
+      const nowMs = Date.now();
+      const scheduled = ((data.blocks ?? []) as ScheduledBlock[])
+        .filter((block) => block.status === "planned" && new Date(block.endsAt).getTime() >= nowMs)
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+      const recentCutoff = nowMs - 5 * 60 * 1000;
+      const recentlyCreated = scheduled
+        .filter((block) => block.createdAt && new Date(block.createdAt).getTime() >= recentCutoff)
+        .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+      const visible = [...recentlyCreated, ...scheduled].filter((block, index, list) => list.findIndex((item) => item.id === block.id) === index).slice(0, 5);
+      setBlocks(visible);
+    }
+    if (projectsRes?.ok) setProjects((await projectsRes.json()).projects ?? []);
+    if (actionsRes?.ok) setActions((await actionsRes.json()).actions ?? []);
   }
 
-  async function fetchActiveTimers() {
-    try {
-      const res = await fetch("/api/timer/active");
-      if (res.ok) {
-        const data = await res.json() as { activeEntries: ActiveTimer[] };
-        const timers = (data.activeEntries || []).map((entry) => ({
-          ...entry,
-          tags: Array.isArray(entry.tags) ? entry.tags : []
-        }));
-        
-        // Sort descending by start time to show most recent first
-        timers.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-        setActiveTimers(timers);
-      }
-    } catch {
-      console.error("Failed to fetch active timers");
-      // Fallback: sync from IndexedDB
-      const localTimers = await db.draftTimers.getAll();
-      setActiveTimers(localTimers.map((t) => ({
-        id: t.id,
-        taskId: t.taskId,
-        startedAt: t.startedAt
-      })));
-    }
-  }
-
-  async function loadProjectsAndGoals() {
-    try {
-      const [pr, gr, tr, ar] = await Promise.all([
-        fetch("/api/projects").catch(() => null), 
-        fetch("/api/goals").catch(() => null), 
-        fetch("/api/tags").catch(() => null), 
-        fetch("/api/user/actions").catch(() => null)
-      ]);
-      if (pr?.ok) setProjects((await pr.json()).projects ?? []);
-      if (gr?.ok) setGoals((await gr.json()).goals ?? []);
-      if (tr?.ok) setWorkspaceTags((await tr.json()).tags ?? []);
-      if (ar?.ok) setActions((await ar.json()).actions ?? []);
-    } catch (err) {
-      console.error("Failed to load context data:", err);
-    }
-  }
-
-  // Load on mount
   useEffect(() => {
-    refreshSession();
-    loadProjectsAndGoals();
-    fetchActiveTimers();
+    const timeout = window.setTimeout(() => {
+      refresh().catch(() => toast.error("Unable to load timer workspace"));
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
-  async function createProject() {
-    if (!newProjectName.trim()) return;
-    try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newProjectName.trim(), billingModel: "hourly" }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success("Project created", { description: data.project.name });
-        setNewProjectName("");
-        await loadProjectsAndGoals();
-      } else throw new Error(data.error);
-    } catch (err) {
-      toast.error("Failed to create project", { description: (err as Error).message });
+  useEffect(() => {
+    const onTimeSaved = () => {
+      refresh().catch(() => null);
+    };
+    window.addEventListener("billabled:time-saved", onTimeSaved);
+    return () => window.removeEventListener("billabled:time-saved", onTimeSaved);
+  }, []);
+
+  async function startTimer(block?: ScheduledBlock) {
+    const payload = block ? {
+      taskId: block.taskId || block.title,
+      projectId: block.projectId || undefined,
+      actionId: block.actionId || undefined,
+      description: block.notes || block.title,
+      tags: block.tags,
+      scheduledBlockId: block.id,
+    } : {
+      taskId: taskId.trim(),
+      projectId: projectId || undefined,
+      actionId: actionId || undefined,
+      description: notes || undefined,
+      tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+    };
+
+    if (!payload.taskId) {
+      toast.error("Add a task or work label before starting.");
+      return;
     }
+
+    const response = await fetch("/api/timer/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      toast.error("Could not start timer", { description: data.error });
+      return;
+    }
+    toast.success("Timer started");
+    await refresh();
   }
 
-  async function deleteProject() {
-    if (!projectId) return;
-    try {
-      const res = await fetch(`/api/projects?projectId=${encodeURIComponent(projectId)}`, { method: "DELETE" });
-      if (res.ok) {
-        toast.success("Project removed");
-        setProjectId("");
-        await loadProjectsAndGoals();
-      } else {
-        const data = await res.json();
-        throw new Error(data.error);
-      }
-    } catch (err) {
-      toast.error("Failed to remove project", { description: (err as Error).message });
+  async function stopTimer(entryId: string) {
+    const response = await fetch("/api/timer/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      toast.error("Could not stop timer", { description: data.error });
+      return;
     }
+    toast.success("Time logged", { description: fmt(data.durationSeconds ?? 0) });
+    await refresh();
   }
 
-  async function createGoal() {
-    if (!newGoalName.trim()) return;
-    try {
-      const res = await fetch("/api/goals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newGoalName.trim(), projectId: projectId || undefined }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success("Goal created", { description: data.goal.name });
-        setNewGoalName("");
-        await loadProjectsAndGoals();
-      } else throw new Error(data.error);
-    } catch (err) {
-      toast.error("Failed to create goal", { description: (err as Error).message });
+  async function updateBlock(block: ScheduledBlock, updates: Partial<ScheduledBlock>) {
+    const response = await fetch("/api/schedule", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blockId: block.id, ...updates }),
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      toast.error("Could not update plan", { description: data.error });
+      return;
     }
+    await refresh();
   }
 
-  async function deleteGoal() {
-    if (!goalId) return;
-    try {
-      const res = await fetch(`/api/goals?goalId=${encodeURIComponent(goalId)}`, { method: "DELETE" });
-      if (res.ok) {
-        toast.success("Goal removed");
-        setGoalId("");
-        await loadProjectsAndGoals();
-      } else {
-        const data = await res.json();
-        throw new Error(data.error);
-      }
-    } catch (err) {
-      toast.error("Failed to remove goal", { description: (err as Error).message });
-    }
+  async function rescheduleTomorrow(block: ScheduledBlock) {
+    const start = new Date(block.startsAt);
+    const end = new Date(block.endsAt);
+    start.setDate(start.getDate() + 1);
+    end.setDate(end.getDate() + 1);
+    await updateBlock(block, { startsAt: start.toISOString(), endsAt: end.toISOString() } as Partial<ScheduledBlock>);
+    toast.success("Moved to tomorrow");
   }
 
-  async function startTimer() {
-    try {
-      const tArray = tags.split(",").map((t) => t.trim()).filter(Boolean);
-      const res = await fetch("/api/timer/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId,
-          description: "Focus block",
-          projectId: projectId || undefined,
-          goalId: goalId || undefined,
-          actionId: actionId || undefined,
-          tags: tArray,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to start timer");
-      
-      const newTimer: ActiveTimer = {
-        id: data.entry.id,
-        taskId,
+  async function createPlan() {
+    const startsAt = new Date(planStart);
+    const endsAt = new Date(planEnd);
+    if (!planTitle.trim() || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
+      toast.error("Enter a valid planned block.");
+      return;
+    }
+    const response = await fetch("/api/schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: planTitle.trim(),
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
         projectId: projectId || undefined,
-        goalId: goalId || undefined,
         actionId: actionId || undefined,
-        tags: tArray,
-        startedAt: data.entry.startedAt
-      };
-      
-      setActiveTimers(prev => [newTimer, ...prev]);
-      
-      await db.draftTimers.put({
-        id: data.entry.id,
-        taskId,
-        workspaceId: data.entry.workspaceId,
-        startedAt: newTimer.startedAt,
-        pomodoroMinutes,
-        lastSeenAt: new Date().toISOString(),
-      });
-      
-      toast.success("Timer Started", { 
-        description: `Running ${taskId} concurrently.`,
-        icon: <Play className="h-4 w-4 text-cyan-400" />
-      });
-    } catch (err) {
-      toast.error("Could not start session", { description: (err as Error).message });
+        taskId: taskId.trim() || undefined,
+        notes: notes || undefined,
+        tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      toast.error("Could not schedule block", { description: data.error });
+      return;
     }
+    const createdBlock = data.block as ScheduledBlock | undefined;
+    if (createdBlock) {
+      setBlocks((current) => [createdBlock, ...current.filter((block) => block.id !== createdBlock.id)].slice(0, 5));
+    }
+    toast.success("Work block scheduled");
+    setPlanningOpen(false);
   }
 
-  async function stopTimer(entryId: string, silent = false) {
-    try {
-      const res = await fetch("/api/timer/stop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entryId }),
-      });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error || "Failed to stop timer");
-      
-      await db.draftTimers.delete(entryId);
-      setActiveTimers(prev => prev.filter(t => t.id !== entryId));
-      
-      if (!silent) {
-        toast.success("Session Logged", { 
-          description: `${data.durationSeconds}s recorded successfully.`,
-          icon: <Check className="h-4 w-4 text-emerald-400" />
-        });
-      }
-    } catch (err) {
-      toast.error("Could not stop session", { description: (err as Error).message });
-    }
-  }
-
-  async function loadRates() {
-    try {
-      const res = await fetch("/api/currency/rates?base=USD&symbols=EUR,GBP,CAD,JPY");
-      const data = (await res.json()) as CurrencyPayload;
-      setRates(data.payload?.rates ?? {});
-      toast.success("FX Rates Updated");
-    } catch {
-      toast.error("Failed to fetch FX rates");
-    }
-  }
-
-  const activeTags = tags.split(",").map((t) => t.trim()).filter(Boolean);
-  const heroTimer = activeTimers[0] || null;
-  const secondaryTimers = activeTimers.slice(1);
-
-  // Compute hero states
-  const heroElapsed = heroTimer ? Math.max(0, Math.floor((now - new Date(heroTimer.startedAt).getTime()) / 1000)) : 0;
-  const isPomodoro = pomodoroTotal > 0;
-  const heroPomodoroRemaining = isPomodoro ? Math.max(0, pomodoroTotal - heroElapsed) : 0;
-  const heroPomodoroProgress = isPomodoro ? Math.min(1, heroElapsed / pomodoroTotal) : (heroElapsed % 3600) / 3600; // Loops every hour for unlimited
-  const heroPomodoroDone = isPomodoro ? heroElapsed >= pomodoroTotal : false;
+  const focusedElapsed = focusedTimer ? Math.max(0, Math.floor((now - new Date(focusedTimer.startedAt).getTime()) / 1000)) : 0;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      {/* ─── Top Nav ─── */}
-      <nav className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] px-5 py-3 backdrop-blur-3xl shadow-2xl">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 shadow-lg shadow-cyan-500/20">
-            <Activity className="h-4 w-4 text-white" />
+    <div className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="flex flex-col gap-4 rounded-[32px] border border-slate-200 bg-white px-6 py-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-700">Today’s command center</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Plan work. Run timers. Log the rest.</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-500">A connected flow for scheduled blocks, concurrent timers, manual entries, analytics, and billing output.</p>
           </div>
-          <span className="text-sm font-semibold tracking-wide text-white">Billabled</span>
-          {session && (
-            <span className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-slate-400 sm:inline">
-              {workspaceSlug}
-            </span>
-          )}
-        </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => { setSelectedBlock(null); setManualOpen(true); }} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">Log time</button>
+            <button onClick={() => setPlanningOpen((value) => !value)} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"><Plus className="mr-2 inline h-4 w-4" />Plan work</button>
+          </div>
+        </header>
 
-        <div className="flex items-center gap-4">
-          <AnimatePresence>
-            {activeTimers.length > 0 && (
-              <motion.span 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400 shadow-inner"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping shadow-lg shadow-emerald-400 absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                {activeTimers.length} Live
-              </motion.span>
-            )}
-          </AnimatePresence>
-          {session && <ProfileMenu email={session.email} isAdmin={isAdminEmail(session.email)} />}
-        </div>
-      </nav>
+        <section className="rounded-[32px] border border-cyan-100 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-cyan-700">First five minutes</p>
+              <h2 className="mt-1 text-2xl font-semibold">Get from setup to billable proof without hunting around.</h2>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Create a project, plan the next block, capture time, then review the record for invoice or export.</p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[520px]">
+              {onboardingSteps.map((step) => {
+                const content = (
+                  <>
+                    <CheckCircle2 className={`h-4 w-4 ${step.done ? "text-emerald-600" : "text-slate-300"}`} />
+                    <span>{step.label}</span>
+                    {!step.done && <ArrowRight className="ml-auto h-4 w-4 text-slate-300" />}
+                  </>
+                );
+                const className = `inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition ${step.done ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-cyan-200 hover:bg-cyan-50"}`;
+                if (step.href) return <Link key={step.label} href={step.href} className={className}>{content}</Link>;
+                return <button key={step.label} onClick={step.action} className={className}>{content}</button>;
+              })}
+            </div>
+          </div>
+        </section>
 
-      {/* ─── Multiple Timer Stack ─── */}
-      <AnimatePresence>
-        {secondaryTimers.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="flex flex-col gap-2"
-          >
-            {secondaryTimers.map((timer) => {
-              const elap = Math.max(0, Math.floor((now - new Date(timer.startedAt).getTime()) / 1000));
-              const projectName = timer.projectId ? projectNameById[timer.projectId] : undefined;
-              return (
-                <motion.div 
-                  key={timer.id}
-                  layout
-                  className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-5 py-3 backdrop-blur-md transition-all hover:bg-white/10"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="font-mono text-xl font-medium tracking-tight text-white">{fmt(elap)}</span>
-                    <div className="hidden sm:flex flex-col">
-                      <span className="text-sm font-semibold text-slate-200">{timer.taskId}</span>
-                      {projectName && <span className="text-[10px] uppercase tracking-wider text-cyan-400/80">{projectName}</span>}
-                    </div>
+        <section className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-500">Focused timer</p>
+                <h2 className="mt-1 text-xl font-semibold">{focusedTimer ? focusedTimer.taskId : "Ready when you are"}</h2>
+              </div>
+              {activeTimers.length > 0 && <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">{activeTimers.length} running</span>}
+            </div>
+
+            <div className="mt-8 rounded-[28px] bg-slate-950 p-6 text-white shadow-inner">
+              <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm text-slate-400">Elapsed</p>
+                  <div className="mt-2 font-mono text-6xl font-semibold tracking-tight sm:text-7xl">{fmt(focusedElapsed)}</div>
+                  <p className="mt-3 text-sm text-slate-400">{focusedTimer?.projectName || (projectId ? projectNameById.get(projectId) : "Pick a project or start unassigned")}</p>
+                </div>
+                {focusedTimer ? (
+                  <div className="flex flex-col gap-2 sm:min-w-48">
+                    <button onClick={() => stopTimer(focusedTimer.id)} className="inline-flex items-center justify-center rounded-2xl bg-rose-500 px-5 py-4 text-sm font-bold text-white transition hover:bg-rose-400"><Square className="mr-2 h-4 w-4 fill-white" />Stop focused timer</button>
+                    <button onClick={() => startTimer()} className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/15"><Play className="mr-2 h-4 w-4 fill-white" />Start another timer</button>
                   </div>
-                  <button
-                    onClick={() => stopTimer(timer.id)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors"
-                  >
-                    <Square className="h-4 w-4" />
-                  </button>
-                </motion.div>
+                ) : (
+                  <button onClick={() => startTimer()} className="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-5 py-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-300"><Play className="mr-2 h-4 w-4 fill-slate-950" />Start timer</button>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-[1.2fr_1fr_1fr]">
+              <input value={taskId} onChange={(e) => setTaskId(e.target.value)} placeholder="What are you working on?" className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" />
+              <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white">
+                <option value="">No project</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+              <select value={actionId} onChange={(e) => setActionId(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white">
+                <option value="">No action rate</option>
+                {actions.map((action) => <option key={action.id} value={action.id}>{action.name}{action.hourlyRate ? ` ($${action.hourlyRate}/hr)` : ""}</option>)}
+              </select>
+              <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white md:col-span-2" />
+              <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags: design, research" className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" />
+            </div>
+
+            {planningOpen && (
+              <div className="mt-5 rounded-[24px] border border-cyan-100 bg-cyan-50/60 p-4">
+                <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-end">
+                  <label className="text-sm font-semibold text-slate-700">Title<input value={planTitle} onChange={(e) => setPlanTitle(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-cyan-100 bg-white px-3 text-sm outline-none" /></label>
+                  <label className="text-sm font-semibold text-slate-700">Start<input type="datetime-local" value={planStart} onChange={(e) => setPlanStart(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-cyan-100 bg-white px-3 text-sm outline-none" /></label>
+                  <label className="text-sm font-semibold text-slate-700">End<input type="datetime-local" value={planEnd} onChange={(e) => setPlanEnd(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-cyan-100 bg-white px-3 text-sm outline-none" /></label>
+                  <button onClick={createPlan} className="h-11 rounded-xl bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-500">Save plan</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-500">Up next</p>
+                <h2 className="mt-1 text-xl font-semibold">Scheduled work blocks</h2>
+              </div>
+              <CalendarClock className="h-5 w-5 text-cyan-700" />
+            </div>
+            <div className="mt-5 space-y-3">
+              {blocks.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                  <ListChecks className="mx-auto h-8 w-8 text-slate-400" />
+                  <p className="mt-3 text-sm font-semibold text-slate-700">No planned work queued.</p>
+                  <p className="mt-1 text-sm text-slate-500">Plan your next block from here or use Calendar for a fuller schedule.</p>
+                </div>
+              ) : blocks.map((block) => (
+                <article key={block.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-950">{block.title}</p>
+                      <p className="mt-1 text-sm text-slate-500">{timeRange(block)}{block.projectId ? ` · ${projectNameById.get(block.projectId) ?? "Project"}` : ""}</p>
+                    </div>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">planned</span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <button onClick={() => startTimer(block)} className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white">Start</button>
+                    <button onClick={() => { setSelectedBlock(block); setManualOpen(true); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">Log</button>
+                    <button onClick={() => rescheduleTomorrow(block)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">Tomorrow</button>
+                    <button onClick={() => updateBlock(block, { status: "skipped" })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">Skip</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-500">Concurrent stack</p>
+              <h2 className="mt-1 text-xl font-semibold">All running timers</h2>
+            </div>
+            <TimerReset className="h-5 w-5 text-slate-400" />
+          </div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {activeTimers.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center lg:col-span-2">
+                <Clock className="mx-auto h-8 w-8 text-slate-400" />
+                <p className="mt-3 text-sm font-semibold text-slate-700">No live timers.</p>
+                <p className="mt-1 text-sm text-slate-500">Start a timer from your focus panel or from a scheduled work block.</p>
+              </div>
+            ) : activeTimers.map((timer, index) => {
+              const elapsed = Math.max(0, Math.floor((now - new Date(timer.startedAt).getTime()) / 1000));
+              return (
+                <article key={timer.id} className={`flex items-center justify-between gap-4 rounded-3xl border p-4 ${index === 0 ? "border-cyan-200 bg-cyan-50" : "border-slate-200 bg-slate-50"}`}>
+                  <div>
+                    <div className="font-mono text-2xl font-semibold text-slate-950">{fmt(elapsed)}</div>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">{timer.taskId}</p>
+                    <p className="text-xs text-slate-500">{timer.projectName || "No project"}{timer.action ? ` · ${timer.action}` : ""}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {index !== 0 && <FastForward className="h-4 w-4 text-slate-400" />}
+                    <button onClick={() => stopTimer(timer.id)} className="rounded-2xl bg-rose-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-rose-400"><Square className="mr-2 inline h-3 w-3 fill-white" />Stop</button>
+                  </div>
+                </article>
               );
             })}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ─── Hero Active Timer OR Empty Placeholder ─── */}
-      <motion.div 
-        layout
-        className="relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-2xl"
-      >
-        <AnimatePresence>
-          {heroTimer && (
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="pointer-events-none absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-transparent to-transparent opacity-50 mix-blend-screen" 
-            />
-          )}
-          {heroTimer && heroPomodoroDone && (
-             <motion.div 
-             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-             className="pointer-events-none absolute inset-0 bg-gradient-to-b from-violet-500/10 via-transparent to-transparent opacity-50 mix-blend-screen" 
-           />
-          )}
-        </AnimatePresence>
-
-        <div className="flex flex-col items-center gap-8 px-6 py-12 sm:py-16">
-          <div className="relative flex h-56 w-56 items-center justify-center sm:h-72 sm:w-72">
-            <PomodoroRing progress={heroTimer ? heroPomodoroProgress : 0} isRunning={!!heroTimer} />
-            <motion.div layout className="z-10 flex flex-col items-center">
-              <span className={`font-mono text-6xl font-light tabular-nums tracking-tighter sm:text-7xl transition-colors duration-500 ${heroTimer ? "text-white" : "text-slate-500"}`}>
-                {fmt(heroElapsed)}
-              </span>
-              <AnimatePresence mode="popLayout">
-                {heroTimer ? (
-                  <motion.span 
-                    initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                    className={`mt-2 text-xs font-medium ${heroPomodoroDone && isPomodoro ? "text-violet-400" : "text-cyan-400"}`}
-                  >
-                    {!isPomodoro 
-                      ? "⏱️ Tracking active" 
-                      : heroPomodoroDone 
-                        ? "🍅 Pomodoro complete!" 
-                        : `${fmt(heroPomodoroRemaining)} remaining`}
-                  </motion.span>
-                ) : (
-                  <motion.span 
-                    initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                    className="mt-2 text-xs font-medium text-slate-500 uppercase tracking-widest"
-                  >
-                    Ready Setup
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.div>
           </div>
+        </section>
+      </div>
 
-          <div className="flex max-w-lg flex-wrap justify-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-slate-300">
-              <Briefcase className="h-3 w-3" /> {heroTimer ? heroTimer.taskId : taskId}
-            </span>
-            {(() => {
-              const pId = heroTimer ? heroTimer.projectId : projectId;
-              const projectName = pId ? projectNameById[pId] : undefined;
-              return projectName ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-cyan-300">
-                  <Folder className="h-3 w-3" /> {projectName}
-                </span>
-              ) : null;
-            })()}
-            {(() => {
-              const gId = heroTimer ? heroTimer.goalId : goalId;
-              const goalName = gId ? goalNameById[gId] : undefined;
-              return goalName ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-violet-300">
-                  <Target className="h-3 w-3" /> {goalName}
-                </span>
-              ) : null;
-            })()}
-          </div>
-
-          <div className="mt-2 flex">
-            {heroTimer ? (
-              <motion.button
-                whileHover={{ scale: 1.02, backgroundColor: "rgb(225, 29, 72)" }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => stopTimer(heroTimer.id)}
-                className="group flex items-center gap-3 rounded-2xl bg-rose-500 px-10 py-4 text-sm font-semibold tracking-wide text-white shadow-xl shadow-rose-500/20 transition-all hover:shadow-rose-500/40 border border-rose-400/50"
-              >
-                <Square className="h-4 w-4 fill-white flex-shrink-0" />
-                Stop Logging
-              </motion.button>
-            ) : (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={startTimer}
-                className="group relative flex items-center gap-3 overflow-hidden rounded-2xl bg-white px-10 py-4 text-sm font-semibold tracking-wide text-slate-900 shadow-xl shadow-white/10 transition-all"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-violet-400/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                <Play className="relative h-4 w-4 fill-slate-900 group-hover:text-cyan-600 transition-colors" />
-                <span className="relative">Start Session</span>
-              </motion.button>
-            )}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* ─── Forms / Context ─── */}
-      <motion.div layout className="grid gap-6 sm:grid-cols-2">
-        <div className="group rounded-3xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-3xl shadow-2xl transition hover:bg-white/[0.03]">
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-white/5 p-2"><Clock className="h-4 w-4 text-slate-400" /></div>
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Configure Next Timer</h2>
-            </div>
-          </div>
-          
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="taskId" className="mb-2 block text-xs font-medium text-slate-400">Task Reference / ID</label>
-                <input
-                  id="taskId"
-                  value={taskId}
-                  onChange={(e) => setTaskId(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-                  placeholder="Ex: TKO-101"
-                />
-              </div>
-              <div>
-                <label htmlFor="pomodoroMinutes" className="mb-2 block text-xs font-medium text-slate-400">Target Time (Minutes) - 0 for continuous</label>
-                <input
-                  id="pomodoroMinutes"
-                  type="number"
-                  min="0"
-                  max="480"
-                  value={pomodoroMinutes}
-                  onChange={(e) => setPomodoroMinutes(parseInt(e.target.value) || 0)}
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-                />
-              </div>
-            </div>
-            <div>
-              <label htmlFor="tags" className="mb-2 block text-xs font-medium text-slate-400">Activity Tags</label>
-              <input
-                id="tags"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-slate-600 transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-                placeholder="focus, research, deep-work"
-              />
-              {workspaceTags.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {workspaceTags.map((t) => {
-                     const isActive = activeTags.includes(t);
-                     return (
-                      <button
-                        key={t}
-                        onClick={() => {
-                          const cur = tags.split(",").map((x) => x.trim()).filter(Boolean);
-                          const next = isActive ? cur.filter((x) => x !== t) : [...cur, t];
-                          setTags(next.join(", "));
-                        }}
-                        className={`rounded-lg border px-3 py-1 text-[11px] font-medium tracking-wide transition-all ${
-                          isActive
-                            ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300 shadow-sm shadow-cyan-500/20"
-                            : "border-white/5 bg-white/5 text-slate-400 hover:border-white/20 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        #{t}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-            {heroTimer && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={startTimer}
-                className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-cyan-500/10 px-4 py-3 text-sm font-semibold tracking-wide text-cyan-400 shadow-xl shadow-cyan-500/5 transition-all hover:bg-cyan-500/20 border border-cyan-500/20"
-              >
-                <Plus className="relative h-4 w-4" />
-                <span className="relative">Start Concurrent Timer</span>
-              </motion.button>
-            )}
-          </div>
-        </div>
-
-        <div className="group rounded-3xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-3xl shadow-2xl transition hover:bg-white/[0.03]">
-          <div className="mb-6 flex items-center gap-2">
-            <div className="rounded-lg bg-white/5 p-2"><Target className="h-4 w-4 text-slate-400" /></div>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Billable Assignments</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="relative">
-              <label htmlFor="projectId" className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Project Workspace</label>
-              <select
-                id="projectId"
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-              >
-                <option value="" className="bg-slate-900 border-none">— Unassigned Project —</option>
-                {projects.map((p) => <option className="bg-slate-900 border-none" key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <ChevronDown className="absolute bottom-3.5 right-4 h-4 w-4 text-slate-500 pointer-events-none" />
-            </div>
-            
-            <div className="relative">
-              <label htmlFor="goalId" className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Billing Goal</label>
-              <select
-                id="goalId"
-                value={goalId}
-                onChange={(e) => setGoalId(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition focus:border-cyan-500/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-              >
-                <option value="" className="bg-slate-900">— Unassigned Goal —</option>
-                {goals.map((g) => <option className="bg-slate-900" key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-              <ChevronDown className="absolute bottom-3.5 right-4 h-4 w-4 text-slate-500 pointer-events-none" />
-            </div>
-
-            <div className="relative">
-              <label htmlFor="actionId" className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500">Action Rate Card</label>
-              <select
-                id="actionId"
-                value={actionId}
-                onChange={(e) => setActionId(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-100 transition focus:border-emerald-500/50 focus:bg-emerald-500/10 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-              >
-                <option value="" className="bg-slate-900">— Select Action Rate —</option>
-                {actions.map((a) => <option className="bg-slate-900" key={a.id} value={a.id}>{a.name} {a.hourlyRate !== undefined ? `($${a.hourlyRate}/hr)` : ""}</option>)}
-              </select>
-              <ChevronDown className="absolute bottom-3.5 right-4 h-4 w-4 text-emerald-500/50 pointer-events-none" />
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* ─── Manage Defaults (Collapsible) ─── */}
-      <motion.div layout className="rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-2xl overflow-hidden">
-        <button
-          title="Preferences"
-          onClick={() => setShowConfig((v) => !v)}
-          className="group flex w-full items-center justify-between px-6 py-5 text-left transition hover:bg-white/[0.02]"
-        >
-          <div className="flex items-center gap-3">
-            <Settings2 className="h-4 w-4 text-slate-500 group-hover:text-cyan-400 transition" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 group-hover:text-slate-200 transition">Workspace Preferences & Entities</span>
-          </div>
-          <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform duration-300 ${showConfig ? "rotate-180" : ""}`} />
-        </button>
-
-        <AnimatePresence>
-          {showConfig && (
-            <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-t border-white/5"
-            >
-              <div className="grid gap-8 p-6 sm:grid-cols-3">
-                {/* New Project */}
-                <div>
-                  <label htmlFor="newProjectName" className="mb-3 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Create New Project</label>
-                  <div className="flex gap-2 relative">
-                    <input
-                      id="newProjectName"
-                      value={newProjectName}
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && createProject()}
-                      placeholder="E.g., Website Redesign"
-                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 pl-4 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none"
-                    />
-                    <button
-                      title="Create Project"
-                      onClick={createProject}
-                      className="absolute right-1.5 top-1.5 bottom-1.5 w-8 flex items-center justify-center rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 transition"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {projectId && (
-                    <button onClick={deleteProject} className="mt-3 text-xs font-medium text-rose-500/60 hover:text-rose-400 transition">
-                      Delete selected project
-                    </button>
-                  )}
-                </div>
-
-                {/* New Goal */}
-                <div>
-                  <label htmlFor="newGoalName" className="mb-3 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Create Goal</label>
-                  <div className="flex gap-2 relative">
-                    <input
-                      id="newGoalName"
-                      value={newGoalName}
-                      onChange={(e) => setNewGoalName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && createGoal()}
-                      placeholder="E.g., Q3 Launch"
-                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 pl-4 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 focus:outline-none"
-                    />
-                    <button
-                      title="Create Goal"
-                      onClick={createGoal}
-                      className="absolute right-1.5 top-1.5 bottom-1.5 w-8 flex items-center justify-center rounded-lg bg-violet-500 hover:bg-violet-400 text-white transition"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {goalId && (
-                    <button onClick={deleteGoal} className="mt-3 text-xs font-medium text-rose-500/60 hover:text-rose-400 transition">
-                      Delete selected goal
-                    </button>
-                  )}
-                </div>
-
-                {/* FX Rates */}
-                <div>
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Currency Exchange (USD base)</p>
-                  {Object.keys(rates).length === 0 ? (
-                    <button
-                      onClick={loadRates}
-                      className="w-full rounded-xl border border-dashed border-white/20 bg-transparent px-4 py-2.5 text-sm text-slate-400 hover:border-white/40 hover:text-white transition"
-                    >
-                      Load FX rates
-                    </button>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(rates).map(([currency, rate]) => (
-                        <span key={currency} className="rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-medium tracking-wide text-slate-300">
-                          {currency} <span className="text-slate-500 ml-1">{Number(rate).toFixed(3)}</span>
-                        </span>
-                      ))}
-                      <button onClick={loadRates} className="rounded-lg border border-white/5 bg-white/5 px-3 py-1.5 text-xs text-slate-400 hover:text-white transition">↻ Refresh</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} scheduledBlock={selectedBlock} onSaved={refresh} defaultTaskId={taskId} defaultProjectId={projectId} defaultDescription={notes} />
     </div>
   );
 }

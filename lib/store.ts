@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { users, workspaces, memberships, projects, goals, invitations, magicLinks, timeEntries, auditLogs, lockPeriods, userActions, projectTasks, notifications, invoices, webhooks } from "@/lib/db/schema";
+import { users, workspaces, memberships, projects, goals, invitations, magicLinks, timeEntries, auditLogs, lockPeriods, userActions, projectTasks, notifications, invoices, webhooks, scheduledWorkBlocks, apiKeys, apiKeyRequests } from "@/lib/db/schema";
 import { eq, and, gt, desc } from "drizzle-orm";
 
 export type WorkspaceRole = "client" | "member" | "manager" | "owner";
@@ -20,6 +20,9 @@ export type Invoice = typeof invoices.$inferSelect;
 export type ProjectTask = typeof projectTasks.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type WebhookIntegration = typeof webhooks.$inferSelect;
+export type ScheduledWorkBlock = typeof scheduledWorkBlocks.$inferSelect;
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type ApiKeyRequest = typeof apiKeyRequests.$inferSelect;
 
 export async function ensureUser(email: string) {
   const normalized = email.trim().toLowerCase();

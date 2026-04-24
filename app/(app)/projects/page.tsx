@@ -4,10 +4,10 @@ import { projects as projectsTable, projectTasks as tasksTable } from "@/lib/db/
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
-import { FolderKanban, Archive } from "lucide-react";
+import { Archive, FolderKanban } from "lucide-react";
 import { CreateProjectButton } from "@/components/create-project-button";
 
-export const metadata = { title: "Projects – Billabled" };
+export const metadata = { title: "Projects - Billabled" };
 
 export default async function ProjectsPage() {
   const session = await requireSession();
@@ -19,121 +19,88 @@ export default async function ProjectsPage() {
     billingModel: "hourly" | "fixed_fee" | "hybrid";
     percentComplete: number;
   }> = [];
-  let tasks: Array<{
-    id: string;
-    projectId: string;
-    status: "todo" | "in_progress" | "review" | "done";
-    parentId: string | null;
-  }> = [];
+  let tasks: Array<{ id: string; projectId: string; status: "todo" | "in_progress" | "review" | "done"; parentId: string | null }> = [];
   let loadError: string | null = null;
 
   try {
     await ensureWorkspaceSchema();
-
-    const rawProjects = await db
-      .select()
-      .from(projectsTable)
-      .where(eq(projectsTable.workspaceId, session.workspaceId))
-      .orderBy(desc(projectsTable.createdAt));
-    projects = rawProjects.map((p) => ({
-      id: p.id,
-      name: p.name,
-      status: p.status,
-      billingModel: p.billingModel,
-      percentComplete: p.percentComplete || 0,
+    const rawProjects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId)).orderBy(desc(projectsTable.createdAt));
+    projects = rawProjects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      status: project.status,
+      billingModel: project.billingModel,
+      percentComplete: project.percentComplete || 0,
     }));
-
-    const rawTasks = await db
-      .select()
-      .from(tasksTable)
-      .where(eq(tasksTable.workspaceId, session.workspaceId));
-    tasks = rawTasks.map((t) => ({
-      id: t.id,
-      projectId: t.projectId,
-      status: t.status,
-      parentId: t.parentId,
-    }));
+    const rawTasks = await db.select().from(tasksTable).where(eq(tasksTable.workspaceId, session.workspaceId));
+    tasks = rawTasks.map((task) => ({ id: task.id, projectId: task.projectId, status: task.status, parentId: task.parentId }));
   } catch (error) {
     loadError = error instanceof Error ? error.message : "Unable to load projects right now.";
   }
 
+  const activeCount = projects.filter((project) => project.status === "active").length;
+  const archivedCount = projects.filter((project) => project.status === "archived").length;
+
   return (
-    <main className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Projects Pipeline</h1>
-          <p className="mt-2 text-sm text-slate-400">Select a project to view its Kanban board and tasks.</p>
+    <main className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Manage</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Projects</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Organize client work, tasks, budgets, and logged time into clear delivery pipelines.</p>
+            </div>
+            <CreateProjectButton />
+          </div>
           {!loadError && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 font-medium text-cyan-300">
-                {projects.filter((project) => project.status === "active").length} Active
-              </span>
-              <span className="rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1 font-medium text-slate-300">
-                {projects.filter((project) => project.status === "archived").length} Archived
-              </span>
-              <span className="rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1 font-medium text-slate-300">
-                {tasks.length} Tasks
-              </span>
+            <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold">
+              <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700">{activeCount} active</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{archivedCount} archived</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{tasks.length} tasks</span>
             </div>
           )}
-        </div>
-        <div className="shrink-0 flex items-start self-end sm:self-auto relative z-50">
-          <CreateProjectButton />
-        </div>
-      </div>
+        </header>
 
-      {loadError ? (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
-          <h2 className="text-lg font-semibold">Projects are temporarily unavailable</h2>
-          <p className="mt-2 text-sm text-amber-100/90">{loadError}</p>
-        </div>
-      ) : projects.length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-16 text-center flex flex-col items-center">
-            <FolderKanban className="w-16 h-16 text-slate-700 mb-4" />
-            <h3 className="text-xl font-medium text-white">No active projects</h3>
-            <p className="text-slate-400 mt-2 max-w-md">Projects help you organize time entries and tasks. Create your first project by clicking the button above.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map(proj => {
-            const projTasks = tasks.filter(t => t.projectId === proj.id);
-            const doneTasks = projTasks.filter(t => t.status === "done" && !t.parentId); // Only count top-level completions perhaps? Actually all is fine.
-            const progress = projTasks.length ? Math.round((doneTasks.length / projTasks.length) * 100) : proj.percentComplete;
-            return (
-              <Link 
-                key={proj.id} 
-                href={`/projects/${proj.id}`} 
-                className={`group relative flex flex-col rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent p-6 shadow-xl transition-all hover:bg-white/[0.05] hover:border-cyan-500/30 ${proj.status === 'archived' ? 'opacity-50 grayscale hover:opacity-80 hover:grayscale-0' : ''}`}
-              >
-                <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold text-white group-hover:text-cyan-400 transition-colors">{proj.name}</h3>
-                        {proj.status === "archived" && <Archive className="h-4 w-4 text-slate-500" />}
+        {loadError ? (
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
+            <h2 className="text-lg font-semibold">Projects are temporarily unavailable</h2>
+            <p className="mt-2 text-sm">{loadError}</p>
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="rounded-[32px] border border-dashed border-slate-300 bg-white p-16 text-center shadow-sm">
+            <FolderKanban className="mx-auto mb-4 h-14 w-14 text-slate-300" />
+            <h3 className="text-xl font-semibold text-slate-950">No active projects</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Create your first project to connect schedules, timers, manual logs, analytics, and exports.</p>
+          </div>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {projects.map((project) => {
+              const projectTasks = tasks.filter((task) => task.projectId === project.id);
+              const doneTasks = projectTasks.filter((task) => task.status === "done" && !task.parentId);
+              const progress = projectTasks.length ? Math.round((doneTasks.length / projectTasks.length) * 100) : project.percentComplete;
+              return (
+                <Link key={project.id} href={`/projects/${project.id}`} className={`group rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md ${project.status === "archived" ? "opacity-60" : ""}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-semibold text-slate-950 group-hover:text-cyan-700">{project.name}</h3>
+                        {project.status === "archived" && <Archive className="h-4 w-4 text-slate-400" />}
+                      </div>
+                      <p className="mt-2 text-sm text-slate-500">{projectTasks.length} task{projectTasks.length === 1 ? "" : "s"}</p>
                     </div>
-                    <div className="rounded-full bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-300">
-                        {proj.billingModel}
-                    </div>
-                </div>
-                
-                <p className="mt-2 text-sm text-slate-400">{projTasks.length} total tasks</p>
-                
-                <div className="mt-auto pt-6">
-                    <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-2">
-                        <span>Project Progress</span>
-                        <span className={progress === 100 ? "text-emerald-400" : ""}>{progress}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-800/50 rounded-full overflow-hidden">
-                        <div 
-                           className={`h-full rounded-full transition-all duration-500 ${progress === 100 ? "bg-emerald-500" : "bg-gradient-to-r from-cyan-500 to-indigo-500"}`} 
-                           style={{ width: `${progress}%` }} 
-                        />
-                    </div>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      )}
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{project.billingModel}</span>
+                  </div>
+                  <div className="mt-8">
+                    <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-500"><span>Progress</span><span>{progress}%</span></div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-600" style={{ width: `${progress}%` }} /></div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </main>
   );
 }

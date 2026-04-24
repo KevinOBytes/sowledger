@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-// Unauthenticated Tests
 test.describe('Unauthenticated Flows', () => {
   test('Test 1: marketing homepage loads with brand', async ({ page }) => {
     await page.goto('/');
@@ -19,58 +18,66 @@ test.describe('Unauthenticated Flows', () => {
     await expect(page).toHaveURL(/.*\/login/);
   });
 
-  test('Test 4: unauthenticated unknown route redirects to login due to protection boundary', async ({ page }) => {
-    await page.goto('/this-route-does-not-exist');
-    await expect(page).toHaveURL(/.*\/login/);
+  test('Test 4: support and API docs are public', async ({ page }) => {
+    await page.goto('/support/api');
+    await expect(page.getByRole('heading', { name: 'Build on Billabled.' })).toBeVisible();
+    await expect(page.getByText('Authorization: Bearer blb_your_api_key', { exact: true })).toBeVisible();
+  });
+
+  test('Test 4b: operational public endpoints are not session-cookie gated', async ({ page }) => {
+    const health = await page.request.get('/api/health');
+    expect(health.ok()).toBeTruthy();
+
+    const publicApi = await page.request.get('/api/v1/projects');
+    expect(publicApi.status()).toBe(401);
+
+    const stripeWebhook = await page.request.post('/api/webhooks/stripe', { data: '{}' });
+    expect(stripeWebhook.status()).toBe(400);
   });
 });
 
-// Authenticated Tests
 test.describe('Authenticated Flows (Free Plan)', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the test login endpoint which provisions a free plan workspace and sets the session cookie
     const res = await page.goto('/api/test/login?plan=free');
     const data = await res?.json();
     expect(data?.success).toBe(true);
-    
     await page.goto('/dashboard');
-    await expect(page).toHaveURL(/.*\/dashboard/); // Wait for redirect to complete
+    await expect(page).toHaveURL(/.*\/dashboard/);
   });
 
   test('Test 5: dashboard renders app layout', async ({ page }) => {
-    await page.goto('/dashboard');
-    // Basic structural check inside the app shell
-    await expect(page.locator('text=Billabled').first()).toBeVisible();
+    await expect(page.getByText('Today’s command center')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Billabled/i })).toBeVisible();
   });
 
   test('Test 6: sidebar navigation works', async ({ page }) => {
-    await page.goto('/dashboard');
-    // Click Settings in sidebar
-    await page.click('text=Settings');
+    await page.getByRole('link', { name: 'Workspace' }).click();
     await expect(page).toHaveURL(/.*\/settings/);
   });
 
-  test('Test 7: billing settings shows meters', async ({ page }) => {
+  test('Test 7: billing settings shows plan and usage meters', async ({ page }) => {
     await page.goto('/settings/billing');
-    await expect(page.locator('text=Billing & Plans')).toBeVisible();
-    await expect(page.locator('text=Workspace Members').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Plans and subscription' })).toBeVisible();
+    await expect(page.getByText('Workspace members')).toBeVisible();
+    await expect(page.getByText('Active projects')).toBeVisible();
   });
 
   test('Test 8: invoices free plan paywall triggers', async ({ page }) => {
     await page.goto('/invoices');
-    await expect(page.locator('text=Invoicing is a Pro feature')).toBeVisible();
-    await expect(page.locator('text=Upgrade to Pro')).toBeVisible();
+    await expect(page.locator('text=Invoicing is a Starter feature')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Move to Starter' })).toBeVisible();
   });
 
   test('Test 9: webhooks free plan paywall triggers', async ({ page }) => {
     await page.goto('/settings/webhooks');
-    await expect(page.getByText('Advanced Integrations')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Upgrade to SMB/i })).toBeVisible();
+    await expect(page.getByText('Advanced integrations')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Move to Studio/i })).toBeVisible();
   });
 
   test('Test 10: global timer interface present', async ({ page }) => {
     await page.goto('/dashboard');
-    // Looking for the timer start button
-    await expect(page.locator('text=Start Session').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Log time' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Plan work/i })).toBeVisible();
   });
 });

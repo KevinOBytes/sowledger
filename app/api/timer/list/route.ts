@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
 
     const entries = await db.select({
       id: timeEntries.id,
+      scheduledBlockId: timeEntries.scheduledBlockId,
       taskId: timeEntries.taskId,
       startedAt: timeEntries.startedAt,
       stoppedAt: timeEntries.stoppedAt,

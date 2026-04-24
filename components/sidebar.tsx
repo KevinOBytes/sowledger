@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -11,14 +11,20 @@ import {
   CalendarDays,
   CheckSquare,
   Clock,
+  Code2,
+  FileDown,
   FolderKanban,
+  LayoutList,
   LogOut,
+  Plus,
   Receipt,
   Settings,
   Tag,
   Users,
   Webhook,
 } from "lucide-react";
+
+import { ManualTimeDialog } from "@/components/manual-time-dialog";
 
 type NavItem = {
   name: string;
@@ -42,6 +48,7 @@ function routeIsActive(pathname: string, item: NavItem) {
 export function Sidebar() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [manualOpen, setManualOpen] = useState(false);
 
   useEffect(() => {
     async function fetchNotifications() {
@@ -53,7 +60,7 @@ export function Sidebar() {
           setUnreadCount(unread);
         }
       } catch {
-        // silently fail
+        // Notification count should never block navigation rendering.
       }
     }
     fetchNotifications();
@@ -63,19 +70,20 @@ export function Sidebar() {
 
   const navSections: NavSection[] = [
     {
-      label: "Track",
+      label: "Work",
       items: [
-        { name: "Time Tracker", href: "/dashboard", icon: Clock },
-        { name: "Activity", href: "/activity", icon: CalendarDays },
+        { name: "Dashboard", href: "/dashboard", icon: Clock },
         { name: "Calendar", href: "/calendar", icon: CalendarDays },
+        { name: "Activity", href: "/activity", icon: LayoutList },
       ],
     },
     {
       label: "Analyze",
       items: [
-        { name: "Reports", href: "/reports", icon: BarChart3 },
+        { name: "Analytics", href: "/reports", icon: BarChart3 },
         { name: "Approvals", href: "/approvals", icon: CheckSquare },
         { name: "Invoices", href: "/invoices", icon: Receipt },
+        { name: "Exports", href: "/exports", icon: FileDown },
       ],
     },
     {
@@ -88,12 +96,18 @@ export function Sidebar() {
       ],
     },
     {
-      label: "Configure",
+      label: "Integrate",
       items: [
-        { name: "Workspace Settings", href: "/settings", icon: Settings },
+        { name: "Developers", href: "/settings/developers", icon: Code2 },
+        { name: "Webhooks", href: "/settings/webhooks", icon: Webhook },
+      ],
+    },
+    {
+      label: "Settings",
+      items: [
+        { name: "Workspace", href: "/settings", icon: Settings },
         { name: "Billing", href: "/settings/billing", icon: Receipt },
         { name: "Tags", href: "/settings/tags", icon: Tag },
-        { name: "Webhooks", href: "/settings/webhooks", icon: Webhook },
       ],
     },
   ];
@@ -101,31 +115,28 @@ export function Sidebar() {
   const mobileNav: NavItem[] = [
     { name: "Timer", href: "/dashboard", icon: Clock },
     { name: "Calendar", href: "/calendar", icon: CalendarDays },
-    { name: "Projects", href: "/projects", icon: FolderKanban },
-    { name: "Reports", href: "/reports", icon: BarChart3 },
-    { name: "Settings", href: "/settings", icon: Settings, prefix: "/settings", showBadge: true },
+    { name: "Activity", href: "/activity", icon: LayoutList },
+    { name: "Analytics", href: "/reports", icon: BarChart3 },
+    { name: "More", href: "/settings", icon: Settings, prefix: "/settings", showBadge: true },
   ];
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-72 flex-col border-r border-slate-800/80 bg-slate-950/95">
-        {/* Brand */}
-        <div className="border-b border-slate-800/80 px-6 py-5">
-          <div className="flex items-center">
-            <Image src="/logo.png" alt="Billabled" width={28} height={28} className="mr-3 rounded-md" unoptimized />
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-72 flex-col border-r border-slate-200 bg-white/95 shadow-[16px_0_50px_rgba(15,23,42,0.06)] backdrop-blur md:flex">
+        <div className="border-b border-slate-100 px-6 py-5">
+          <Link href="/dashboard" className="flex items-center transition hover:opacity-80">
+            <Image src="/logo.png" alt="Billabled" width={30} height={30} className="mr-3 rounded-lg" unoptimized />
             <div>
-              <p className="text-lg font-semibold tracking-tight text-slate-100">Billabled</p>
-              <p className="text-xs text-slate-500">Workforce Operations</p>
+              <p className="text-lg font-semibold tracking-tight text-slate-950">Billabled</p>
+              <p className="text-xs font-medium text-slate-400">Plan, track, invoice</p>
             </div>
-          </div>
+          </Link>
         </div>
 
-        {/* Navigation */}
         <nav className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
           {navSections.map((section) => (
-            <div key={section.label} className="mb-6">
-              <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500">{section.label}</p>
+            <div key={section.label} className="mb-5">
+              <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{section.label}</p>
               <div className="space-y-1">
                 {section.items.map((item) => {
                   const isActive = routeIsActive(pathname, item);
@@ -134,14 +145,14 @@ export function Sidebar() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                      className={`group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${
                         isActive
-                          ? "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/35"
-                          : "text-slate-300 hover:bg-slate-900 hover:text-slate-100"
+                          ? "bg-slate-950 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                       }`}
                     >
                       <span className="flex items-center gap-3">
-                        <Icon className={`h-4 w-4 ${isActive ? "text-cyan-300" : "text-slate-500 group-hover:text-slate-300"}`} />
+                        <Icon className={`h-4 w-4 ${isActive ? "text-cyan-300" : "text-slate-400 group-hover:text-cyan-700"}`} />
                         {item.name}
                       </span>
                       {item.showBadge && unreadCount > 0 && (
@@ -157,20 +168,30 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-slate-800/80 p-4">
+        <div className="border-t border-slate-100 p-4">
+          <button
+            type="button"
+            onClick={() => setManualOpen(true)}
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" />
+            Quick entry
+          </button>
+          <Link href="/support/api" className="mb-2 flex items-center gap-3 rounded-2xl bg-cyan-50 px-3 py-2.5 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-100">
+            <Code2 className="h-4 w-4" />
+            API guide
+          </Link>
           <Link
             href="/api/auth/logout"
-            className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-rose-500/10 hover:text-rose-300"
+            className="group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
           >
-            <LogOut className="h-4 w-4 text-slate-500 group-hover:text-rose-300" />
+            <LogOut className="h-4 w-4 text-slate-400 group-hover:text-rose-500" />
             Sign out
           </Link>
         </div>
       </aside>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 z-50 flex w-full items-center justify-around border-t border-slate-800 bg-slate-950/95 px-2 py-3 pb-safe shadow-[0_-10px_35px_rgba(0,0,0,0.45)]">
+      <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around border-t border-slate-200 bg-white/95 px-2 py-3 pb-safe shadow-[0_-12px_35px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
         {mobileNav.map((item) => {
           const isActive = routeIsActive(pathname, item);
           const Icon = item.icon;
@@ -178,19 +199,30 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`relative flex flex-col items-center justify-center gap-1 p-2 transition-all ${
-                isActive ? "text-cyan-400" : "text-slate-500 hover:text-slate-300"
+              className={`relative flex flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 transition ${
+                isActive ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"
               }`}
             >
               <Icon className="h-5 w-5" />
-              <span className="text-[10px] font-medium">{item.name}</span>
+              <span className="text-[10px] font-semibold">{item.name}</span>
               {item.showBadge && unreadCount > 0 && (
-                <span className="absolute right-2 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white shadow-sm ring-2 ring-slate-950" />
+                <span className="absolute right-2 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white shadow-sm ring-2 ring-white" />
               )}
             </Link>
           );
         })}
       </nav>
+
+      <button
+        type="button"
+        onClick={() => setManualOpen(true)}
+        className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 text-white shadow-xl shadow-slate-950/20 transition hover:bg-slate-800 md:hidden"
+        aria-label="Quick time entry"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
+      <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} />
     </>
   );
 }

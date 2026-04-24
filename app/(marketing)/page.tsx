@@ -12,7 +12,41 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRef, useEffect, useState } from "react";
-import { STRIPE_PLANS } from "@/lib/billing-plans";
+
+const MARKETING_PLANS = [
+  {
+    planId: "free",
+    name: "Free",
+    description: "Try the operational workflow on a small workspace.",
+    price: 0,
+    features: ["time-tracking", "manual-logging"],
+    limits: { members: 1, projects: 2, storageMB: 100, goals: 1 },
+  },
+  {
+    planId: "pro",
+    name: "Starter",
+    description: "A low-friction paid plan for solo operators who need invoices, exports, and planned work.",
+    price: 9,
+    features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "invoicing"],
+    limits: { members: 2, projects: 10, storageMB: 1000, goals: 10 },
+  },
+  {
+    planId: "smb",
+    name: "Studio",
+    description: "Small-team operations with approvals, API keys, webhooks, and complete exports.",
+    price: 29,
+    features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "api", "webhooks", "invoicing", "approvals"],
+    limits: { members: 5, projects: 50, storageMB: 5000, goals: 50 },
+  },
+  {
+    planId: "enterprise",
+    name: "Business",
+    description: "More seats, audit depth, advanced API usage, and priority support for growing firms.",
+    price: 79,
+    features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "api", "webhooks", "invoicing", "approvals", "saml"],
+    limits: { members: 20, projects: 200, storageMB: 25000, goals: 200 },
+  },
+];
 
 // The constant background animation component
 function BackgroundText() {
@@ -129,7 +163,7 @@ export default function MarketingPage() {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="mb-6 inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-sm font-medium text-cyan-300"
             >
-              Introducing Billabled Pro
+              Flat workspace pricing for operators
             </motion.div>
             <motion.h1
               initial={{ y: 20, opacity: 0 }}
@@ -137,9 +171,9 @@ export default function MarketingPage() {
               transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
               className="mb-8 text-5xl font-extrabold tracking-tight sm:text-7xl lg:text-8xl"
             >
-              Master your time. <br />
+              Plan the work. <br />
               <span className="bg-gradient-to-r from-cyan-400 to-indigo-500 bg-clip-text text-transparent">
-                Elevate your work.
+                Prove every billable hour.
               </span>
             </motion.h1>
             <motion.p
@@ -148,7 +182,7 @@ export default function MarketingPage() {
               transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
               className="mx-auto mb-12 max-w-2xl text-lg text-slate-400 sm:text-xl"
             >
-              The most advanced, beautifully designed time tracking and workforce intelligence platform. Built for professionals who demand excellence.
+              Billabled turns schedules, live timers, manual time, approvals, invoices, exports, and API access into one operational flow for research and technical service teams.
             </motion.p>
             <motion.div
               initial={{ y: 20, opacity: 0 }}
@@ -160,7 +194,7 @@ export default function MarketingPage() {
                 href="/login"
                 className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-4 text-base font-semibold text-black transition-transform hover:scale-105"
               >
-                Sign up for free
+                Start free
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
@@ -178,15 +212,15 @@ export default function MarketingPage() {
             >
               <span className="inline-flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-cyan-400" />
-                Advanced billing intelligence
+                Plan-to-invoice workflow
               </span>
               <span className="inline-flex items-center gap-2">
                 <Check className="h-4 w-4 text-cyan-400" />
-                SOC-ready audit trails
+                Exportable audit records
               </span>
               <span className="inline-flex items-center gap-2">
                 <Check className="h-4 w-4 text-cyan-400" />
-                Multi-team scale
+                Public API and webhooks
               </span>
             </motion.div>
           </motion.div>
@@ -201,10 +235,10 @@ export default function MarketingPage() {
             <div className="grid gap-12 md:grid-cols-2 lg:gap-24">
               <div className="flex flex-col justify-center">
                 <h2 className="mb-6 text-3xl font-bold tracking-tight sm:text-5xl">
-                  Seamless tracking.
+                  One flow, not five disconnected tools.
                 </h2>
                 <p className="text-lg text-slate-400">
-                  Track every second with precision. No clunky interfaces, just a beautifully smooth widget that stays out of your way until you need it. Intelligent categorization and automatic pause/resume flows.
+                  Plan work like a calendar event, start timers from the plan, log offline work manually, and keep the result ready for analytics, invoicing, exports, or API sync.
                 </p>
               </div>
               <div className="relative aspect-square overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900 to-slate-950 p-8 shadow-2xl">
@@ -285,11 +319,11 @@ export default function MarketingPage() {
               >
                 Pricing
               </motion.div>
-              <h2 className="text-4xl font-bold tracking-tight sm:text-6xl">Simple, transparent scale.</h2>
-              <p className="mt-4 text-lg text-slate-400">Everything you need to run your business gracefully.</p>
+              <h2 className="text-4xl font-bold tracking-tight sm:text-6xl">Easy to approve. Useful on day one.</h2>
+              <p className="mt-4 text-lg text-slate-400">Flat monthly workspace pricing keeps the first paid step small while still funding TKOResearch.</p>
             </div>
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-              {Object.values(STRIPE_PLANS).map((plan, i) => (
+              {MARKETING_PLANS.map((plan, i) => (
                 <motion.div
                   key={plan.planId}
                   initial={{ y: 20, opacity: 0 }}
@@ -303,26 +337,33 @@ export default function MarketingPage() {
                     <p className="mt-2 text-sm text-slate-400 min-h-[40px]">{plan.description}</p>
                     <div className="my-6">
                       <span className="text-5xl font-extrabold tracking-tight">${plan.price}</span>
-                      <span className="text-slate-500">/mo</span>
+                      <span className="text-slate-500">/workspace/mo</span>
                     </div>
+                    <p className="mb-5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">No per-seat surprise at checkout</p>
 
                     <ul className="mb-8 space-y-4 text-sm text-slate-300">
                       <li className="flex items-center gap-3">
                         <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        {plan.limits.members === 9999 ? "Unlimited members" : `Up to ${plan.limits.members} members`}
+                        {plan.limits.members >= 9999 ? "Unlimited members" : `Up to ${plan.limits.members} member${plan.limits.members === 1 ? "" : "s"}`}
                       </li>
                       <li className="flex items-center gap-3">
                         <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        {plan.limits.projects === 9999 ? "Unlimited projects" : `Up to ${plan.limits.projects} active projects`}
+                        {plan.limits.projects >= 9999 ? "Unlimited projects" : `Up to ${plan.limits.projects} active projects`}
                       </li>
                       <li className="flex items-center gap-3">
                         <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        {plan.limits.storageMB >= 999999 ? "Unlimited file storage" : `${Math.round(plan.limits.storageMB / 1000)}GB file storage`}
+                        {plan.limits.storageMB >= 999999 ? "Unlimited file storage" : `${Math.max(1, Math.round(plan.limits.storageMB / 1000))}GB file storage`}
                       </li>
                       {plan.features.includes("invoicing") && (
                         <li className="flex items-center gap-3">
                           <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                           Professional Invoicing
+                        </li>
+                      )}
+                      {plan.features.includes("api") && (
+                        <li className="flex items-center gap-3">
+                          <svg className="h-5 w-5 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          API keys and webhooks
                         </li>
                       )}
                       {plan.features.includes("approvals") && (
@@ -355,13 +396,13 @@ export default function MarketingPage() {
         <section className="py-32 px-6">
           <div className="mx-auto max-w-4xl text-center">
             <h2 className="mb-8 text-5xl font-extrabold tracking-tight sm:text-7xl">
-              Ready to take control?
+              Ready to turn work into revenue records?
             </h2>
             <Link
               href="/login"
               className="inline-flex rounded-full bg-cyan-600 px-8 py-4 text-lg font-bold text-white transition-all hover:scale-105 hover:bg-cyan-500 shadow-[0_0_40px_-10px_rgba(6,182,212,0.5)]"
             >
-              Sign up for free
+              Start free
             </Link>
           </div>
         </section>

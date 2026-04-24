@@ -1,214 +1,112 @@
 import { test, expect } from '@playwright/test';
 
 let didClean = false;
+const unique = () => Date.now().toString(36);
 
 test.describe('Professional Feature Suite (10 User Stories)', () => {
-  // We use sequential execution here to ensure DB mutations (creating a client, a project, a tag) 
-  // can predictably carry over or not disrupt concurrent test assertions on the same user session.
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ page }) => {
-    // Authenticate with a standard pro plan so we have access to all features (like invoicing/financials)
     const cleanParam = !didClean ? '&clean=true' : '';
     didClean = true;
-    
     const res = await page.goto(`/api/test/login?plan=pro${cleanParam}`);
     const data = await res?.json();
     expect(data?.success).toBe(true);
-    await page.goto('/dashboard');
   });
 
-  // -------------------------------------------------------------------------
-  // 1. Client Management
-  // -------------------------------------------------------------------------
-  test('Story 1: Create a corporate client and verify it appears', async ({ page }) => {
+  test('Story 1: create a corporate client and verify it appears', async ({ page }) => {
     await page.goto('/clients');
-    
-    // Check if the new client button exists and click it
     await page.getByRole('button', { name: 'New Client' }).click();
-
-    // Fill the modal
     await page.getByLabel('Company Name').fill('Acme Corp E2E');
     await page.getByPlaceholder('billing@acme.inc').fill('test@acme.example.com');
     await page.getByRole('button', { name: 'Save Client' }).click();
-
-    // The modal should close and the new client should be visible
-    await expect(page.locator('text=Acme Corp E2E')).toBeVisible();
+    await expect(page.getByText('Acme Corp E2E')).toBeVisible();
   });
 
-  // -------------------------------------------------------------------------
-  // 2. Entity Archiving
-  // -------------------------------------------------------------------------
-  test('Story 2: Create a workspace tag and immediately archive it', async ({ page }) => {
+  test('Story 2: create a workspace tag and immediately archive it', async ({ page }) => {
     await page.goto('/settings/tags');
-
-    // Create a new tag
     await page.getByPlaceholder('Enter new tag...').fill('Legacy E2E Tag');
-    // Select the first color swatch
     await page.locator('button[title="Blue"]').click();
     await page.getByRole('button', { name: 'Add Tag' }).click();
-
-    // Verify it exists in the active view
-    await expect(page.locator('text=Legacy E2E Tag')).toBeVisible();
-
-    // Archive it
-    const tagCard = page.locator('div.group').filter({ hasText: 'Legacy E2E Tag' });
-    await tagCard.getByRole('button', { name: 'Archive Tag' }).click();
-    
-    // The tag should now be archived (opacity reduced). Wait a brief moment.
-    await page.waitForTimeout(500);
+    await expect(page.getByText('#legacy e2e tag')).toBeVisible();
+    const row = page.getByRole('row').filter({ hasText: 'legacy e2e tag' });
+    await row.getByRole('button', { name: 'Archive Tag' }).click();
+    await expect(row.getByRole('button', { name: 'archived' })).toBeVisible();
   });
 
-  // -------------------------------------------------------------------------
-  // 3. Budget Envelopes
-  // -------------------------------------------------------------------------
-  test('Story 3: Create a project with financial budget thresholds', async ({ page }) => {
+  test('Story 3: create a project with budget thresholds', async ({ page }) => {
     await page.goto('/projects');
-    
-    // Click New Project
     await page.getByRole('button', { name: 'New Project' }).click();
-    
     await page.getByLabel('Project Name').fill('E2E Budget Project');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
-
     await page.getByRole('combobox', { name: 'Select Budget Type' }).selectOption('hours');
     await page.getByPlaceholder('e.g. 100 hrs').fill('100');
-    
     await page.getByRole('button', { name: 'Create Project' }).click();
-
-    // Wait for success
-    await expect(page.locator('h3').filter({ hasText: 'E2E Budget Project' }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /E2E Budget Project/ })).toBeVisible();
   });
 
-  // -------------------------------------------------------------------------
-  // 4. Project Financials View
-  // -------------------------------------------------------------------------
-  test('Story 4: View project financials burndown', async ({ page }) => {
+  test('Story 4: view project financials burndown', async ({ page }) => {
     await page.goto('/projects');
-    
-    // Click on the newly created project
-    await page.locator('a', { hasText: 'E2E Budget Project' }).first().click();
-    
-    // We expect the Project Financials component to be rendered
+    await page.getByRole('link', { name: /E2E Budget Project/ }).first().click();
     await expect(page.locator('text=Budget (Hours)')).toBeVisible();
   });
 
-  // -------------------------------------------------------------------------
-  // 5. Concurrent Timekeeping
-  // -------------------------------------------------------------------------
-  test('Story 5: Log overlapping timer blocks', async ({ page }) => {
+  test('Story 5: run overlapping timer blocks', async ({ page }) => {
     await page.goto('/dashboard');
-
-    // Start timer 1
-    await page.getByRole('button', { name: 'Start Session' }).click();
+    await page.getByRole('button', { name: 'Start timer' }).click();
     await page.waitForTimeout(1000);
-
-    // Start timer 2
-    await page.getByRole('button', { name: 'Start Concurrent Timer' }).click();
+    await page.getByRole('button', { name: 'Start another timer' }).click();
     await page.waitForTimeout(1000);
-
-    // Wait until we have 2 Live
-    await expect(page.locator('text=2 Live')).toBeVisible();
-
-    // Stop hero timer 
-    await page.getByRole('button', { name: 'Stop Logging' }).click();
+    await expect(page.getByText('2 running')).toBeVisible();
+    await page.getByRole('button', { name: 'Stop focused timer' }).click();
     await page.waitForTimeout(1000);
-    // The secondary timer becomes the primary, we stop it again
-    await page.getByRole('button', { name: 'Stop Logging' }).click();
+    await page.getByRole('button', { name: 'Stop focused timer' }).click();
   });
 
-  // -------------------------------------------------------------------------
-  // 6. Activity Board
-  // -------------------------------------------------------------------------
-  test('Story 6: View historical records in activity board', async ({ page }) => {
-    // Ensure the timers logged
+  test('Story 6: view historical records in activity board', async ({ page }) => {
     await page.goto('/activity');
-    await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();
-    
-    // Verify our recently stopped tasks exist in the table (default description is "Focus block")
-    await expect(page.locator('text=Focus block').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
+    await expect(page.getByText('TASK-1').first()).toBeVisible();
   });
 
-  // -------------------------------------------------------------------------
-  // 7. Manual Log Recovery
-  // -------------------------------------------------------------------------
-  test('Story 7: Submit a retroactive manual time log', async ({ page }) => {
+  test('Story 7: submit a retroactive manual time log', async ({ page }) => {
     await page.goto('/activity');
-    
-    // Click Log Manual Time
-    await page.getByRole('button', { name: 'Log Manual Time' }).click();
-
-    // Identify a task input in manual log
-    await page.getByLabel('Description').fill('Retroactive E2E Task');
-    
-    // Fill Date and times
-    // Date fields might be native inputs, we fill them. Format YYYY-MM-DD
+    await page.getByRole('button', { name: 'Log manual time' }).click();
+    await page.getByLabel('Work reference').fill('retroactive-e2e');
+    await page.getByLabel('Notes').fill('Retroactive E2E Task');
     const today = new Date().toISOString().split('T')[0];
-    await page.getByLabel('Start Date').fill(today);
-    await page.getByLabel('End Date').fill(today);
-    
-    // Times HH:MM
-    await page.getByLabel('Start Time').fill('09:00');
-    await page.getByLabel('End Time').fill('11:00');
-
-    await page.getByRole('button', { name: 'Save Manual Entry' }).click();
-
-    // Find it in the activity list
-    await expect(page.locator('text=Retroactive E2E Task')).toBeVisible();
+    await page.getByLabel('Start date').fill(today);
+    await page.getByLabel('End date').fill(today);
+    await page.getByLabel('Start time').fill('09:00');
+    await page.getByLabel('End time').fill('11:00');
+    await page.getByRole('button', { name: 'Log time' }).click();
+    await expect(page.getByText('Retroactive E2E Task')).toBeVisible();
   });
 
-  // -------------------------------------------------------------------------
-  // 8. Goal Alignment (Planner)
-  // -------------------------------------------------------------------------
-  test('Story 8: Goals display alongside resource planning', async ({ page }) => {
-    // Create a goal first from the dashboard preference modal
-    await page.goto('/dashboard');
-    await page.getByRole('button', { name: /Workspace Preferences/i }).click();
-    const goalInput = page.locator('#newGoalName');
-    await goalInput.waitFor({ state: 'visible' });
-    await goalInput.fill('Q4 Target Goal E2E');
-    await goalInput.press('Enter');
-    // Wait a brief moment for it to save and appear
-    await page.waitForTimeout(1000);
-
-    // Go to planner
-    await page.goto('/planner');
-    
-    // Wait for data
-    await expect(page.locator('text=Q4 Target Goal E2E')).toBeVisible();
+  test('Story 8: calendar schedules a planned work block', async ({ page }) => {
+    const title = `Calendar E2E ${unique()}`;
+    await page.goto('/calendar');
+    await page.getByRole('button', { name: 'Schedule work' }).click();
+    await page.getByLabel('Title').fill(title);
+    await page.getByRole('button', { name: 'Save planned block' }).click();
+    await expect(page.getByText(title).first()).toBeVisible();
   });
 
-  // -------------------------------------------------------------------------
-  // 9. Project-Scoped Tags
-  // -------------------------------------------------------------------------
-  test('Story 9: Add a scoped tag to a project and assign it from dashboard', async ({ page }) => {
-    // 1. Create a tag mapped to E2E Budget Project
+  test('Story 9: add a scoped tag to a project', async ({ page }) => {
     await page.goto('/settings/tags');
     await page.getByPlaceholder('Enter new tag...').fill('Scoped Tag E2E');
     await page.getByRole('button', { name: 'Add Tag' }).click();
-    
-    // There should be a project selector
-    const tagCard = page.locator('div.group').filter({ hasText: 'Scoped Tag E2E' });
-    await tagCard.getByRole('combobox', { name: 'Select Project Scope' }).selectOption({ label: 'E2E Budget Project' });
-    await page.waitForTimeout(500);
+    const row = page.getByRole('row').filter({ hasText: 'scoped tag e2e' });
+    await row.getByRole('combobox', { name: 'Select Project Scope' }).selectOption({ label: 'E2E Budget Project' });
+    await expect(row.getByRole('combobox', { name: 'Select Project Scope' })).toHaveValue(/.+/);
   });
 
-  // -------------------------------------------------------------------------
-  // 10. Default Billable Toggles
-  // -------------------------------------------------------------------------
-  test('Story 10: Create a default billable tag and assign it', async ({ page }) => {
-    // 1. Create billable tag
-    await page.goto('/settings/tags');
-    await page.getByPlaceholder('New Tag Name').fill('Auto Billable Tag');
-    await page.getByRole('button', { name: 'Add Tag' }).click();
-    
-    // Toggle the switch for billable default (default is true)
-    const tableRow = page.locator('tr').filter({ hasText: 'Auto Billable Tag' });
-    // Click the Billable Default button which will toggle it to Non-Billable
-    await tableRow.getByText('Billable Default').click();
-
-    // Verify it changed to Non-Billable
-    await expect(tableRow.getByText('Non-Billable')).toBeVisible();
+  test('Story 10: complete filtered export is available', async ({ page }) => {
+    await page.goto('/exports');
+    await expect(page.getByRole('heading', { name: 'Complete and filtered data exports' })).toBeVisible();
+    await page.getByLabel('Format').selectOption('csv');
+    const response = await page.request.get('/api/export/csv?format=csv&include=projects,timeEntries');
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()['x-billabled-export-sha256']).toBeTruthy();
   });
-
 });

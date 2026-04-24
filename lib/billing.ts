@@ -19,8 +19,8 @@ export async function checkWorkspaceLimits(
 
   const planData = STRIPE_PLANS[ws.plan as keyof typeof STRIPE_PLANS] || STRIPE_PLANS.free;
 
-  if (feature === "invoices" && !planData.features.includes("invoicing")) return { allowed: false, error: "Invoices require a Premium plan." };
-  if (feature === "webhooks" && !planData.features.includes("webhooks") && ws.plan !== 'smb' && ws.plan !== 'enterprise') return { allowed: false, error: "Webhooks require the SMB plan." };
+  if (feature === "invoices" && !planData.features.includes("invoicing")) return { allowed: false, error: "Invoices require the Starter plan." };
+  if (feature === "webhooks" && !planData.features.includes("webhooks") && ws.plan !== "smb" && ws.plan !== "enterprise") return { allowed: false, error: "Webhooks require the Studio plan." };
 
   if (feature === "members") {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(memberships).where(eq(memberships.workspaceId, workspaceId));

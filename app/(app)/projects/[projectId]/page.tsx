@@ -33,58 +33,61 @@ export default async function ProjectBoardPage({
   }
 
   return (
-    <main className="flex h-screen flex-col bg-[#050914] p-6 sm:p-10">
-      <div className="mb-2">
-        <Link href="/projects" className="inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-cyan-400 transition-colors mb-4">
-            <ChevronLeft className="h-4 w-4" /> All Projects
+    <main className="flex min-h-screen flex-col bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
+        <Link href="/projects" className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-cyan-700">
+            <ChevronLeft className="h-4 w-4" /> All projects
         </Link>
-        <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold tracking-tight text-white">{project.name}</h1>
+        <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Project workspace</p>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{project.name}</h1>
                 {project.status === "archived" && (
-                   <span className="flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-400">
+                   <span className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
                       <Archive className="h-3.5 w-3.5" />
                       Archived
                    </span>
                 )}
+              </div>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Manage tasks, budget risk, project assets, and chronological activity in one focused workspace.</p>
             </div>
-            <div className="flex items-center gap-4">
-                <div className="hidden sm:block rounded-full border border-white/5 bg-white/5 px-4 py-1.5 text-sm font-medium text-slate-300">
+            <div className="flex items-center gap-3">
+                <div className="hidden rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-bold text-slate-600 sm:block">
                     {project.billingModel === "hourly" ? "Hourly Billing" : "Fixed Fee"}
                 </div>
                 <ProjectActions projectId={project.id} status={project.status} />
             </div>
-        </div>
-        <p className="mt-2 text-sm text-slate-400">Manage tasks across execution stages and review chronological activity.</p>
+          </div>
         
-        <ProjectFinancials projectId={project.id} />
+          <ProjectFinancials projectId={project.id} />
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-6 mt-8 border-b border-white/10 px-2">
+          <div className="mt-8 flex items-center gap-3 border-t border-slate-100 pt-4">
             <Link 
                 href={`?tab=board`} 
-                className={`flex items-center gap-2 pb-3 font-medium transition-colors ${tab === 'board' ? 'border-b-2 border-cyan-400 text-cyan-400' : 'text-slate-400 hover:text-slate-200 border-b-2 border-transparent'}`}
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-colors ${tab === "board" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-950"}`}
             >
                 <LayoutDashboard className="h-4 w-4" /> Board
             </Link>
             <Link 
                 href={`?tab=activity`} 
-                className={`flex items-center gap-2 pb-3 font-medium transition-colors ${tab === 'activity' ? 'border-b-2 border-cyan-400 text-cyan-400' : 'text-slate-400 hover:text-slate-200 border-b-2 border-transparent'}`}
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-colors ${tab === "activity" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-950"}`}
             >
                 <Activity className="h-4 w-4" /> Activity Feed
             </Link>
-        </div>
-      </div>
+          </div>
+        </header>
 
-      {/* Dynamic Tab Content */}
-      <div className="flex-1 overflow-hidden mt-6">
+      <div className="mt-6 min-h-0 flex-1 overflow-hidden">
         {tab === "board" ? (
             <KanbanBoard projectId={project.id} />
         ) : (
-            <div className="h-full overflow-y-auto lg:pr-4 max-w-4xl">
+            <div className="h-full max-w-4xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm lg:pr-6">
                <ActivityFeed projectId={project.id} />
             </div>
         )}
+      </div>
       </div>
     </main>
   );

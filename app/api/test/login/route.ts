@@ -10,8 +10,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
   
-  console.log("HELLO FROM API TEST LOGIN");
-  
   const { searchParams } = new URL(request.url);
   const planParam = searchParams.get("plan") || "free";
   const plan = planParam as "free" | "pro" | "smb" | "enterprise";

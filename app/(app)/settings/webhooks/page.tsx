@@ -79,7 +79,7 @@ export default function WebhooksPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950">
+      <div className="flex h-screen items-center justify-center bg-[#f6f3ee]">
         <Zap className="h-8 w-8 animate-pulse text-cyan-500" />
       </div>
     );
@@ -87,20 +87,20 @@ export default function WebhooksPage() {
 
   if (requiresUpgrade) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8 mt-20">
-        <div className="max-w-md text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-900/30">
-            <Webhook className="h-8 w-8 text-purple-400" />
+      <div className="mt-20 flex h-full flex-col items-center justify-center bg-[#f6f3ee] p-8">
+        <div className="max-w-md rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50">
+            <Webhook className="h-8 w-8 text-cyan-700" />
           </div>
-          <h2 className="mb-3 text-2xl font-bold text-white">Advanced Integrations</h2>
-          <p className="mb-8 text-slate-400">
-            Upgrade to the SMB plan to unlock real-time Webhooks and connect your workspace events to external services.
+          <h2 className="mb-3 text-2xl font-bold text-slate-950">Advanced integrations</h2>
+          <p className="mb-8 text-slate-500">
+            Move to Studio for $29/workspace/month to unlock real-time webhooks, API keys, and usage tracking.
           </p>
           <a
             href="/settings/billing"
-            className="inline-flex rounded-xl bg-purple-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-purple-500"
+            className="inline-flex rounded-xl bg-cyan-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-cyan-500"
           >
-            Upgrade to SMB
+            Move to Studio
           </a>
         </div>
       </div>

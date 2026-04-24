@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { workspaces } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
+import { getPaidPlanById } from "@/lib/billing-plans";
 
 export async function POST(req: Request) {
   try {
@@ -14,10 +15,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Only workspace owners can manage billing" }, { status: 403 });
     }
 
-    const { priceId } = await req.json();
+    const { planId } = await req.json() as { planId?: string };
 
-    if (!priceId) {
-      return NextResponse.json({ error: "No price ID provided" }, { status: 400 });
+    if (!planId) {
+      return NextResponse.json({ error: "planId is required" }, { status: 400 });
+    }
+    const plan = getPaidPlanById(planId);
+    if (!plan) {
+      return NextResponse.json({ error: "Unknown billing plan" }, { status: 400 });
+    }
+    if (!plan.priceId || plan.priceId.startsWith("price_dummy")) {
+      return NextResponse.json({ error: "Stripe price is not configured for this plan" }, { status: 500 });
     }
 
     const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, session.workspaceId));
@@ -29,7 +37,7 @@ export async function POST(req: Request) {
       client_reference_id: ws.id,
       line_items: [
         {
-          price: priceId,
+          price: plan.priceId,
           quantity: 1,
         },
       ],
@@ -38,7 +46,12 @@ export async function POST(req: Request) {
       subscription_data: {
         metadata: {
           workspaceId: ws.id,
+          planId: plan.planId,
         },
+      },
+      metadata: {
+        workspaceId: ws.id,
+        planId: plan.planId,
       },
       customer_email: ws.stripeCustomerId ? undefined : session.email,
     });

@@ -1,95 +1,90 @@
 import { test, expect } from '@playwright/test';
 
+const unique = () => Date.now().toString(36);
+
 test.describe('Deep Authenticated Workflows', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ page }) => {
-    // Authenticate with a standard free plan before each test unless specifically overridden
     const res = await page.goto('/api/test/login?plan=free');
     const data = await res?.json();
     expect(data?.success).toBe(true);
-    await page.goto('/dashboard');
   });
 
-  test('Test 11: Create a Project & Goal via Timer Dashboard', async ({ page }) => {
+  test('Test 11: schedule a work block from dashboard', async ({ page }) => {
+    const title = `Dashboard Plan ${unique()}`;
     await page.goto('/dashboard');
-    await page.getByText('Manage Projects, Goals & FX').click();
-    await page.getByPlaceholder('Project name').fill('Automated E2E Project');
-    await page.getByPlaceholder('Project name').press('Enter');
-    
-    // Verify success toast
-    await expect(page.locator('text=Project "Automated E2E Project" created')).toBeVisible();
+    await page.getByRole('button', { name: /Plan work/i }).click();
+    await page.getByLabel('Title').fill(title);
+    await page.getByRole('button', { name: 'Save plan' }).click();
+    await expect(page.getByText(title)).toBeVisible();
   });
 
-  test('Test 12: Create a Task in Kanban Board', async ({ page }) => {
-    // 1. Create a project
-    await page.goto('/dashboard');
-    await page.getByText('Manage Projects, Goals & FX').click();
-    await page.getByPlaceholder('Project name').fill('Kanban Test Project');
-    await page.locator('div').filter({ hasText: 'New Project' }).getByRole('button', { name: 'Add' }).first().click();
-    await expect(page.locator('text=Project "Kanban Test Project" created')).toBeVisible();
-    
-    // 2. Go to projects, click project
+  test('Test 12: create a project and task in Kanban board', async ({ page }) => {
+    const projectName = `Kanban Test ${unique()}`;
     await page.goto('/projects');
-    await page.getByText('Kanban Test Project').click(); // navigates to project
-    
-    // 3. Create task by clicking the plus icon in the TO DO column
+    await page.getByRole('button', { name: 'New Project' }).click();
+    await page.getByLabel('Project Name').fill(projectName);
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await page.getByRole('button', { name: 'Create Project' }).click();
+    await expect(page.getByRole('link', { name: new RegExp(projectName) })).toBeVisible();
+    await page.getByRole('link', { name: new RegExp(projectName) }).click();
     await page.locator('.w-80').filter({ hasText: 'To Do' }).getByRole('button').first().click();
     await page.getByPlaceholder('What needs to be done?').fill('E2E Generated Task');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('E2E Generated Task')).toBeVisible();
   });
 
-  test('Test 13: Goal Creation in Dashboard', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByText('Manage Projects, Goals & FX').click();
-    await page.getByPlaceholder('Goal name').fill('E2E Automated Goal');
-    await page.getByPlaceholder('Goal name').press('Enter');
-    await expect(page.locator('text=Goal "E2E Automated Goal" created')).toBeVisible({ timeout: 15000 });
+  test('Test 13: calendar planning surface renders', async ({ page }) => {
+    await page.goto('/calendar');
+    await expect(page.getByRole('heading', { name: 'Calendar' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Schedule/i })).toBeVisible();
   });
 
-  test('Test 14: Planner Visualization Renders', async ({ page }) => {
+  test('Test 14: planner visualization renders', async ({ page }) => {
     await page.goto('/planner');
     await expect(page.getByRole('heading', { level: 1, name: 'Resource Planner' })).toBeVisible();
     await expect(page.getByText('Total Backlog Output')).toBeVisible();
   });
 
-  test('Test 15: Reports Dashboard Maps Telemetry', async ({ page }) => {
+  test('Test 15: analytics dashboard maps telemetry', async ({ page }) => {
     await page.goto('/reports');
-    await expect(page.getByRole('heading', { level: 1, name: 'Workforce Intelligence' })).toBeVisible();
-    await expect(page.getByText('Total Logged Hours')).toBeVisible();
-    await expect(page.getByText('Total Billable Pipeline')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Work performance and billable output' })).toBeVisible();
+    await expect(page.getByText('Logged hours', { exact: true })).toBeVisible();
+    await expect(page.getByText('Billable pipeline', { exact: true })).toBeVisible();
   });
 
-  test('Test 16: Client Segregation', async ({ page }) => {
+  test('Test 16: client route blocks member access', async ({ page }) => {
     await page.goto('/client');
-    // Members inherently get bounced to dashboard or remain on it, or trigger login wall
     await expect(page).toHaveURL(/.*(\/dashboard|\/login)/);
   });
 
-  test('Test 17: Approvals Pipeline Renders for Managers', async ({ page }) => {
+  test('Test 17: approvals pipeline renders for managers', async ({ page }) => {
     await page.goto('/approvals');
     await expect(page.getByRole('heading', { level: 1, name: 'Timesheet Approvals' })).toBeVisible();
-    await expect(page.getByText('All caught up!').or(page.locator('text=Duration'))).toBeVisible();
+    await expect(page.getByText('All caught up!').or(page.getByText('Duration').first())).toBeVisible();
   });
 
-  test('Test 18: Enterprise/SMB Plan Accesses Invoices properly', async ({ page }) => {
-    // Re-auth as SMB explicitly overcoming the global test hook
+  test('Test 18: Studio plan accesses invoices properly', async ({ page }) => {
     await page.goto('/api/test/login?plan=smb');
     await page.goto('/invoices');
     await expect(page.locator('text=Approved Billables Pipeline')).toBeVisible();
-    await expect(page.locator('text=Invoicing is a Pro feature')).not.toBeVisible();
+    await expect(page.locator('text=Invoicing is a Starter feature')).not.toBeVisible();
   });
 
-  test('Test 19: Dashboard Context Persistence', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByPlaceholder('focus, deep-work').fill('playwright-test');
-    await expect(page.locator('span').filter({ hasText: '#playwright-test' })).toBeVisible();
+  test('Test 19: export center returns digest header', async ({ page }) => {
+    await page.goto('/exports');
+    await expect(page.getByRole('heading', { name: 'Complete and filtered data exports' })).toBeVisible();
+    const response = await page.request.get('/api/export/csv?format=json');
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()['x-billabled-export-sha256']).toBeTruthy();
   });
 
-  test('Test 20: 404 Route on Authenticated State', async ({ page }) => {
-    await page.goto('/dashboard/fake-route-for-testing');
-    await expect(page.locator('text=404').or(page.locator('text=Not Found').or(page.locator('text=Could not find requested resource')))).toBeVisible();
+  test('Test 20: developers page creates a scoped API key once', async ({ page }) => {
+    await page.goto('/settings/developers');
+    await expect(page.getByRole('heading', { name: 'API keys, usage, and docs' })).toBeVisible();
+    await page.getByLabel('Name').fill(`E2E API Key ${unique()}`);
+    await page.getByRole('button', { name: 'Create API key' }).click();
+    await expect(page.getByText('New API key. It is shown only once.')).toBeVisible();
   });
-
 });

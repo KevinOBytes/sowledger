@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "agentic:check": "node scripts/check-agentic-files.mjs",
+    "db:migrate:product": "node scripts/run-safe-migration.mjs"
   },
   "dependencies": {
     "@datadog/browser-rum": "^6.32.0",

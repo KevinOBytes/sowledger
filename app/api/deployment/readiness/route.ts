@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 
 function hasNeon() {
@@ -9,11 +9,10 @@ function hasUpstash() {
   return Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN);
 }
 
-export async function GET() {
-  // Disable detailed readiness checks outside development to avoid leaking operational info.
-  if (process.env.NODE_ENV !== "development") {
-    return NextResponse.json({ ok: false }, { status: 404 });
-  }
+export async function GET(req: NextRequest) {
+  const providedKey = req.headers.get("x-auth-key");
+  const detailsAllowed = process.env.NODE_ENV === "development" || Boolean(env.AUTH_SHARED_KEY && providedKey === env.AUTH_SHARED_KEY);
+  if (!detailsAllowed) return NextResponse.json({ ok: true, service: "billabled" });
 
   const checks = {
     appUrl: Boolean(env.NEXT_PUBLIC_APP_URL),
@@ -21,6 +20,10 @@ export async function GET() {
     auditSigningSecret: Boolean(env.AUDIT_SIGNING_SECRET),
     resendApiKey: Boolean(env.RESEND_API_KEY),
     neonPostgres: hasNeon(),
+    stripeSecretKey: Boolean(env.STRIPE_SECRET_KEY),
+    stripeWebhookSecret: Boolean(env.STRIPE_WEBHOOK_SECRET),
+    stripePrices: Boolean(env.STRIPE_PRO_PRICE_ID && env.STRIPE_SMB_PRICE_ID && env.STRIPE_ENTERPRISE_PRICE_ID),
+    sentryDsn: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
     upstashKv: hasUpstash(),
   };
 

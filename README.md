@@ -26,6 +26,8 @@ When a project/goal is deleted, linked time entries are cleaned by unsetting the
 ## Vercel + Neon + Upstash readiness
 - `GET /api/deployment/readiness` checks env wiring for Vercel deployment with Neon + Upstash.
 - SQL migration for Postgres remains included at `db/migrations/0001_init.sql`.
+- Launch/deploy runbook lives at [`docs/launch-readiness.md`](docs/launch-readiness.md).
+- Product-completion schema changes are applied with `npm run db:migrate:product`, which backs up schema metadata and records migration checksums.
 
 ## Current persistence note
 This branch currently uses an in-memory runtime store for API state so it remains compile-safe in restricted CI environments. SQL-first schema is included and adapter wiring to Neon can be done behind current API contracts.
@@ -92,3 +94,4 @@ ALLOW_BOOTSTRAP_OWNER=true
 
 ## Docs
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
+- Launch readiness: [`docs/launch-readiness.md`](docs/launch-readiness.md)
