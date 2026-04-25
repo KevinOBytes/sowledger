@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import {
   apiKeyRequests,
   auditLogs,
@@ -52,6 +53,8 @@ function includedSet(include?: string | null) {
 }
 
 export async function loadExportData(workspaceId: string, filters: ExportFilters = {}) {
+  await ensureWorkspaceSchema();
+
   const include = includedSet(filters.include);
   const wants = (key: string) => !include || include.has(key);
   const start = parseDate(filters.start);

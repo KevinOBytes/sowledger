@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { goals, projects, timeEntries } from "@/lib/db/schema";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, and } from "drizzle-orm";
 
 function getAuthStatus(error: unknown): number {
@@ -14,6 +15,7 @@ function getAuthStatus(error: unknown): number {
 
 export async function GET() {
   try {
+    await ensureWorkspaceSchema();
     const session = await requireSession();
     requireRole("member", session.role);
 
@@ -26,6 +28,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureWorkspaceSchema();
     const session = await requireSession();
     requireRole("manager", session.role);
 
@@ -76,6 +79,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    await ensureWorkspaceSchema();
     const session = await requireSession();
     requireRole("manager", session.role);
 
@@ -136,6 +140,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    await ensureWorkspaceSchema();
     const session = await requireSession();
     requireRole("manager", session.role);
 

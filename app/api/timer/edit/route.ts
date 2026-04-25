@@ -3,11 +3,13 @@ import { requireSession, requireRole } from "@/lib/auth";
 import { appendAuditLog, enforceDailyHoursLimit, ensurePeriodUnlocked } from "@/lib/security";
 import { db } from "@/lib/db";
 import { timeEntries, projects, goals, userActions } from "@/lib/db/schema";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function PATCH(req: NextRequest) {
   try {
+    await ensureWorkspaceSchema();
     const session = await requireSession();
     const body = await req.json() as {
       entryId?: string;

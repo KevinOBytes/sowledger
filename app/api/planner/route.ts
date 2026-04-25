@@ -8,10 +8,10 @@ import { eq, ne, and } from "drizzle-orm";
 
 export async function GET() {
   try {
+    await ensureWorkspaceSchema();
     const session = await requireSession();
     // Allow any member to view the planner
     requireRole("member", session.role);
-    await ensureWorkspaceSchema();
 
     const workspaceId = session.workspaceId;
     const directory = await listWorkspacePeopleDirectory(workspaceId);

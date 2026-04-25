@@ -128,6 +128,24 @@ async function runSchemaEnsure() {
     )
   `);
 
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS goals (
+      id varchar(255) PRIMARY KEY,
+      workspace_id varchar(255) NOT NULL,
+      project_id varchar(255),
+      assigned_user_id varchar(255),
+      name varchar(255) NOT NULL,
+      description text,
+      recurrence varchar(20) NOT NULL DEFAULT 'none',
+      target_hours real,
+      target_amount real,
+      target_type varchar(20) NOT NULL DEFAULT 'hours',
+      due_date timestamp,
+      completed boolean NOT NULL DEFAULT false,
+      created_at timestamp NOT NULL DEFAULT now()
+    )
+  `);
+
   // Ensure modern project fields exist for project, client, and tag flows.
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS client_id varchar(255)`);
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS description text`);
@@ -156,6 +174,45 @@ async function runSchemaEnsure() {
   await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'active'`);
   await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`);
 
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS project_id varchar(255)`);
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS assigned_user_id varchar(255)`);
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS name varchar(255)`);
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS recurrence varchar(20) NOT NULL DEFAULT 'none'`);
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS target_hours real`);
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS target_amount real`);
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS target_type varchar(20) NOT NULL DEFAULT 'hours'`);
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS completed boolean NOT NULL DEFAULT false`);
+  await db.execute(sql`ALTER TABLE goals ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`);
+
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'goals'
+          AND column_name = 'title'
+      ) THEN
+        EXECUTE 'UPDATE goals SET name = COALESCE(NULLIF(name, ''''), title) WHERE title IS NOT NULL';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'goals'
+          AND column_name = 'status'
+      ) THEN
+        EXECUTE 'UPDATE goals SET completed = CASE WHEN lower(status) = ''completed'' THEN true ELSE completed END WHERE status IS NOT NULL';
+      END IF;
+    END $$;
+  `);
+
+  await db.execute(sql`ALTER TABLE goals ALTER COLUMN name SET DEFAULT 'Untitled goal'`);
+  await db.execute(sql`UPDATE goals SET name = 'Untitled goal' WHERE name IS NULL OR btrim(name) = ''`);
+  await db.execute(sql`ALTER TABLE goals ALTER COLUMN name SET NOT NULL`);
+
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS project_id varchar(255)`);
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS color varchar(50) NOT NULL DEFAULT '#3b82f6'`);
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS is_billable_default boolean NOT NULL DEFAULT true`);
@@ -166,6 +223,7 @@ async function runSchemaEnsure() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_workspace_people_workspace_id ON workspace_people (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_workspace_people_org_id ON workspace_people (organization_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_project_tasks_workspace_id ON project_tasks (workspace_id)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_goals_workspace_id ON goals (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_workspace_tags_workspace_id ON workspace_tags (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_scheduled_blocks_workspace_user ON scheduled_work_blocks (workspace_id, user_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_scheduled_blocks_project ON scheduled_work_blocks (workspace_id, project_id)`);

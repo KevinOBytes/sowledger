@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { workspaces, memberships, projects, goals, users } from "./db/schema";
+import { ensureWorkspaceSchema } from "./db/ensure-workspace-schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { STRIPE_PLANS, type StripePlanId } from "./billing-plans";
 import { isInternalHighestAccessEmail } from "./internal-accounts";
@@ -35,6 +36,10 @@ export async function checkWorkspaceLimits(
   workspaceId: string,
   feature: "members" | "projects" | "invoices" | "webhooks" | "goals"
 ) {
+  if (feature === "goals") {
+    await ensureWorkspaceSchema();
+  }
+
   const plan = await resolveWorkspacePlan(workspaceId);
   const planData = STRIPE_PLANS[plan.plan];
 

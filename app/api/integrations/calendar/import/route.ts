@@ -3,11 +3,13 @@ import { requireSession, requireRole } from "@/lib/auth";
 import { createTimeEntry } from "@/lib/security";
 import { db } from "@/lib/db";
 import { projects, goals } from "@/lib/db/schema";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureWorkspaceSchema();
     const session = await requireSession();
     requireRole("manager", session.role);
 
