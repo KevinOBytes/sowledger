@@ -1,6 +1,6 @@
 import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { clients as clientsTable, projects as projectsTable } from "@/lib/db/schema";
+import { clients as clientsTable, organizations as organizationsTable, projects as projectsTable, workspacePeople as workspacePeopleTable } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, desc } from "drizzle-orm";
 import { CreateClientButton } from "@/components/create-client-button";
@@ -12,12 +12,16 @@ export default async function ClientsPage() {
   const session = await requireSession();
   let clientsData: Array<{ id: string; name: string; email: string | null; status: "active" | "archived" }> = [];
   let projectsData: Array<{ id: string; clientId: string | null }> = [];
+  let organizationsData: Array<{ id: string; clientId: string | null }> = [];
+  let peopleData: Array<{ id: string; organizationId: string }> = [];
   let loadError: string | null = null;
 
   try {
     await ensureWorkspaceSchema();
     clientsData = await db.select({ id: clientsTable.id, name: clientsTable.name, email: clientsTable.email, status: clientsTable.status }).from(clientsTable).where(eq(clientsTable.workspaceId, session.workspaceId)).orderBy(desc(clientsTable.createdAt));
     projectsData = await db.select({ id: projectsTable.id, clientId: projectsTable.clientId }).from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId));
+    organizationsData = await db.select({ id: organizationsTable.id, clientId: organizationsTable.clientId }).from(organizationsTable).where(eq(organizationsTable.workspaceId, session.workspaceId));
+    peopleData = await db.select({ id: workspacePeopleTable.id, organizationId: workspacePeopleTable.organizationId }).from(workspacePeopleTable).where(eq(workspacePeopleTable.workspaceId, session.workspaceId));
   } catch (error) {
     loadError = error instanceof Error ? error.message : "Unable to load clients right now.";
   }
@@ -38,6 +42,7 @@ export default async function ClientsPage() {
             <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold">
               <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700">{clientsData.filter((client) => client.status === "active").length} active</span>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{projectsData.length} linked projects</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{peopleData.length} people records</span>
             </div>
           )}
         </header>
@@ -47,7 +52,7 @@ export default async function ClientsPage() {
             <p className="mt-2 text-sm">{loadError}</p>
           </div>
         ) : (
-          <ClientsPageClient initialClients={clientsData} projects={projectsData} />
+          <ClientsPageClient initialClients={clientsData} projects={projectsData} organizations={organizationsData} people={peopleData} />
         )}
       </div>
     </main>

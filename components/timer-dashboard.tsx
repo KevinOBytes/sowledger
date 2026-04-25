@@ -346,6 +346,36 @@ export function TimerDashboard() {
                 </div>
               </div>
             )}
+
+            {activeTimers.length > 1 && (
+              <div className="mt-5 rounded-[24px] border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">Concurrent stack</p>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-950">More timers are already running</h3>
+                    <p className="mt-1 text-sm text-slate-600">The focused timer above is only one of {activeTimers.length}. The others are listed here so they are visible without scrolling.</p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-amber-700">{activeTimers.length} live</span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {activeTimers.slice(1).map((timer) => {
+                    const elapsed = Math.max(0, Math.floor((now - new Date(timer.startedAt).getTime()) / 1000));
+                    return (
+                      <div key={timer.id} className="flex items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-white px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-950">{timer.taskId}</p>
+                          <p className="mt-1 text-xs text-slate-500">{timer.projectName || "No project"}{timer.action ? ` · ${timer.action}` : ""}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-sm font-semibold text-slate-950">{fmt(elapsed)}</span>
+                          <button onClick={() => stopTimer(timer.id)} className="rounded-xl bg-rose-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-rose-400">Stop</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">

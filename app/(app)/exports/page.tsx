@@ -5,8 +5,17 @@ import { Archive, Download, FileJson, FileSpreadsheet, Filter, ShieldCheck } fro
 import { toast } from "sonner";
 
 type Project = { id: string; name: string };
+type Person = {
+  id: string;
+  linkedUserId?: string | null;
+  displayName?: string | null;
+  email?: string | null;
+  personType: "member" | "client" | "contractor" | "contact";
+  invitationStatus: "none" | "pending" | "accepted";
+};
 
 type ExportFormat = "csv" | "json";
+type ExportLayout = "detailed" | "summary";
 
 const DATASETS = [
   { id: "workspace", label: "Workspace metadata" },
@@ -36,7 +45,9 @@ function thirtyDaysAgo() {
 
 export default function ExportsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [format, setFormat] = useState<ExportFormat>("json");
+  const [layout, setLayout] = useState<ExportLayout>("detailed");
   const [projectId, setProjectId] = useState("");
   const [start, setStart] = useState(thirtyDaysAgo());
   const [end, setEnd] = useState(today());
@@ -48,9 +59,13 @@ export default function ExportsPage() {
   const [lastDigest, setLastDigest] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/projects")
-      .then((res) => res.json())
-      .then((data) => setProjects(data.projects ?? []))
+    Promise.all([fetch("/api/projects"), fetch("/api/people")])
+      .then(async ([projectsRes, peopleRes]) => {
+        const projectsData = await projectsRes.json();
+        const peopleData = await peopleRes.json();
+        setProjects(projectsData.projects ?? []);
+        setPeople((peopleData.people ?? []).filter((person: Person) => person.personType === "member" && person.invitationStatus === "accepted" && person.linkedUserId));
+      })
       .catch(() => null);
   }, []);
 
@@ -66,6 +81,7 @@ export default function ExportsPage() {
     setLastDigest(null);
     try {
       const query = new URLSearchParams({ format: nextFormat });
+      query.set("layout", layout);
       if (projectId) query.set("projectId", projectId);
       if (start) query.set("start", start);
       if (end) query.set("end", end);
@@ -119,10 +135,11 @@ export default function ExportsPage() {
             <div className="mb-5 flex items-center gap-3"><Filter className="h-5 w-5 text-cyan-700" /><h2 className="text-xl font-semibold">Filters</h2></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm font-bold text-slate-700">Format<select value={format} onChange={(event) => setFormat(event.target.value as ExportFormat)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="json">JSON backup</option><option value="csv">CSV spreadsheet</option></select></label>
+              <label className="text-sm font-bold text-slate-700">Layout<select value={layout} onChange={(event) => setLayout(event.target.value as ExportLayout)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="detailed">Detailed rows</option><option value="summary">Summarized hours</option></select></label>
               <label className="text-sm font-bold text-slate-700">Project<select value={projectId} onChange={(event) => setProjectId(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="">All projects</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
               <label className="text-sm font-bold text-slate-700">Start<input type="date" value={start} onChange={(event) => setStart(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" /></label>
               <label className="text-sm font-bold text-slate-700">End<input type="date" value={end} onChange={(event) => setEnd(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" /></label>
-              <label className="text-sm font-bold text-slate-700">User/member ID<input value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="Optional user ID" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" /></label>
+              <label className="text-sm font-bold text-slate-700">Person<select value={userId} onChange={(event) => setUserId(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="">All people</option>{people.map((person) => <option key={person.id} value={person.linkedUserId || ""}>{person.displayName || person.email || "Unnamed member"}</option>)}</select></label>
               <label className="text-sm font-bold text-slate-700">Entry status<select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="">Any status</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="approved">Approved</option><option value="invoiced">Invoiced</option></select></label>
               <label className="text-sm font-bold text-slate-700 sm:col-span-2">Source<select value={source} onChange={(event) => setSource(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="">Any source</option><option value="timer">Timer</option><option value="manual">Manual</option><option value="calendar">Calendar</option><option value="scheduled">Scheduled plan-linked time</option></select></label>
             </div>
@@ -140,6 +157,7 @@ export default function ExportsPage() {
             </div>
             <div className="mt-5 rounded-3xl border border-cyan-100 bg-cyan-50 p-4 text-sm text-cyan-900">
               <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">Integrity headers stay on exports.</p><p className="mt-1">The API returns <code>x-billabled-export-sha256</code> so exported payloads can be verified later.</p></div></div>
+              <p className="mt-3 text-xs text-cyan-900">{layout === "summary" ? "Summary CSV groups hours by day, person, project, status, and source." : "Detailed CSV exports one row per time entry."}</p>
               {lastDigest && <p className="mt-3 break-all font-mono text-xs">Last digest: {lastDigest}</p>}
             </div>
           </div>

@@ -20,6 +20,7 @@ import {
   Receipt,
   Settings,
   Tag,
+  UserRound,
   Users,
   Webhook,
 } from "lucide-react";
@@ -91,7 +92,8 @@ export function Sidebar() {
       items: [
         { name: "Projects", href: "/projects", icon: FolderKanban },
         { name: "Clients", href: "/clients", icon: Building2 },
-        { name: "Planner", href: "/planner", icon: Users },
+        { name: "Planning", href: "/planner", icon: Users },
+        { name: "People", href: "/people", icon: UserRound },
         { name: "Notifications", href: "/notifications", icon: Bell, showBadge: true },
       ],
     },

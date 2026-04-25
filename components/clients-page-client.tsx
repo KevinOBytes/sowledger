@@ -3,12 +3,24 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Archive, Building2Icon, CheckIcon, Edit2, Mail, XIcon } from "lucide-react";
+import { Archive, Building2Icon, CheckIcon, Edit2, Mail, Users, XIcon } from "lucide-react";
 
 type Client = { id: string; name: string; email: string | null; status: "active" | "archived" };
 type Project = { id: string; clientId: string | null };
+type Organization = { id: string; clientId: string | null };
+type Person = { id: string; organizationId: string };
 
-export function ClientsPageClient({ initialClients, projects }: { initialClients: Client[]; projects: Project[] }) {
+export function ClientsPageClient({
+  initialClients,
+  projects,
+  organizations,
+  people,
+}: {
+  initialClients: Client[];
+  projects: Project[];
+  organizations: Organization[];
+  people: Person[];
+}) {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>(initialClients);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -58,6 +70,8 @@ export function ClientsPageClient({ initialClients, projects }: { initialClients
 
   function renderClient(client: Client) {
     const clientProjects = projects.filter((project) => project.clientId === client.id);
+    const clientOrganizationIds = organizations.filter((organization) => organization.clientId === client.id).map((organization) => organization.id);
+    const clientPeopleCount = people.filter((person) => clientOrganizationIds.includes(person.organizationId)).length;
     const isEditing = editingId === client.id;
     return (
       <article key={client.id} className={`rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md ${client.status === "archived" ? "opacity-60" : ""}`}>
@@ -95,9 +109,19 @@ export function ClientsPageClient({ initialClients, projects }: { initialClients
             )}
           </div>
         </div>
-        <div className="mt-7 flex items-center justify-between border-t border-slate-100 pt-5 text-sm">
-          <span className="font-semibold text-slate-500">{clientProjects.length} project{clientProjects.length === 1 ? "" : "s"}</span>
-          <Link href={`/projects?client=${client.id}`} className="font-bold text-cyan-700 hover:text-cyan-600">View pipeline</Link>
+        <div className="mt-6 flex flex-wrap gap-2 text-xs font-bold">
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{clientProjects.length} project{clientProjects.length === 1 ? "" : "s"}</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+            <Users className="h-3 w-3" />
+            {clientPeopleCount} people
+          </span>
+        </div>
+        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-5 text-sm">
+          <span className="font-semibold text-slate-500">Projects, contacts, and billing stay tied to this client record.</span>
+          <div className="flex items-center gap-3">
+            <Link href={`/people?client=${client.id}`} className="font-bold text-slate-500 hover:text-slate-700">Manage contacts</Link>
+            <Link href={`/projects?client=${client.id}`} className="font-bold text-cyan-700 hover:text-cyan-600">View pipeline</Link>
+          </div>
         </div>
       </article>
     );

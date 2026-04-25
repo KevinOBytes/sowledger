@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { projectTasks } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
+import { projectTasks, projects, workspacePeople } from "@/lib/db/schema";
+import { eq, and, or } from "drizzle-orm";
 import { KanbanColumn } from "@/lib/store";
 
 function getAuthStatus(error: unknown): number {
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
+    await ensureWorkspaceSchema();
 
     const projectId = req.nextUrl.searchParams.get("projectId");
     
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
+    await ensureWorkspaceSchema();
 
     const body = await req.json() as {
       projectId: string;
@@ -54,6 +57,23 @@ export async function POST(req: NextRequest) {
 
     if (!body.projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
     if (!body.title) return NextResponse.json({ error: "title is required" }, { status: 400 });
+    const [project] = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
+    if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    if (body.assigneeId) {
+      const [person] = await db
+        .select()
+        .from(workspacePeople)
+        .where(
+          and(
+            eq(workspacePeople.workspaceId, session.workspaceId),
+            or(eq(workspacePeople.id, body.assigneeId), eq(workspacePeople.linkedUserId, body.assigneeId)),
+          ),
+        );
+      if (!person) return NextResponse.json({ error: "Assigned person not found" }, { status: 404 });
+    }
 
     const newTask = {
       id: crypto.randomUUID(),
@@ -82,6 +102,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
+    await ensureWorkspaceSchema();
 
     const body = await req.json() as {
       taskId: string;
@@ -102,6 +123,18 @@ export async function PATCH(req: NextRequest) {
     const [existing] = await db.select().from(projectTasks).where(eq(projectTasks.id, body.taskId));
     if (!existing || existing.workspaceId !== session.workspaceId) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+    if (body.assigneeId) {
+      const [person] = await db
+        .select()
+        .from(workspacePeople)
+        .where(
+          and(
+            eq(workspacePeople.workspaceId, session.workspaceId),
+            or(eq(workspacePeople.id, body.assigneeId), eq(workspacePeople.linkedUserId, body.assigneeId)),
+          ),
+        );
+      if (!person) return NextResponse.json({ error: "Assigned person not found" }, { status: 404 });
     }
 
     const updates: Partial<typeof projectTasks.$inferInsert> = {};
@@ -127,6 +160,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
+    await ensureWorkspaceSchema();
 
     const taskId = req.nextUrl.searchParams.get("taskId");
     if (!taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });

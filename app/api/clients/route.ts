@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { clients, projects } from "@/lib/db/schema";
+import { clients, organizations, projects } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, and } from "drizzle-orm";
 
@@ -54,6 +54,13 @@ export async function POST(req: NextRequest) {
     };
 
     const [client] = await db.insert(clients).values(newClient).returning();
+    await db.insert(organizations).values({
+      id: crypto.randomUUID(),
+      workspaceId: session.workspaceId,
+      clientId: client.id,
+      name: client.name,
+      type: "client",
+    });
     return NextResponse.json({ ok: true, client });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
@@ -90,6 +97,12 @@ export async function PATCH(req: NextRequest) {
     if (body.status !== undefined) updates.status = body.status;
 
     const [client] = await db.update(clients).set(updates).where(eq(clients.id, body.clientId)).returning();
+    if (body.name !== undefined) {
+      await db
+        .update(organizations)
+        .set({ name: body.name })
+        .where(and(eq(organizations.workspaceId, session.workspaceId), eq(organizations.clientId, body.clientId)));
+    }
     return NextResponse.json({ ok: true, client });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
@@ -110,6 +123,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
+    await db.delete(organizations).where(and(eq(organizations.workspaceId, session.workspaceId), eq(organizations.clientId, clientId)));
     await db.delete(clients).where(eq(clients.id, clientId));
 
     // Clear clientId from projects

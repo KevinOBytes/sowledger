@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, DragEvent } from "react";
-import { Plus, GripVertical, CheckCircle2, Circle, HelpCircle, Lock, Paperclip, X, Link as LinkIcon, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
+import { Plus, GripVertical, CheckCircle2, Circle, HelpCircle, Lock, Paperclip, UserRound, X, Link as LinkIcon, ExternalLink } from "lucide-react";
 import { ProjectTask, KanbanColumn } from "@/lib/store";
 
 const COLUMNS: { id: KanbanColumn; title: string, color: string }[] = [
@@ -13,6 +14,7 @@ const COLUMNS: { id: KanbanColumn; title: string, color: string }[] = [
 
 export function KanbanBoard({ projectId }: { projectId: string }) {
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  const [people, setPeople] = useState<Array<{ id: string; linkedUserId?: string | null; displayName?: string | null; email?: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
@@ -27,15 +29,28 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     async function fetchTasks() {
-      const res = await fetch(`/api/tasks?projectId=${projectId}`);
-      if (res.ok) {
-        const data = await res.json();
+      const [taskResponse, peopleResponse] = await Promise.all([
+        fetch(`/api/tasks?projectId=${projectId}`),
+        fetch("/api/people"),
+      ]);
+      if (taskResponse.ok) {
+        const data = await taskResponse.json();
         setTasks(data.tasks || []);
+      }
+      if (peopleResponse.ok) {
+        const data = await peopleResponse.json();
+        setPeople((data.people || []).filter((person: { status?: string }) => person.status !== "archived"));
       }
       setLoading(false);
     }
     fetchTasks();
   }, [projectId]);
+
+  const getAssigneeLabel = (assigneeId: string | null) => {
+    if (!assigneeId) return "Unassigned";
+    const person = people.find((entry) => entry.id === assigneeId || entry.linkedUserId === assigneeId);
+    return person?.displayName || person?.email || "Assigned";
+  };
 
   const handleAddTask = async (status: KanbanColumn) => {
     if (!newTaskTitle.trim()) {
@@ -110,7 +125,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     }
 
     if ((targetStatus === "done" || targetStatus === "review") && isBlocked(task)) {
-      alert("This task is blocked by incomplete dependencies. You cannot move it to Review or Done until all blockers are complete.");
+      toast.error("This task is still blocked by incomplete dependencies.");
       setDraggedTaskId(null);
       return;
     }
@@ -125,12 +140,14 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: draggedTaskId, status: targetStatus })
     });
+    toast.success("Task moved");
   };
 
   const deleteBtn = async (id: string, e?: React.MouseEvent) => {
      if (e) e.stopPropagation();
      setTasks(prev => prev.filter(t => t.id !== id));
      await fetch(`/api/tasks?taskId=${id}`, { method: "DELETE" });
+     toast.success("Task deleted");
   };
 
   const handleAddAttachment = async () => {
@@ -156,6 +173,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
       })
     });
     setIsPatching(false);
+    toast.success("Attachment added");
   };
 
   const handleRemoveAttachment = async (index: number) => {
@@ -175,6 +193,26 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
         attachments: updatedAttachments
       })
     });
+    setIsPatching(false);
+    toast.success("Attachment removed");
+  };
+
+  const patchSelectedTask = async (updates: Record<string, unknown>) => {
+    if (!selectedTask) return;
+    setIsPatching(true);
+    const response = await fetch("/api/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: selectedTask.id, ...updates }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      toast.error("Could not update task", { description: data.error });
+      setIsPatching(false);
+      return;
+    }
+    setTasks((prev) => prev.map((task) => (task.id === selectedTask.id ? data.task : task)));
+    setSelectedTask(data.task);
     setIsPatching(false);
   };
 
@@ -239,6 +277,10 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                                 {t.attachments.length} attachment{t.attachments.length !== 1 && 's'}
                             </div>
                         )}
+                        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                          <UserRound className="h-3 w-3" />
+                          {getAssigneeLabel(t.assigneeId)}
+                        </div>
                         <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-2">
                              <div className="flex items-center gap-1.5 opacity-60">
                                 <GripVertical className="h-3.5 w-3.5 text-stone-400" />
@@ -289,20 +331,66 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-stone-200 bg-white p-4">
                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Status</p>
-                   <p className="text-sm font-semibold uppercase tracking-wider text-[#17211d]">{selectedTask.status.replace("_", " ")}</p>
+                   <select
+                     value={selectedTask.status}
+                     onChange={(event) => patchSelectedTask({ status: event.target.value })}
+                     className="mt-1 h-10 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm font-semibold uppercase tracking-wider text-[#17211d] outline-none focus:border-teal-500"
+                   >
+                     {COLUMNS.map((column) => (
+                       <option key={column.id} value={column.id}>
+                         {column.title}
+                       </option>
+                     ))}
+                   </select>
                 </div>
                 <div className="rounded-2xl border border-stone-200 bg-white p-4">
                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Estimated hours</p>
-                   <p className="font-semibold text-[#17211d]">{selectedTask.estimatedHours ? `${selectedTask.estimatedHours} hrs` : "--"}</p>
+                   <input
+                     type="number"
+                     min="0"
+                     step="0.25"
+                     value={selectedTask.estimatedHours || ""}
+                     onChange={(event) => setSelectedTask({ ...selectedTask, estimatedHours: event.target.value ? Number.parseFloat(event.target.value) : null })}
+                     onBlur={() => patchSelectedTask({ estimatedHours: selectedTask.estimatedHours })}
+                     className="mt-1 h-10 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm font-semibold text-[#17211d] outline-none focus:border-teal-500"
+                   />
+                </div>
+                <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Assigned person</p>
+                   <select
+                     value={selectedTask.assigneeId || ""}
+                     onChange={(event) => patchSelectedTask({ assigneeId: event.target.value || null })}
+                     className="mt-1 h-10 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm text-[#17211d] outline-none focus:border-teal-500"
+                   >
+                     <option value="">Unassigned</option>
+                     {people.map((person) => (
+                       <option key={person.id} value={person.id}>
+                         {person.displayName || person.email || "Unnamed person"}
+                       </option>
+                     ))}
+                   </select>
+                </div>
+                <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Due date</p>
+                   <input
+                     type="date"
+                     value={selectedTask.dueDate ? String(selectedTask.dueDate).slice(0, 10) : ""}
+                     onChange={(event) => patchSelectedTask({ dueDate: event.target.value || null })}
+                     className="mt-1 h-10 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm text-[#17211d] outline-none focus:border-teal-500"
+                   />
                 </div>
               </div>
 
-              {selectedTask.description && (
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold text-stone-700">Description</h3>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-600">{selectedTask.description}</p>
-                </div>
-              )}
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-stone-700">Description</h3>
+                <textarea
+                  rows={4}
+                  value={selectedTask.description || ""}
+                  onChange={(event) => setSelectedTask({ ...selectedTask, description: event.target.value })}
+                  onBlur={() => patchSelectedTask({ description: selectedTask.description || null })}
+                  className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm leading-relaxed text-stone-600 outline-none focus:border-teal-500"
+                />
+              </div>
 
               {/* Attachments Section */}
               <div className="rounded-2xl border border-stone-200 bg-white p-5">

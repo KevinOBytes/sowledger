@@ -7,8 +7,9 @@ import { KanbanBoard } from "@/components/kanban-board";
 import { ActivityFeed } from "@/components/activity-feed";
 import { ProjectActions } from "@/components/project-actions";
 import { ProjectFinancials } from "@/components/project-financials";
+import { ProjectTaskList } from "@/components/project-task-list";
 import Link from "next/link";
-import { ChevronLeft, Activity, LayoutDashboard, Archive } from "lucide-react";
+import { ChevronLeft, Activity, LayoutDashboard, Archive, LayoutList } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -71,6 +72,12 @@ export default async function ProjectBoardPage({
                 <LayoutDashboard className="h-4 w-4" /> Board
             </Link>
             <Link 
+                href={`?tab=list`} 
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-colors ${tab === "list" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-950"}`}
+            >
+                <LayoutList className="h-4 w-4" /> Task list
+            </Link>
+            <Link 
                 href={`?tab=activity`} 
                 className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-colors ${tab === "activity" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-950"}`}
             >
@@ -82,6 +89,10 @@ export default async function ProjectBoardPage({
       <div className="mt-6 min-h-0 flex-1 overflow-hidden">
         {tab === "board" ? (
             <KanbanBoard projectId={project.id} />
+        ) : tab === "list" ? (
+            <div className="h-full overflow-y-auto rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+              <ProjectTaskList projectId={project.id} />
+            </div>
         ) : (
             <div className="h-full max-w-4xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm lg:pr-6">
                <ActivityFeed projectId={project.id} />

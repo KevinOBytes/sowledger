@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { memberships, users, projectTasks, goals } from "@/lib/db/schema";
+import { projectTasks, goals } from "@/lib/db/schema";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
+import { listWorkspacePeopleDirectory } from "@/lib/people-directory";
 import { eq, ne, and } from "drizzle-orm";
 
 export async function GET() {
@@ -9,22 +11,10 @@ export async function GET() {
     const session = await requireSession();
     // Allow any member to view the planner
     requireRole("member", session.role);
+    await ensureWorkspaceSchema();
 
     const workspaceId = session.workspaceId;
-
-    const workspaceMemberships = await db.select().from(memberships).where(eq(memberships.workspaceId, workspaceId));
-    const allUsers = await db.select().from(users);
-    
-    const memberIds = workspaceMemberships.map((m) => m.userId);
-
-    const members = memberIds.map((id) => {
-      const u = allUsers.find(user => user.id === id);
-      return {
-        id,
-        email: u?.email ?? "Unknown",
-        displayName: u?.displayName ?? null,
-      };
-    });
+    const directory = await listWorkspacePeopleDirectory(workspaceId);
 
     const tasks = await db.select().from(projectTasks).where(
       and(
@@ -40,7 +30,13 @@ export async function GET() {
       )
     );
 
-    return NextResponse.json({ ok: true, members, tasks, goals: workspaceGoals });
+    return NextResponse.json({
+      ok: true,
+      people: directory.people,
+      organizations: directory.organizations,
+      tasks,
+      goals: workspaceGoals,
+    });
   } catch (error) {
     const err = error as Record<string, unknown>;
     const status = err.code === "FORBIDDEN" || err.status === 403 ? 403 : 401;

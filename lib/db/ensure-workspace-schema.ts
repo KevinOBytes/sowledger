@@ -19,6 +19,34 @@ async function runSchemaEnsure() {
   `);
 
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS organizations (
+      id varchar(255) PRIMARY KEY,
+      workspace_id varchar(255) NOT NULL,
+      client_id varchar(255),
+      name varchar(255) NOT NULL,
+      type varchar(20) NOT NULL DEFAULT 'other',
+      created_at timestamp NOT NULL DEFAULT now()
+    )
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS workspace_people (
+      id varchar(255) PRIMARY KEY,
+      workspace_id varchar(255) NOT NULL,
+      organization_id varchar(255) NOT NULL,
+      linked_user_id varchar(255),
+      display_name varchar(255),
+      email varchar(255),
+      title varchar(255),
+      person_type varchar(20) NOT NULL DEFAULT 'contact',
+      invitation_status varchar(20) NOT NULL DEFAULT 'none',
+      invite_role varchar(20),
+      status varchar(20) NOT NULL DEFAULT 'active',
+      created_at timestamp NOT NULL DEFAULT now()
+    )
+  `);
+
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS project_tasks (
       id varchar(255) PRIMARY KEY,
       workspace_id varchar(255) NOT NULL,
@@ -117,6 +145,16 @@ async function runSchemaEnsure() {
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`);
 
   await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS scheduled_block_id varchar(255)`);
+  await db.execute(sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS client_id varchar(255)`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS linked_user_id varchar(255)`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS display_name varchar(255)`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS email varchar(255)`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS title varchar(255)`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS person_type varchar(20) NOT NULL DEFAULT 'contact'`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS invitation_status varchar(20) NOT NULL DEFAULT 'none'`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS invite_role varchar(20)`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'active'`);
+  await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`);
 
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS project_id varchar(255)`);
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS color varchar(50) NOT NULL DEFAULT '#3b82f6'`);
@@ -124,6 +162,9 @@ async function runSchemaEnsure() {
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'active'`);
 
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_clients_workspace_id ON clients (workspace_id)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_organizations_workspace_id ON organizations (workspace_id)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_workspace_people_workspace_id ON workspace_people (workspace_id)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_workspace_people_org_id ON workspace_people (organization_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_project_tasks_workspace_id ON project_tasks (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_workspace_tags_workspace_id ON workspace_tags (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_scheduled_blocks_workspace_user ON scheduled_work_blocks (workspace_id, user_id)`);

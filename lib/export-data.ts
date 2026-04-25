@@ -27,6 +27,7 @@ export type ExportFilters = {
   status?: string | null;
   source?: string | null;
   include?: string | null;
+  layout?: string | null;
 };
 
 type TimeEntryStatus = "draft" | "submitted" | "approved" | "invoiced";
@@ -141,8 +142,47 @@ export function exportRows(data: Awaited<ReturnType<typeof loadExportData>>) {
   });
 }
 
+export function exportSummaryRows(data: Awaited<ReturnType<typeof loadExportData>>) {
+  const detailedRows = exportRows(data);
+  const grouped = new Map<string, {
+    date: string;
+    userEmail: string;
+    projectName: string;
+    status: string;
+    source: string;
+    entryCount: number;
+    totalDurationSeconds: number;
+    totalHours: number;
+  }>();
+
+  for (const row of detailedRows) {
+    const date = row.startedAtUtc.slice(0, 10);
+    const key = [date, row.userEmail, row.projectName, row.status, row.source].join("|");
+    const existing = grouped.get(key) ?? {
+      date,
+      userEmail: row.userEmail,
+      projectName: row.projectName,
+      status: row.status,
+      source: row.source,
+      entryCount: 0,
+      totalDurationSeconds: 0,
+      totalHours: 0,
+    };
+    existing.entryCount += 1;
+    existing.totalDurationSeconds += Number(row.durationSeconds) || 0;
+    existing.totalHours = Number((existing.totalDurationSeconds / 3600).toFixed(2));
+    grouped.set(key, existing);
+  }
+
+  return [...grouped.values()].sort((left, right) => {
+    if (left.date === right.date) return left.userEmail.localeCompare(right.userEmail);
+    return left.date.localeCompare(right.date);
+  });
+}
+
 export function createExportResponse(data: Awaited<ReturnType<typeof loadExportData>>, format: "csv" | "json", filenameBase: string) {
-  const body = format === "json" ? JSON.stringify(data, null, 2) : toCsv(exportRows(data));
+  const layout = data.filters.layout === "summary" ? "summary" : "detailed";
+  const body = format === "json" ? JSON.stringify(data, null, 2) : toCsv(layout === "summary" ? exportSummaryRows(data) : exportRows(data));
   const digest = createHash("sha256").update(body).digest("hex");
   return new Response(body, {
     status: 200,

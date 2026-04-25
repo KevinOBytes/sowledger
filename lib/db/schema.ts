@@ -41,6 +41,30 @@ export const clients = pgTable("clients", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const organizations = pgTable("organizations", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id", { length: 255 }).references(() => clients.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { enum: ["internal", "client", "vendor", "partner", "other"] }).notNull().default("other"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const workspacePeople = pgTable("workspace_people", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id", { length: 255 }).notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  linkedUserId: varchar("linked_user_id", { length: 255 }).references(() => users.id, { onDelete: "set null" }),
+  displayName: varchar("display_name", { length: 255 }),
+  email: varchar("email", { length: 255 }),
+  title: varchar("title", { length: 255 }),
+  personType: varchar("person_type", { enum: ["member", "client", "contractor", "contact"] }).notNull().default("contact"),
+  invitationStatus: varchar("invitation_status", { enum: ["none", "pending", "accepted"] }).notNull().default("none"),
+  inviteRole: varchar("invite_role", { enum: ["client", "member", "manager", "owner"] }),
+  status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const projects = pgTable("projects", {
   id: varchar("id", { length: 255 }).primaryKey(),
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),

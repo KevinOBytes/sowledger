@@ -2,15 +2,21 @@ import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { projects as projectsTable, projectTasks as tasksTable } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import Link from "next/link";
-import { Archive, FolderKanban } from "lucide-react";
+import { Archive, FolderKanban, LayoutList, ArrowRight } from "lucide-react";
 import { CreateProjectButton } from "@/components/create-project-button";
 
 export const metadata = { title: "Projects - Billabled" };
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ client?: string }>;
+}) {
   const session = await requireSession();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const clientFilter = resolvedSearchParams?.client || null;
 
   let projects: Array<{
     id: string;
@@ -24,7 +30,11 @@ export default async function ProjectsPage() {
 
   try {
     await ensureWorkspaceSchema();
-    const rawProjects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId)).orderBy(desc(projectsTable.createdAt));
+    const rawProjects = await db
+      .select()
+      .from(projectsTable)
+      .where(clientFilter ? and(eq(projectsTable.workspaceId, session.workspaceId), eq(projectsTable.clientId, clientFilter)) : eq(projectsTable.workspaceId, session.workspaceId))
+      .orderBy(desc(projectsTable.createdAt));
     projects = rawProjects.map((project) => ({
       id: project.id,
       name: project.name,
@@ -58,6 +68,7 @@ export default async function ProjectsPage() {
               <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700">{activeCount} active</span>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{archivedCount} archived</span>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{tasks.length} tasks</span>
+              {clientFilter && <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">filtered to client</span>}
             </div>
           )}
         </header>
@@ -80,14 +91,16 @@ export default async function ProjectsPage() {
               const doneTasks = projectTasks.filter((task) => task.status === "done" && !task.parentId);
               const progress = projectTasks.length ? Math.round((doneTasks.length / projectTasks.length) * 100) : project.percentComplete;
               return (
-                <Link key={project.id} href={`/projects/${project.id}`} className={`group rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md ${project.status === "archived" ? "opacity-60" : ""}`}>
+                <article key={project.id} className={`group rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md ${project.status === "archived" ? "opacity-60" : ""}`}>
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-xl font-semibold text-slate-950 group-hover:text-cyan-700">{project.name}</h3>
+                        <Link href={`/projects/${project.id}`} className="text-xl font-semibold text-slate-950 transition group-hover:text-cyan-700">
+                          {project.name}
+                        </Link>
                         {project.status === "archived" && <Archive className="h-4 w-4 text-slate-400" />}
                       </div>
-                      <p className="mt-2 text-sm text-slate-500">{projectTasks.length} task{projectTasks.length === 1 ? "" : "s"}</p>
+                      <p className="mt-2 text-sm text-slate-500">{projectTasks.length} task{projectTasks.length === 1 ? "" : "s"} ready across board and list views.</p>
                     </div>
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{project.billingModel}</span>
                   </div>
@@ -95,7 +108,24 @@ export default async function ProjectsPage() {
                     <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-500"><span>Progress</span><span>{progress}%</span></div>
                     <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-600" style={{ width: `${progress}%` }} /></div>
                   </div>
-                </Link>
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Choose a workspace view</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Link href={`/projects/${project.id}?tab=board`} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-800">
+                        <FolderKanban className="h-4 w-4" />
+                        Open board
+                      </Link>
+                      <Link href={`/projects/${project.id}?tab=list`} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:text-cyan-700">
+                        <LayoutList className="h-4 w-4" />
+                        Task list
+                      </Link>
+                      <Link href={`/projects/${project.id}`} className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 transition hover:text-cyan-700">
+                        Open workspace
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  </div>
+                </article>
               );
             })}
           </div>
