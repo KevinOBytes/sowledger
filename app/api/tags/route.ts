@@ -3,7 +3,7 @@ import { ForbiddenError, requireRole, requireSession, UnauthorizedError } from "
 import { listWorkspaceTags } from "@/lib/store";
 import { db } from "@/lib/db";
 import { timeEntries, users, memberships } from "@/lib/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function GET() {
@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest) {
     for (const entry of entries) {
       if (entry.tags && entry.tags.includes(from)) {
         const newTags = normalizeTags(entry.tags.map((tag) => (tag === from ? to : tag)));
-        await db.update(timeEntries).set({ tags: newTags }).where(eq(timeEntries.id, entry.id));
+        await db.update(timeEntries).set({ tags: newTags }).where(and(eq(timeEntries.id, entry.id), eq(timeEntries.workspaceId, session.workspaceId)));
         changedEntries += 1;
       }
     }
@@ -77,7 +77,7 @@ export async function DELETE(req: NextRequest) {
     for (const entry of entries) {
       if (entry.tags && entry.tags.includes(tag)) {
         const newTags = entry.tags.filter((existing) => existing !== tag);
-        await db.update(timeEntries).set({ tags: newTags }).where(eq(timeEntries.id, entry.id));
+        await db.update(timeEntries).set({ tags: newTags }).where(and(eq(timeEntries.id, entry.id), eq(timeEntries.workspaceId, session.workspaceId)));
         changedEntries += 1;
       }
     }

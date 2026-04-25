@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { webhooks } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -56,10 +56,15 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     
-    if (id) {
-       await db.delete(webhooks).where(eq(webhooks.id, id));
-    }
-    return NextResponse.json({ ok: true });
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+    const [deleted] = await db
+      .delete(webhooks)
+      .where(and(eq(webhooks.id, id), eq(webhooks.workspaceId, session.workspaceId)))
+      .returning({ id: webhooks.id });
+
+    if (!deleted) return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
+    return NextResponse.json({ ok: true, deletedWebhookId: deleted.id });
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

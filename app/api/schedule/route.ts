@@ -4,7 +4,7 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { memberships, projects, scheduledWorkBlocks, userActions } from "@/lib/db/schema";
+import { memberships, projects, scheduledWorkBlocks, timeEntries, userActions } from "@/lib/db/schema";
 import { normalizeTags } from "@/lib/validators";
 
 type ScheduleStatus = "planned" | "in_progress" | "completed" | "skipped" | "canceled";
@@ -23,14 +23,14 @@ function parseDate(value: unknown, label: string) {
 
 async function validateProject(workspaceId: string, projectId?: string | null) {
   if (!projectId) return;
-  const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
-  if (!project || project.workspaceId !== workspaceId) throw new Error("Invalid projectId");
+  const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)));
+  if (!project) throw new Error("Invalid projectId");
 }
 
 async function validateAction(workspaceId: string, userId: string, actionId?: string | null) {
   if (!actionId) return;
-  const [action] = await db.select().from(userActions).where(eq(userActions.id, actionId));
-  if (!action || action.workspaceId !== workspaceId || action.userId !== userId) throw new Error("Invalid actionId");
+  const [action] = await db.select().from(userActions).where(and(eq(userActions.id, actionId), eq(userActions.workspaceId, workspaceId), eq(userActions.userId, userId)));
+  if (!action) throw new Error("Invalid actionId");
 }
 
 async function validateUserAccess(workspaceId: string, actorRole: string, actorUserId: string, requestedUserId?: string | null) {
@@ -143,13 +143,20 @@ export async function PATCH(req: NextRequest) {
     };
     if (!body.blockId) return NextResponse.json({ error: "blockId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(scheduledWorkBlocks).where(eq(scheduledWorkBlocks.id, body.blockId));
-    if (!existing || existing.workspaceId !== session.workspaceId) return NextResponse.json({ error: "Scheduled block not found" }, { status: 404 });
+    const [existing] = await db.select().from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId)));
+    if (!existing) return NextResponse.json({ error: "Scheduled block not found" }, { status: 404 });
     if (existing.userId !== session.sub && session.role !== "manager" && session.role !== "owner") return NextResponse.json({ error: "Cannot edit another user's schedule" }, { status: 403 });
 
     const nextUserId = body.userId !== undefined ? await validateUserAccess(session.workspaceId, session.role, session.sub, body.userId) : existing.userId;
     const nextProjectId = body.projectId !== undefined ? body.projectId : existing.projectId;
     const nextActionId = body.actionId !== undefined ? body.actionId : existing.actionId;
+    if (body.linkedTimeEntryId) {
+      const [entry] = await db
+        .select({ id: timeEntries.id })
+        .from(timeEntries)
+        .where(and(eq(timeEntries.id, body.linkedTimeEntryId), eq(timeEntries.workspaceId, session.workspaceId)));
+      if (!entry) return NextResponse.json({ error: "Invalid linkedTimeEntryId" }, { status: 400 });
+    }
     await validateProject(session.workspaceId, nextProjectId);
     await validateAction(session.workspaceId, nextUserId, nextActionId);
 
@@ -170,7 +177,11 @@ export async function PATCH(req: NextRequest) {
     const endForCheck = updates.endsAt ?? existing.endsAt;
     if (endForCheck <= startForCheck) return NextResponse.json({ error: "endsAt must be after startsAt" }, { status: 400 });
 
-    const [block] = await db.update(scheduledWorkBlocks).set(updates).where(eq(scheduledWorkBlocks.id, body.blockId)).returning();
+    const [block] = await db
+      .update(scheduledWorkBlocks)
+      .set(updates)
+      .where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId)))
+      .returning();
     return NextResponse.json({ ok: true, block });
   } catch (error) {
     const message = (error as Error).message;
@@ -187,11 +198,14 @@ export async function DELETE(req: NextRequest) {
 
     const blockId = req.nextUrl.searchParams.get("blockId");
     if (!blockId) return NextResponse.json({ error: "blockId is required" }, { status: 400 });
-    const [existing] = await db.select().from(scheduledWorkBlocks).where(eq(scheduledWorkBlocks.id, blockId));
-    if (!existing || existing.workspaceId !== session.workspaceId) return NextResponse.json({ error: "Scheduled block not found" }, { status: 404 });
+    const [existing] = await db.select().from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.id, blockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId)));
+    if (!existing) return NextResponse.json({ error: "Scheduled block not found" }, { status: 404 });
     if (existing.userId !== session.sub && session.role !== "manager" && session.role !== "owner") return NextResponse.json({ error: "Cannot delete another user's schedule" }, { status: 403 });
 
-    await db.update(scheduledWorkBlocks).set({ status: "canceled", updatedAt: new Date() }).where(eq(scheduledWorkBlocks.id, blockId));
+    await db
+      .update(scheduledWorkBlocks)
+      .set({ status: "canceled", updatedAt: new Date() })
+      .where(and(eq(scheduledWorkBlocks.id, blockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId)));
     return NextResponse.json({ ok: true, blockId });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: statusFrom(error) });

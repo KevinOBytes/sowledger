@@ -79,8 +79,8 @@ export async function PATCH(req: NextRequest) {
 
     if (!body.tagId) return NextResponse.json({ error: "tagId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(workspaceTags).where(eq(workspaceTags.id, body.tagId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(workspaceTags).where(and(eq(workspaceTags.id, body.tagId), eq(workspaceTags.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Tag not found" }, { status: 404 });
     }
 
@@ -91,7 +91,7 @@ export async function PATCH(req: NextRequest) {
     if (body.isBillableDefault !== undefined) updates.isBillableDefault = body.isBillableDefault;
     if (body.status !== undefined) updates.status = body.status;
 
-    const [tag] = await db.update(workspaceTags).set(updates).where(eq(workspaceTags.id, body.tagId)).returning();
+    const [tag] = await db.update(workspaceTags).set(updates).where(and(eq(workspaceTags.id, body.tagId), eq(workspaceTags.workspaceId, session.workspaceId))).returning();
     return NextResponse.json({ ok: true, tag });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
@@ -106,12 +106,12 @@ export async function DELETE(req: NextRequest) {
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(workspaceTags).where(eq(workspaceTags.id, id));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(workspaceTags).where(and(eq(workspaceTags.id, id), eq(workspaceTags.workspaceId, session.workspaceId)));
+    if (!existing) {
        return NextResponse.json({ error: "Tag metadata not found" }, { status: 404 });
     }
 
-    await db.delete(workspaceTags).where(eq(workspaceTags.id, id));
+    await db.delete(workspaceTags).where(and(eq(workspaceTags.id, id), eq(workspaceTags.workspaceId, session.workspaceId)));
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });

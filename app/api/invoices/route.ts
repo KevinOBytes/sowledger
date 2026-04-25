@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { invoices as invoicesTable, timeEntries as timeEntriesTable, projects as projectsTable, users as usersTable } from "@/lib/db/schema";
-import { desc, eq, and, isNotNull } from "drizzle-orm";
+import { invoices as invoicesTable, memberships as membershipsTable, timeEntries as timeEntriesTable, projects as projectsTable, users as usersTable } from "@/lib/db/schema";
+import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -41,10 +41,15 @@ export async function GET() {
       )
       .orderBy(desc(timeEntriesTable.startedAt));
 
-    const allUsers = await db.select().from(usersTable);
+    const workspaceMemberships = await db
+      .select({ userId: membershipsTable.userId })
+      .from(membershipsTable)
+      .where(eq(membershipsTable.workspaceId, session.workspaceId));
+    const workspaceUserIds = workspaceMemberships.map((membership) => membership.userId);
+    const workspaceUsers = workspaceUserIds.length > 0 ? await db.select().from(usersTable).where(inArray(usersTable.id, workspaceUserIds)) : [];
 
     const billableEntries = approvedEntries.map((e) => {
-        const user = allUsers.find(u => u.id === e.userId);
+        const user = workspaceUsers.find(u => u.id === e.userId);
         const project = e.projectId ? workspaceProjects.find(p => p.id === e.projectId) : null;
         return {
           ...e,
@@ -78,11 +83,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No time entries selected." }, { status: 400 });
     }
 
+    if (body.projectId) {
+      const [project] = await db
+        .select({ id: projectsTable.id })
+        .from(projectsTable)
+        .where(and(eq(projectsTable.id, body.projectId), eq(projectsTable.workspaceId, session.workspaceId)));
+      if (!project) return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
+    }
+
     let totalAmount = 0;
     
     for (const id of body.timeEntryIds) {
-      const [entry] = await db.select().from(timeEntriesTable).where(eq(timeEntriesTable.id, id));
-      if (!entry || entry.workspaceId !== session.workspaceId) {
+      const [entry] = await db
+        .select()
+        .from(timeEntriesTable)
+        .where(and(eq(timeEntriesTable.id, id), eq(timeEntriesTable.workspaceId, session.workspaceId)));
+      if (!entry) {
         return NextResponse.json({ error: `Invalid entry ${id}` }, { status: 400 });
       }
       if (entry.status === "invoiced") {
@@ -111,7 +127,7 @@ export async function POST(req: NextRequest) {
     for (const id of body.timeEntryIds) {
       await db.update(timeEntriesTable)
         .set({ status: "invoiced" })
-        .where(eq(timeEntriesTable.id, id));
+        .where(and(eq(timeEntriesTable.id, id), eq(timeEntriesTable.workspaceId, session.workspaceId)));
     }
 
     return NextResponse.json({ ok: true, invoice });

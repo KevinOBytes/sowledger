@@ -4,7 +4,7 @@ import { appendAuditLog, enforceDailyHoursLimit, ensurePeriodUnlocked } from "@/
 import { db } from "@/lib/db";
 import { timeEntries, projects, goals, userActions } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function PATCH(req: NextRequest) {
@@ -24,8 +24,8 @@ export async function PATCH(req: NextRequest) {
 
     if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
 
-    const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, body.entryId));
-    if (!entry || entry.workspaceId !== session.workspaceId) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+    const [entry] = await db.select().from(timeEntries).where(and(eq(timeEntries.id, body.entryId), eq(timeEntries.workspaceId, session.workspaceId)));
+    if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
 
     const canManageOthers = session.role === "manager" || session.role === "owner";
     if (!canManageOthers && entry.userId !== session.sub) {
@@ -38,15 +38,15 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (body.projectId) {
-      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
-      if (!project || project.workspaceId !== session.workspaceId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
+      if (!project) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
     }
 
     if (body.goalId) {
-      const [goal] = await db.select().from(goals).where(eq(goals.id, body.goalId));
-      if (!goal || goal.workspaceId !== session.workspaceId) {
+      const [goal] = await db.select().from(goals).where(and(eq(goals.id, body.goalId), eq(goals.workspaceId, session.workspaceId)));
+      if (!goal) {
         return NextResponse.json({ error: "Invalid goalId" }, { status: 400 });
       }
     }
@@ -59,8 +59,8 @@ export async function PATCH(req: NextRequest) {
         nextActionName = null;
         nextHourlyRate = null;
       } else {
-        const [uAction] = await db.select().from(userActions).where(eq(userActions.id, body.actionId));
-        if (!uAction || uAction.workspaceId !== session.workspaceId || uAction.userId !== entry.userId) {
+        const [uAction] = await db.select().from(userActions).where(and(eq(userActions.id, body.actionId), eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, entry.userId)));
+        if (!uAction) {
           return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
         }
         nextActionName = uAction.name;
@@ -93,7 +93,7 @@ export async function PATCH(req: NextRequest) {
     updates.action = nextActionName;
     updates.hourlyRate = nextHourlyRate;
 
-    await db.update(timeEntries).set(updates).where(eq(timeEntries.id, entry.id));
+    await db.update(timeEntries).set(updates).where(and(eq(timeEntries.id, entry.id), eq(timeEntries.workspaceId, session.workspaceId)));
 
     await appendAuditLog({
       workspaceId: session.workspaceId,

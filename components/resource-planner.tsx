@@ -90,7 +90,7 @@ export function ResourcePlanner() {
                <Clock className="h-5 w-5" />
              </div>
              <div>
-               <p className="text-sm font-medium text-stone-500">Total backlog output</p>
+               <p className="text-sm font-medium text-stone-500">Total Backlog Output</p>
                <h3 className="text-2xl font-bold text-[#17211d]">
                   {memberBuckets.reduce((sum, b) => sum + b.totalHours, 0) + unassignedHours} hrs
                </h3>

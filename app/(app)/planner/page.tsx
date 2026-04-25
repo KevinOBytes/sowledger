@@ -3,7 +3,7 @@ import { ArrowRight, CalendarClock, FolderKanban, Users } from "lucide-react";
 
 import { ResourcePlanner } from "@/components/resource-planner";
 
-export const metadata = { title: "Planning - Billabled" };
+export const metadata = { title: "Resource Planner - Billabled" };
 
 export default function PlannerPage() {
   return (
@@ -13,7 +13,7 @@ export default function PlannerPage() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Plan</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Planning</h1>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Resource Planner</h1>
               <p className="mt-2 max-w-3xl text-sm text-slate-500">
                 Balance assigned work, expose unowned backlog, and move directly into staffing, projects, or calendar planning without leaving the operational flow.
               </p>

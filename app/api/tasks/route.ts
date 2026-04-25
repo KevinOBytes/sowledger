@@ -120,8 +120,8 @@ export async function PATCH(req: NextRequest) {
 
     if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(projectTasks).where(eq(projectTasks.id, body.taskId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(projectTasks).where(and(eq(projectTasks.id, body.taskId), eq(projectTasks.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     if (body.assigneeId) {
@@ -149,7 +149,7 @@ export async function PATCH(req: NextRequest) {
     if (body.blockedByTaskIds !== undefined) updates.blockedByTaskIds = body.blockedByTaskIds;
     if (body.attachments !== undefined) updates.attachments = body.attachments;
 
-    const [task] = await db.update(projectTasks).set(updates).where(eq(projectTasks.id, body.taskId)).returning();
+    const [task] = await db.update(projectTasks).set(updates).where(and(eq(projectTasks.id, body.taskId), eq(projectTasks.workspaceId, session.workspaceId))).returning();
     return NextResponse.json({ ok: true, task });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
@@ -165,13 +165,13 @@ export async function DELETE(req: NextRequest) {
     const taskId = req.nextUrl.searchParams.get("taskId");
     if (!taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(projectTasks).where(eq(projectTasks.id, taskId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(projectTasks).where(and(eq(projectTasks.id, taskId), eq(projectTasks.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     // Delete task itself
-    await db.delete(projectTasks).where(eq(projectTasks.id, taskId));
+    await db.delete(projectTasks).where(and(eq(projectTasks.id, taskId), eq(projectTasks.workspaceId, session.workspaceId)));
 
     // Naive cascading delete for subtasks
     await db.delete(projectTasks).where(and(eq(projectTasks.workspaceId, session.workspaceId), eq(projectTasks.parentId, taskId)));

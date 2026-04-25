@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { timeEntries, users, projects } from "@/lib/db/schema";
-import { eq, and, notInArray, desc } from "drizzle-orm";
+import { memberships, timeEntries, users, projects } from "@/lib/db/schema";
+import { eq, and, notInArray, desc, inArray } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,7 +21,12 @@ export async function GET(req: NextRequest) {
       .where(condition)
       .orderBy(desc(timeEntries.startedAt));
 
-    const workspaceUsers = await db.select().from(users); 
+    const workspaceMemberships = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(eq(memberships.workspaceId, session.workspaceId));
+    const workspaceUserIds = workspaceMemberships.map((membership) => membership.userId);
+    const workspaceUsers = workspaceUserIds.length > 0 ? await db.select().from(users).where(inArray(users.id, workspaceUserIds)) : [];
     const workspaceProjects = await db.select().from(projects).where(eq(projects.workspaceId, session.workspaceId));
 
     const pendingEntries = pendingEntriesData.map((e) => {

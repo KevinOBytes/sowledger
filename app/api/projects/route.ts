@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { projects } from "@/lib/db/schema";
+import { clients, projects } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, and } from "drizzle-orm";
 
@@ -61,6 +61,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: limits.error }, { status: 402 }); // 402 Payment Required
     }
 
+    if (body.clientId) {
+      const [client] = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(and(eq(clients.id, body.clientId), eq(clients.workspaceId, session.workspaceId)));
+      if (!client) return NextResponse.json({ error: "Invalid clientId" }, { status: 400 });
+    }
+
     const newProject = {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
@@ -112,8 +120,8 @@ export async function PATCH(req: NextRequest) {
 
     if (!body.projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(projects).where(eq(projects.id, body.projectId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(projects).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
@@ -127,7 +135,16 @@ export async function PATCH(req: NextRequest) {
       if (normalizedName.length > 120) return NextResponse.json({ error: "name must be 120 chars or fewer" }, { status: 400 });
       updates.name = normalizedName;
     }
-    if (body.clientId !== undefined) updates.clientId = body.clientId;
+    if (body.clientId !== undefined) {
+      if (body.clientId) {
+        const [client] = await db
+          .select({ id: clients.id })
+          .from(clients)
+          .where(and(eq(clients.id, body.clientId), eq(clients.workspaceId, session.workspaceId)));
+        if (!client) return NextResponse.json({ error: "Invalid clientId" }, { status: 400 });
+      }
+      updates.clientId = body.clientId;
+    }
     if (body.description !== undefined) updates.description = body.description;
     if (body.color !== undefined) updates.color = body.color;
     if (body.billingModel !== undefined) updates.billingModel = body.billingModel;
@@ -141,7 +158,7 @@ export async function PATCH(req: NextRequest) {
     if (body.status !== undefined) updates.status = body.status;
     if (body.percentComplete !== undefined) updates.percentComplete = Math.max(0, Math.min(100, body.percentComplete));
 
-    const [project] = await db.update(projects).set(updates).where(eq(projects.id, body.projectId)).returning();
+    const [project] = await db.update(projects).set(updates).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId))).returning();
     return NextResponse.json({ ok: true, project });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
@@ -157,12 +174,12 @@ export async function DELETE(req: NextRequest) {
     const projectId = req.nextUrl.searchParams.get("projectId");
     if (!projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(projects).where(eq(projects.id, projectId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    await db.delete(projects).where(eq(projects.id, projectId));
+    await db.delete(projects).where(and(eq(projects.id, projectId), eq(projects.workspaceId, session.workspaceId)));
 
     // Also need to clear projectId from time entries and goals
     // Wait, let's keep it simple by querying them

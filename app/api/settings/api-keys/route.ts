@@ -89,7 +89,11 @@ export async function PATCH(req: NextRequest) {
       rawKey = material.rawKey;
     }
 
-    const [key] = await db.update(apiKeys).set(updates).where(eq(apiKeys.id, body.keyId)).returning();
+    const [key] = await db
+      .update(apiKeys)
+      .set(updates)
+      .where(and(eq(apiKeys.id, body.keyId), eq(apiKeys.workspaceId, session.workspaceId)))
+      .returning();
     return NextResponse.json({ ok: true, key: toPublicApiKey(key), rawKey });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: statusFrom(error) });

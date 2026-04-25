@@ -218,7 +218,11 @@ export async function PATCH(req: NextRequest) {
       updates.status = "active";
     }
 
-    const [person] = await db.update(workspacePeople).set(updates).where(eq(workspacePeople.id, body.personId)).returning();
+    const [person] = await db
+      .update(workspacePeople)
+      .set(updates)
+      .where(and(eq(workspacePeople.id, body.personId), eq(workspacePeople.workspaceId, session.workspaceId)))
+      .returning();
     return NextResponse.json({ ok: true, person });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });

@@ -84,8 +84,8 @@ export async function PATCH(req: NextRequest) {
 
     if (!body.clientId) return NextResponse.json({ error: "clientId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(clients).where(eq(clients.id, body.clientId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(clients).where(and(eq(clients.id, body.clientId), eq(clients.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
@@ -96,7 +96,7 @@ export async function PATCH(req: NextRequest) {
     if (body.currencyOverride !== undefined) updates.currencyOverride = body.currencyOverride;
     if (body.status !== undefined) updates.status = body.status;
 
-    const [client] = await db.update(clients).set(updates).where(eq(clients.id, body.clientId)).returning();
+    const [client] = await db.update(clients).set(updates).where(and(eq(clients.id, body.clientId), eq(clients.workspaceId, session.workspaceId))).returning();
     if (body.name !== undefined) {
       await db
         .update(organizations)
@@ -118,13 +118,13 @@ export async function DELETE(req: NextRequest) {
     const clientId = req.nextUrl.searchParams.get("clientId");
     if (!clientId) return NextResponse.json({ error: "clientId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(clients).where(eq(clients.id, clientId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(clients).where(and(eq(clients.id, clientId), eq(clients.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
     await db.delete(organizations).where(and(eq(organizations.workspaceId, session.workspaceId), eq(organizations.clientId, clientId)));
-    await db.delete(clients).where(eq(clients.id, clientId));
+    await db.delete(clients).where(and(eq(clients.id, clientId), eq(clients.workspaceId, session.workspaceId)));
 
     // Clear clientId from projects
     await db.update(projects).set({ clientId: null }).where(and(eq(projects.workspaceId, session.workspaceId), eq(projects.clientId, clientId)));

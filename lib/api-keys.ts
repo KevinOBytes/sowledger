@@ -33,6 +33,8 @@ export type ApiKeyContext = {
   name: string;
 };
 
+type ApiKeyAuthError = UnauthorizedError & { apiKeyContext?: ApiKeyContext };
+
 function hashInput(rawKey: string) {
   if (env.NODE_ENV === "production" && !env.AUTH_COOKIE_SECRET) {
     throw new Error("AUTH_COOKIE_SECRET must be configured before API keys can be used in production");
@@ -69,20 +71,28 @@ export async function authenticateApiKey(req: NextRequest): Promise<ApiKeyContex
   if (!token) throw new UnauthorizedError("Missing API key bearer token");
 
   const keyHash = hashInput(token);
-  const [key] = await db.select().from(apiKeys).where(and(eq(apiKeys.keyHash, keyHash), isNull(apiKeys.revokedAt)));
+  const [key] = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, keyHash));
   if (!key) throw new UnauthorizedError("Invalid API key");
-  if (key.expiresAt && new Date(key.expiresAt).getTime() <= Date.now()) {
-    throw new UnauthorizedError("API key expired");
-  }
-
-  await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, key.id));
-
-  return {
+  const context = {
     id: key.id,
     workspaceId: key.workspaceId,
     name: key.name,
     scopes: Array.isArray(key.scopes) ? key.scopes : [],
   };
+  if (key.revokedAt) {
+    const error = new UnauthorizedError("API key revoked") as ApiKeyAuthError;
+    error.apiKeyContext = context;
+    throw error;
+  }
+  if (key.expiresAt && new Date(key.expiresAt).getTime() <= Date.now()) {
+    const error = new UnauthorizedError("API key expired") as ApiKeyAuthError;
+    error.apiKeyContext = context;
+    throw error;
+  }
+
+  await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(and(eq(apiKeys.id, key.id), eq(apiKeys.workspaceId, key.workspaceId), isNull(apiKeys.revokedAt)));
+
+  return context;
 }
 
 export function requireApiScope(context: ApiKeyContext, scope: ApiScope) {

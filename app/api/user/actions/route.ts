@@ -72,8 +72,8 @@ export async function PATCH(req: NextRequest) {
 
     if (!body.actionId) return NextResponse.json({ error: "actionId is required" }, { status: 400 });
 
-    const [action] = await db.select().from(userActions).where(eq(userActions.id, body.actionId));
-    if (!action || action.workspaceId !== session.workspaceId || action.userId !== session.sub) {
+    const [action] = await db.select().from(userActions).where(and(eq(userActions.id, body.actionId), eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, session.sub)));
+    if (!action) {
       return NextResponse.json({ error: "Action not found" }, { status: 404 });
     }
 
@@ -95,7 +95,7 @@ export async function PATCH(req: NextRequest) {
     
     if (body.hourlyRate !== undefined) updates.hourlyRate = body.hourlyRate;
 
-    const [updatedAction] = await db.update(userActions).set(updates).where(eq(userActions.id, body.actionId)).returning();
+    const [updatedAction] = await db.update(userActions).set(updates).where(and(eq(userActions.id, body.actionId), eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, session.sub))).returning();
     return NextResponse.json({ ok: true, action: updatedAction });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 401 });
@@ -110,12 +110,12 @@ export async function DELETE(req: NextRequest) {
     const actionId = req.nextUrl.searchParams.get("actionId");
     if (!actionId) return NextResponse.json({ error: "actionId is required" }, { status: 400 });
 
-    const [action] = await db.select().from(userActions).where(eq(userActions.id, actionId));
-    if (!action || action.workspaceId !== session.workspaceId || action.userId !== session.sub) {
+    const [action] = await db.select().from(userActions).where(and(eq(userActions.id, actionId), eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, session.sub)));
+    if (!action) {
       return NextResponse.json({ error: "Action not found" }, { status: 404 });
     }
 
-    await db.delete(userActions).where(eq(userActions.id, actionId));
+    await db.delete(userActions).where(and(eq(userActions.id, actionId), eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, session.sub)));
 
     return NextResponse.json({ ok: true, deletedActionId: actionId });
   } catch (error) {

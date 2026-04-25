@@ -42,7 +42,11 @@ export async function PATCH(req: NextRequest) {
     if (body.name !== undefined) updates.name = body.name.trim();
     if (body.type !== undefined) updates.type = body.type;
 
-    const [organization] = await db.update(organizations).set(updates).where(eq(organizations.id, body.organizationId)).returning();
+    const [organization] = await db
+      .update(organizations)
+      .set(updates)
+      .where(and(eq(organizations.id, body.organizationId), eq(organizations.workspaceId, session.workspaceId)))
+      .returning();
     return NextResponse.json({ ok: true, organization });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });

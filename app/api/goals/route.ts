@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { goals, projects, timeEntries } from "@/lib/db/schema";
+import { goals, memberships, projects, timeEntries } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, and } from "drizzle-orm";
 
@@ -11,6 +11,15 @@ function getAuthStatus(error: unknown): number {
     return 403;
   }
   return 401;
+}
+
+async function validateAssignedUser(workspaceId: string, assignedUserId?: string | null) {
+  if (!assignedUserId) return true;
+  const [membership] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(and(eq(memberships.workspaceId, workspaceId), eq(memberships.userId, assignedUserId)));
+  return Boolean(membership);
 }
 
 export async function GET() {
@@ -49,10 +58,13 @@ export async function POST(req: NextRequest) {
     if (normalizedName.length > 120) return NextResponse.json({ error: "name must be 120 chars or fewer" }, { status: 400 });
     
     if (body.projectId) {
-      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
-      if (!project || project.workspaceId !== session.workspaceId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
+      if (!project) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
+    }
+    if (!(await validateAssignedUser(session.workspaceId, body.assignedUserId))) {
+      return NextResponse.json({ error: "Invalid assignedUserId" }, { status: 400 });
     }
 
     const newGoal = {
@@ -99,16 +111,19 @@ export async function PATCH(req: NextRequest) {
 
     if (!body.goalId) return NextResponse.json({ error: "goalId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(goals).where(eq(goals.id, body.goalId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(goals).where(and(eq(goals.id, body.goalId), eq(goals.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
     }
 
     if (body.projectId) {
-      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
-      if (!project || project.workspaceId !== session.workspaceId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
+      if (!project) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
+    }
+    if (body.assignedUserId !== undefined && !(await validateAssignedUser(session.workspaceId, body.assignedUserId))) {
+      return NextResponse.json({ error: "Invalid assignedUserId" }, { status: 400 });
     }
 
     const updates: Partial<typeof goals.$inferInsert> = {};
@@ -131,7 +146,7 @@ export async function PATCH(req: NextRequest) {
     if (body.dueDate !== undefined) updates.dueDate = body.dueDate ? new Date(body.dueDate) : null;
     if (body.completed !== undefined) updates.completed = body.completed;
 
-    const [goal] = await db.update(goals).set(updates).where(eq(goals.id, body.goalId)).returning();
+    const [goal] = await db.update(goals).set(updates).where(and(eq(goals.id, body.goalId), eq(goals.workspaceId, session.workspaceId))).returning();
     return NextResponse.json({ ok: true, goal });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
@@ -147,12 +162,12 @@ export async function DELETE(req: NextRequest) {
     const goalId = req.nextUrl.searchParams.get("goalId");
     if (!goalId) return NextResponse.json({ error: "goalId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(goals).where(eq(goals.id, goalId));
-    if (!existing || existing.workspaceId !== session.workspaceId) {
+    const [existing] = await db.select().from(goals).where(and(eq(goals.id, goalId), eq(goals.workspaceId, session.workspaceId)));
+    if (!existing) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
     }
 
-    await db.delete(goals).where(eq(goals.id, goalId));
+    await db.delete(goals).where(and(eq(goals.id, goalId), eq(goals.workspaceId, session.workspaceId)));
 
     await db.update(timeEntries).set({ goalId: null }).where(and(eq(timeEntries.workspaceId, session.workspaceId), eq(timeEntries.goalId, goalId)));
 

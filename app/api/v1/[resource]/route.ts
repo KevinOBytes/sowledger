@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, gte, isNotNull, lt } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, lt, or } from "drizzle-orm";
 
 import { authenticateApiKey, requireApiScope, recordApiKeyRequest, type ApiKeyContext, type ApiScope } from "@/lib/api-keys";
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import {
   clients,
+  goals,
   invoices,
   memberships,
   projectTasks,
   projects,
   scheduledWorkBlocks,
   timeEntries,
+  workspacePeople,
   workspaceTags,
 } from "@/lib/db/schema";
 import { createExportResponse, loadExportData } from "@/lib/export-data";
@@ -70,6 +72,7 @@ async function guarded(req: NextRequest, resource: Resource, scope: ApiScope, ha
     return response;
   } catch (error) {
     status = statusFrom(error);
+    context = context ?? (error as { apiKeyContext?: ApiKeyContext }).apiKeyContext ?? null;
     return NextResponse.json({ error: (error as Error).message, resource }, { status });
   } finally {
     await recordApiKeyRequest(context, req, status).catch(() => null);
@@ -104,6 +107,39 @@ function entryConditions(workspaceId: string, req: NextRequest) {
 async function assertWorkspaceMember(workspaceId: string, userId: string) {
   const [membership] = await db.select().from(memberships).where(and(eq(memberships.workspaceId, workspaceId), eq(memberships.userId, userId)));
   if (!membership) throw new Error("userId is not a workspace member");
+}
+
+async function assertWorkspaceClient(workspaceId: string, clientId?: string | null) {
+  if (!clientId) return;
+  const [client] = await db.select({ id: clients.id }).from(clients).where(and(eq(clients.workspaceId, workspaceId), eq(clients.id, clientId)));
+  if (!client) throw new Error("clientId is not in this workspace");
+}
+
+async function assertWorkspaceProject(workspaceId: string, projectId?: string | null) {
+  if (!projectId) return;
+  const [project] = await db.select({ id: projects.id }).from(projects).where(and(eq(projects.workspaceId, workspaceId), eq(projects.id, projectId)));
+  if (!project) throw new Error("projectId is not in this workspace");
+}
+
+async function assertWorkspaceGoal(workspaceId: string, goalId?: string | null) {
+  if (!goalId) return;
+  const [goal] = await db.select({ id: goals.id }).from(goals).where(and(eq(goals.workspaceId, workspaceId), eq(goals.id, goalId)));
+  if (!goal) throw new Error("goalId is not in this workspace");
+}
+
+async function assertWorkspaceScheduleBlock(workspaceId: string, scheduledBlockId?: string | null) {
+  if (!scheduledBlockId) return;
+  const [block] = await db.select({ id: scheduledWorkBlocks.id }).from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.workspaceId, workspaceId), eq(scheduledWorkBlocks.id, scheduledBlockId)));
+  if (!block) throw new Error("scheduledBlockId is not in this workspace");
+}
+
+async function assertWorkspacePerson(workspaceId: string, assigneeId?: string | null) {
+  if (!assigneeId) return;
+  const [person] = await db
+    .select({ id: workspacePeople.id })
+    .from(workspacePeople)
+    .where(and(eq(workspacePeople.workspaceId, workspaceId), or(eq(workspacePeople.id, assigneeId), eq(workspacePeople.linkedUserId, assigneeId))));
+  if (!person) throw new Error("assigneeId is not in this workspace");
 }
 
 async function analytics(workspaceId: string, req: NextRequest) {
@@ -197,17 +233,21 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     if (resource === "projects") {
       const name = typeof body.name === "string" ? body.name.trim() : "";
       if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
+      await assertWorkspaceClient(context.workspaceId, body.clientId);
       const [project] = await db.insert(projects).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, name, clientId: body.clientId || null, description: body.description || null, color: body.color || "#3b82f6", billingModel: body.billingModel ?? "hourly", hourlyRate: body.hourlyRate ?? null, budgetType: body.budgetType ?? "none", budgetAmount: body.budgetAmount ?? null }).returning();
       return NextResponse.json({ ok: true, project }, { status: 201 });
     }
     if (resource === "tags") {
       const name = typeof body.name === "string" ? body.name.trim().toLowerCase() : "";
       if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
+      await assertWorkspaceProject(context.workspaceId, body.projectId);
       const [tag] = await db.insert(workspaceTags).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, name, color: body.color || "#3b82f6", projectId: body.projectId || null, isBillableDefault: body.isBillableDefault ?? true }).returning();
       return NextResponse.json({ ok: true, tag }, { status: 201 });
     }
     if (resource === "tasks") {
       if (!body.projectId || !body.title) return NextResponse.json({ error: "projectId and title are required" }, { status: 400 });
+      await assertWorkspaceProject(context.workspaceId, body.projectId);
+      await assertWorkspacePerson(context.workspaceId, body.assigneeId);
       const [task] = await db.insert(projectTasks).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, projectId: body.projectId, title: body.title, status: body.status ?? "todo", position: body.position ?? Date.now(), description: body.description || null, parentId: body.parentId || null, dueDate: body.dueDate ? new Date(body.dueDate) : null, assigneeId: body.assigneeId || null, estimatedHours: body.estimatedHours ?? null, blockedByTaskIds: body.blockedByTaskIds ?? [], attachments: body.attachments ?? [] }).returning();
       return NextResponse.json({ ok: true, task }, { status: 201 });
     }
@@ -217,12 +257,16 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       const startsAt = new Date(body.startsAt);
       const endsAt = new Date(body.endsAt);
       if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) return NextResponse.json({ error: "Invalid schedule window" }, { status: 400 });
+      await assertWorkspaceProject(context.workspaceId, body.projectId);
       const [block] = await db.insert(scheduledWorkBlocks).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, userId: body.userId, projectId: body.projectId || null, taskId: body.taskId || null, actionId: body.actionId || null, title: body.title, notes: body.notes || null, tags: normalizeTags(body.tags), startsAt, endsAt, createdByUserId: body.userId }).returning();
       return NextResponse.json({ ok: true, block }, { status: 201 });
     }
 
     if (!body.userId || !body.startedAt || !body.stoppedAt) return NextResponse.json({ error: "userId, startedAt, and stoppedAt are required" }, { status: 400 });
     await assertWorkspaceMember(context.workspaceId, body.userId);
+    await assertWorkspaceProject(context.workspaceId, body.projectId);
+    await assertWorkspaceGoal(context.workspaceId, body.goalId);
+    await assertWorkspaceScheduleBlock(context.workspaceId, body.scheduledBlockId);
     const startedAt = new Date(body.startedAt);
     const stoppedAt = new Date(body.stoppedAt);
     if (Number.isNaN(startedAt.getTime()) || Number.isNaN(stoppedAt.getTime()) || stoppedAt <= startedAt) return NextResponse.json({ error: "Invalid time window" }, { status: 400 });
@@ -263,25 +307,30 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     }
     if (resource === "projects") {
       if (!body.projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
-      const [project] = await db.update(projects).set({ name: body.name, description: body.description, status: body.status, percentComplete: body.percentComplete, hourlyRate: body.hourlyRate, budgetAmount: body.budgetAmount }).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, context.workspaceId))).returning();
+      await assertWorkspaceClient(context.workspaceId, body.clientId);
+      const [project] = await db.update(projects).set({ name: body.name, clientId: body.clientId, description: body.description, status: body.status, percentComplete: body.percentComplete, hourlyRate: body.hourlyRate, budgetAmount: body.budgetAmount }).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, context.workspaceId))).returning();
       return NextResponse.json({ ok: true, project });
     }
     if (resource === "tags") {
       if (!body.tagId) return NextResponse.json({ error: "tagId is required" }, { status: 400 });
+      await assertWorkspaceProject(context.workspaceId, body.projectId);
       const [tag] = await db.update(workspaceTags).set({ name: body.name, color: body.color, projectId: body.projectId, isBillableDefault: body.isBillableDefault, status: body.status }).where(and(eq(workspaceTags.id, body.tagId), eq(workspaceTags.workspaceId, context.workspaceId))).returning();
       return NextResponse.json({ ok: true, tag });
     }
     if (resource === "tasks") {
       if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
+      await assertWorkspacePerson(context.workspaceId, body.assigneeId);
       const [task] = await db.update(projectTasks).set({ title: body.title, description: body.description, status: body.status as KanbanColumn | undefined, dueDate: body.dueDate ? new Date(body.dueDate) : undefined, assigneeId: body.assigneeId, estimatedHours: body.estimatedHours }).where(and(eq(projectTasks.id, body.taskId), eq(projectTasks.workspaceId, context.workspaceId))).returning();
       return NextResponse.json({ ok: true, task });
     }
     if (resource === "schedule") {
       if (!body.blockId) return NextResponse.json({ error: "blockId is required" }, { status: 400 });
+      await assertWorkspaceProject(context.workspaceId, body.projectId);
       const [block] = await db.update(scheduledWorkBlocks).set({ title: body.title, notes: body.notes, status: body.status, startsAt: body.startsAt ? new Date(body.startsAt) : undefined, endsAt: body.endsAt ? new Date(body.endsAt) : undefined, projectId: body.projectId, taskId: body.taskId, tags: body.tags ? normalizeTags(body.tags) : undefined, updatedAt: new Date() }).where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, context.workspaceId))).returning();
       return NextResponse.json({ ok: true, block });
     }
     if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
+    await assertWorkspaceProject(context.workspaceId, body.projectId);
     const [entry] = await db.update(timeEntries).set({ description: body.description, projectId: body.projectId, tags: body.tags ? normalizeTags(body.tags) : undefined, status: body.status }).where(and(eq(timeEntries.id, body.entryId), eq(timeEntries.workspaceId, context.workspaceId))).returning();
     return NextResponse.json({ ok: true, entry });
   });
