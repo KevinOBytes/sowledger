@@ -21,7 +21,12 @@ test.describe('Unauthenticated Flows', () => {
   test('Test 4: support and API docs are public', async ({ page }) => {
     await page.goto('/support/api');
     await expect(page.getByRole('heading', { name: 'Build on Billabled.' })).toBeVisible();
-    await expect(page.getByText('Authorization: Bearer blb_your_api_key', { exact: true })).toBeVisible();
+    await expect(page.getByText(/oauth2-bearer/).first()).toBeVisible();
+
+    for (const path of ['/security', '/privacy', '/terms', '/billing-policy', '/contact']) {
+      await page.goto(path);
+      await expect(page).not.toHaveURL(/.*\/login/);
+    }
   });
 
   test('Test 4b: operational public endpoints are not session-cookie gated', async ({ page }) => {

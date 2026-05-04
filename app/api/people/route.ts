@@ -15,6 +15,10 @@ function getErrorStatus(error: unknown, fallback = 500): number {
   return fallback;
 }
 
+function isElevatedRole(role: string | null | undefined) {
+  return role === "manager" || role === "owner";
+}
+
 export async function GET() {
   try {
     const session = await requireSession();
@@ -173,15 +177,15 @@ export async function PATCH(req: NextRequest) {
     if (body.personType !== undefined) updates.personType = body.personType;
     if (body.status !== undefined) updates.status = body.status;
     if (body.inviteRole !== undefined) {
-      if (body.inviteRole === "owner" && session.role !== "owner") {
-        return NextResponse.json({ error: "Only owners can assign owner invites" }, { status: 403 });
+      if (isElevatedRole(body.inviteRole) && session.role !== "owner") {
+        return NextResponse.json({ error: "Only owners can assign elevated invites" }, { status: 403 });
       }
       updates.inviteRole = body.inviteRole;
     }
 
     if (body.workspaceRole !== undefined) {
-      if (body.workspaceRole === "owner" && session.role !== "owner") {
-        return NextResponse.json({ error: "Only owners can promote owners" }, { status: 403 });
+      if (isElevatedRole(body.workspaceRole) && session.role !== "owner") {
+        return NextResponse.json({ error: "Only owners can promote elevated roles" }, { status: 403 });
       }
       if (!existing.linkedUserId) {
         return NextResponse.json({ error: "Person is not linked to a workspace member" }, { status: 400 });

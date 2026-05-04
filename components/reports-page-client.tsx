@@ -28,6 +28,7 @@ type ReportData = {
   plannedHours: number;
   manualHours: number;
   timerHours: number;
+  calendarHours: number;
   utilization: number | null;
   missedBlocks: number;
   dailyTrend: { date: string; hours: number }[];
@@ -163,7 +164,7 @@ export function ReportsPageClient() {
               <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm font-semibold text-slate-500">Manual vs timer</p>
                 <p className="mt-2 text-3xl font-semibold">{metric(data.manualHours, "h")}</p>
-                <p className="text-sm text-slate-500">manual / {metric(data.timerHours, "h")} timer</p>
+                <p className="text-sm text-slate-500">manual / {metric(data.timerHours, "h")} timer / {metric(data.calendarHours, "h")} calendar</p>
               </div>
               <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm font-semibold text-slate-500">Billable pipeline</p>

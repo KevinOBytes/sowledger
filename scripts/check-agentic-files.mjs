@@ -2,6 +2,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const nextVersion = packageJson.dependencies?.next;
 const requiredFiles = [
   "AGENTS.md",
   "CLAUDE.md",
@@ -14,7 +16,7 @@ const requiredFiles = [
 ];
 
 const requiredAgentPhrases = [
-  "Next.js `16.2.0`",
+  `Next.js \`${nextVersion}\``,
   "workspaceId",
   "Plan work -> Track live timers -> Log manual/calendar time -> Review analytics -> Approve/invoice/export -> Integrate by API",
   "Stripe checkout accepts internal `planId` values only",

@@ -1,0 +1,3 @@
+# Historical false positives from public API docs placeholder bearer-token examples.
+a718ea818c85629d821bb921b2c0a8b42a477ffb:app/(marketing)/support/api/page.tsx:curl-auth-header:66
+a718ea818c85629d821bb921b2c0a8b42a477ffb:app/(marketing)/support/api/page.tsx:curl-auth-header:68

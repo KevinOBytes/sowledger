@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
     let totalBillableAmount = 0;
     let manualSeconds = 0;
     let timerSeconds = 0;
+    let calendarSeconds = 0;
 
     const byDate: Record<string, number> = {};
     const byProject: Record<string, number> = {};
@@ -65,6 +66,7 @@ export async function GET(req: NextRequest) {
       totalDurationSeconds += entry.durationSeconds;
       if (entry.source === "manual") manualSeconds += entry.durationSeconds;
       if (entry.source === "web") timerSeconds += entry.durationSeconds;
+      if (entry.source === "calendar") calendarSeconds += entry.durationSeconds;
 
       if (entry.hourlyRate) {
         totalBillableAmount += (entry.durationSeconds / 3600) * entry.hourlyRate;
@@ -123,6 +125,7 @@ export async function GET(req: NextRequest) {
       plannedHours: plannedSeconds / 3600,
       manualHours: manualSeconds / 3600,
       timerHours: timerSeconds / 3600,
+      calendarHours: calendarSeconds / 3600,
       utilization: plannedSeconds > 0 ? totalDurationSeconds / plannedSeconds : null,
       missedBlocks,
       dailyTrend,

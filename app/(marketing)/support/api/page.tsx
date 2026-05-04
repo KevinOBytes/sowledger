@@ -43,7 +43,7 @@ export default function ApiSupportPage() {
                 <div>
                   <h2 className="text-2xl font-semibold">Authentication</h2>
                   <p className="mt-2 text-sm text-slate-600">Send API keys as bearer tokens. Keys are generated in <Link href="/settings/developers" className="font-bold text-cyan-800">Settings - Developers</Link> and are shown once.</p>
-                  <pre className="mt-4 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-sm text-cyan-100"><code>{`Authorization: Bearer blb_your_api_key`}</code></pre>
+                  <pre className="mt-4 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-sm text-cyan-100"><code>{`Authorization: Bearer $BILLABLED_API_KEY`}</code></pre>
                 </div>
               </div>
             </div>
@@ -63,10 +63,12 @@ export default function ApiSupportPage() {
         <div className="mx-auto max-w-6xl rounded-[36px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3"><Code2 className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">Example requests</h2></div>
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <pre className="overflow-x-auto rounded-3xl bg-slate-950 p-5 text-sm text-cyan-100"><code>{`curl https://your-domain.com/api/v1/projects \
-  -H "Authorization: Bearer blb_your_api_key"`}</code></pre>
-            <pre className="overflow-x-auto rounded-3xl bg-slate-950 p-5 text-sm text-cyan-100"><code>{`curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
-  -H "Authorization: Bearer blb_your_api_key"`}</code></pre>
+            <pre className="overflow-x-auto rounded-3xl bg-slate-950 p-5 text-sm text-cyan-100"><code>{`export BILLABLED_API_KEY="blb_example_replace_me"
+curl https://your-domain.com/api/v1/projects \
+  --oauth2-bearer "$BILLABLED_API_KEY"`}</code></pre>
+            <pre className="overflow-x-auto rounded-3xl bg-slate-950 p-5 text-sm text-cyan-100"><code>{`export BILLABLED_API_KEY="blb_example_replace_me"
+curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
+  --oauth2-bearer "$BILLABLED_API_KEY"`}</code></pre>
           </div>
         </div>
       </section>

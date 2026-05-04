@@ -6,7 +6,8 @@ test.describe('Deep Authenticated Workflows', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ page }) => {
-    const res = await page.goto('/api/test/login?plan=free');
+    const workspace = `advanced-${unique()}`;
+    const res = await page.goto(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
     const data = await res?.json();
     expect(data?.success).toBe(true);
   });
@@ -86,5 +87,46 @@ test.describe('Deep Authenticated Workflows', () => {
     await page.getByLabel('Name').fill(`E2E API Key ${unique()}`);
     await page.getByRole('button', { name: 'Create API key' }).click();
     await expect(page.getByText('New API key. It is shown only once.')).toBeVisible();
+  });
+
+  test('Test 21: integration endpoints reject unsafe cross-boundary input', async ({ page }) => {
+    await page.goto('/api/test/login?plan=smb');
+
+    const unsafeWebhook = await page.request.post('/api/webhooks', {
+      data: { url: 'https://127.0.0.1/internal', events: ['time.created'] },
+    });
+    expect(unsafeWebhook.status()).toBe(400);
+
+    const unsafeIpv6Webhook = await page.request.post('/api/webhooks', {
+      data: { url: 'https://[::1]/internal', events: ['time.created'] },
+    });
+    expect(unsafeIpv6Webhook.status()).toBe(400);
+
+    const invalidAssigneeImport = await page.request.post('/api/integrations/calendar/import', {
+      data: {
+        provider: 'google',
+        assigneeUserId: 'not-a-workspace-member',
+        events: [{ id: 'security-e2e', title: 'Security E2E', startsAt: '2026-05-04T09:00:00.000Z', endsAt: '2026-05-04T10:00:00.000Z' }],
+      },
+    });
+    expect(invalidAssigneeImport.status()).toBe(400);
+  });
+
+  test('Test 22: managers cannot promote other members to elevated roles', async ({ page }) => {
+    const workspace = `rbac-${unique()}`;
+    await page.goto(`/api/test/login?plan=smb&role=owner&email=owner-${workspace}%40example.com&workspace=${workspace}&clean=true`);
+    await page.goto(`/api/test/login?plan=smb&role=member&email=member-${workspace}%40example.com&workspace=${workspace}`);
+    await page.goto(`/api/test/login?plan=smb&role=manager&email=manager-${workspace}%40example.com&workspace=${workspace}`);
+
+    const people = await page.request.get('/api/people');
+    expect(people.ok()).toBeTruthy();
+    const body = await people.json();
+    const member = body.people.find((person: { email?: string; id: string }) => person.email === `member-${workspace}@example.com`);
+    expect(member?.id).toBeTruthy();
+
+    const promote = await page.request.patch('/api/people', {
+      data: { personId: member.id, workspaceRole: 'manager' },
+    });
+    expect(promote.status()).toBe(403);
   });
 });

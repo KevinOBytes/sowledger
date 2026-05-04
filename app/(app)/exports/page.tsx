@@ -37,20 +37,14 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function thirtyDaysAgo() {
-  const date = new Date();
-  date.setDate(date.getDate() - 30);
-  return date.toISOString().slice(0, 10);
-}
-
 export default function ExportsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [format, setFormat] = useState<ExportFormat>("json");
   const [layout, setLayout] = useState<ExportLayout>("detailed");
   const [projectId, setProjectId] = useState("");
-  const [start, setStart] = useState(thirtyDaysAgo());
-  const [end, setEnd] = useState(today());
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
   const [userId, setUserId] = useState("");
   const [status, setStatus] = useState("");
   const [source, setSource] = useState("");
@@ -69,7 +63,7 @@ export default function ExportsPage() {
       .catch(() => null);
   }, []);
 
-  const completeExport = include.length === DATASETS.length && !projectId && !userId && !status && !source;
+  const completeExport = include.length === DATASETS.length && !projectId && !start && !end && !userId && !status && !source;
   const selectedProjectName = useMemo(() => projects.find((project) => project.id === projectId)?.name, [projectId, projects]);
 
   function toggleDataset(id: string) {
