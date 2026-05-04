@@ -277,9 +277,9 @@ export function CalendarView() {
           }),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Could not log calendar time");
+        if (!response.ok) throw new Error(data.error || "Could not log completed work");
         window.dispatchEvent(new CustomEvent("billabled:time-saved"));
-        toast.success("Calendar time logged");
+        toast.success("Completed work logged");
       }
       setComposerOpen(false);
       await fetchData();
@@ -303,8 +303,8 @@ export function CalendarView() {
       }),
     });
     const data = await response.json();
-    if (!response.ok) toast.error("Could not start planned block", { description: data.error });
-    else toast.success("Timer started from plan");
+    if (!response.ok) toast.error("Could not start scheduled work", { description: data.error });
+    else toast.success("Timer started from schedule");
     await fetchData();
   }
 
@@ -341,7 +341,7 @@ export function CalendarView() {
               <CalendarClock className="h-4 w-4" /> Calendar operations
             </div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Block the week. Log what happened.</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">Use the week board for real time blocking. Click an empty slot to schedule work, or log completed calendar time when work happened without a timer.</p>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">Calendar is for scheduling and adjusting the week. Click an empty slot to schedule work, or log completed work when it happened without a timer.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => openComposer({ mode: "scheduled" })} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800">
@@ -432,10 +432,10 @@ export function CalendarView() {
                                 <p className="truncate font-bold">{block.title}</p>
                                 <p className="mt-0.5 truncate text-[10px] text-cyan-700">{timeLabel(block.startsAt)} - {timeLabel(block.endsAt)}</p>
                               </div>
-                              <button onClick={(event) => { event.stopPropagation(); startBlock(block); }} className="rounded-full bg-white/70 p-1 text-cyan-700" aria-label="Start timer from planned work"><Play className="h-3 w-3 fill-cyan-700" /></button>
+                              <button onClick={(event) => { event.stopPropagation(); startBlock(block); }} className="rounded-full bg-white/70 p-1 text-cyan-700" aria-label="Start timer from scheduled work"><Play className="h-3 w-3 fill-cyan-700" /></button>
                             </div>
                             <div className="mt-1 flex gap-2 text-[10px] font-bold text-cyan-700">
-                              <button onClick={(event) => { event.stopPropagation(); openComposer({ mode: "calendar", block }); }} className="inline-flex items-center gap-1"><SquarePen className="h-3 w-3" />Log</button>
+                              <button onClick={(event) => { event.stopPropagation(); openComposer({ mode: "calendar", block }); }} className="inline-flex items-center gap-1"><SquarePen className="h-3 w-3" />Log completed</button>
                               <button onClick={(event) => { event.stopPropagation(); moveBlockTomorrow(block); }}>Move</button>
                               <button onClick={(event) => { event.stopPropagation(); cancelBlock(block); }} aria-label="Cancel scheduled work"><Trash2 className="h-3 w-3" /></button>
                             </div>
@@ -508,7 +508,7 @@ export function CalendarView() {
                   {composerMode === "scheduled" ? <CalendarPlus className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                   {editingBlock ? "Edit calendar work" : "New calendar work"}
                 </div>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight">{composerMode === "scheduled" ? "Schedule planned work" : "Log completed calendar time"}</h2>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">{composerMode === "scheduled" ? "Schedule work" : "Log completed work"}</h2>
                 <p className="mt-1 text-sm text-slate-500">Use the same title, project, start, and end model people expect from calendar events.</p>
               </div>
               <button onClick={() => setComposerOpen(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close calendar composer">
@@ -518,7 +518,7 @@ export function CalendarView() {
 
             <div className="border-b border-slate-100 px-6 py-4">
               <div className="inline-flex rounded-full bg-slate-100 p-1">
-                <button onClick={() => setComposerMode("scheduled")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "scheduled" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Planned block</button>
+                <button onClick={() => setComposerMode("scheduled")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "scheduled" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Scheduled work</button>
                 <button onClick={() => setComposerMode("calendar")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "calendar" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Completed time</button>
               </div>
             </div>
@@ -536,8 +536,8 @@ export function CalendarView() {
                 </select>
               </label>
               <label className="space-y-1 text-sm font-medium text-slate-700">
-                Work reference
-                <input value={eventTaskId} onChange={(event) => setEventTaskId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="TASK-123 or short label" />
+                Work label
+                <input value={eventTaskId} onChange={(event) => setEventTaskId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="Client call, research review, design QA" />
               </label>
               <label className="space-y-1 text-sm font-medium text-slate-700">
                 Starts
@@ -560,11 +560,11 @@ export function CalendarView() {
             <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Pencil className="h-4 w-4" />
-                {composerMode === "scheduled" ? "Creates a planned block visible on Dashboard and exports." : "Creates a completed time entry with source calendar."}
+                {composerMode === "scheduled" ? "Creates scheduled work visible on Dashboard and exports." : "Creates a completed time entry with source calendar."}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setComposerOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white">Cancel</button>
-                <button onClick={saveEvent} disabled={savingEvent} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">{savingEvent ? "Saving..." : composerMode === "scheduled" ? "Save planned block" : "Log calendar time"}</button>
+                <button onClick={saveEvent} disabled={savingEvent} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">{savingEvent ? "Saving..." : composerMode === "scheduled" ? "Save scheduled work" : "Log completed work"}</button>
               </div>
             </div>
           </div>

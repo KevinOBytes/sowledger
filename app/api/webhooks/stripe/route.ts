@@ -59,9 +59,13 @@ export async function POST(req: Request) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+    if (typeof session.subscription !== "string") {
+      console.warn("Stripe checkout completed without a subscription", session.id);
+      return new NextResponse(null, { status: 200 });
+    }
     // Retrieve the subscription details from Stripe.
     const subscription = await stripe.subscriptions.retrieve(
-      session.subscription as string
+      session.subscription
     );
 
     const workspaceId = session.client_reference_id ?? session.metadata?.workspaceId;
@@ -73,7 +77,7 @@ export async function POST(req: Request) {
     await updateWorkspaceFromSubscription(subscription, workspaceId);
   }
 
-  if (event.type === "customer.subscription.updated") {
+  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
     const subscription = event.data.object as Stripe.Subscription;
     await updateWorkspaceFromSubscription(subscription);
   }

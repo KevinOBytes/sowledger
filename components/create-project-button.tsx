@@ -6,7 +6,12 @@ import { BuildingIcon, ClockIcon, DollarSignIcon, PlusIcon, XIcon } from "lucide
 
 type ClientOption = { id: string; name: string };
 
-export function CreateProjectButton() {
+type CreateProjectButtonProps = {
+  canCreate?: boolean;
+  lockedReason?: string;
+};
+
+export function CreateProjectButton({ canCreate = true, lockedReason = "Only managers and owners can create projects." }: CreateProjectButtonProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(1);
@@ -70,12 +75,17 @@ export function CreateProjectButton() {
 
   return (
     <>
-      <button onClick={() => setIsOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800">
+      <button
+        onClick={() => canCreate ? setIsOpen(true) : setError(lockedReason)}
+        className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold shadow-sm transition ${canCreate ? "bg-slate-950 text-white hover:bg-slate-800" : "border border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300"}`}
+        title={canCreate ? "Create project" : lockedReason}
+      >
         <PlusIcon className="h-4 w-4" />
-        New Project
+        {canCreate ? "New Project" : "Owner/manager required"}
       </button>
+      {!canCreate && error && <p className="mt-2 text-sm font-semibold text-amber-700">{error}</p>}
 
-      {isOpen && (
+      {isOpen && canCreate && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg overflow-hidden rounded-[28px] border border-slate-200 bg-white text-slate-950 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">

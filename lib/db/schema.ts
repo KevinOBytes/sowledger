@@ -261,6 +261,17 @@ export const apiKeyRequests = pgTable("api_key_requests", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const onboardingProgress = pgTable("onboarding_progress", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  completedSteps: jsonb("completed_steps").$type<string[]>().default([]).notNull(),
+  skippedAt: timestamp("skipped_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const workspaceTags = pgTable("workspace_tags", {
   id: varchar("id", { length: 255 }).primaryKey(),
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),

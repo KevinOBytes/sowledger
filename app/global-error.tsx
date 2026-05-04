@@ -10,7 +10,12 @@ export default function GlobalError({
   error: Error & { digest?: string };
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return;
+    try {
+      Sentry.captureException(error);
+    } catch {
+      // Error UI should render even if observability is unavailable.
+    }
   }, [error]);
 
   return (

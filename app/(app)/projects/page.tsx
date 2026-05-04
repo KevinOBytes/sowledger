@@ -50,6 +50,7 @@ export default async function ProjectsPage({
 
   const activeCount = projects.filter((project) => project.status === "active").length;
   const archivedCount = projects.filter((project) => project.status === "archived").length;
+  const canManageProjects = session.role === "manager" || session.role === "owner";
 
   return (
     <main className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
@@ -61,7 +62,7 @@ export default async function ProjectsPage({
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Projects</h1>
               <p className="mt-2 max-w-2xl text-sm text-slate-500">Organize client work, tasks, budgets, and logged time into clear delivery pipelines.</p>
             </div>
-            <CreateProjectButton />
+            <CreateProjectButton canCreate={canManageProjects} />
           </div>
           {!loadError && (
             <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold">

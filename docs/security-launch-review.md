@@ -1,10 +1,11 @@
 # Security Launch Review
 
 Date: 2026-04-24
+Updated: 2026-05-04
 Scope: Billabled launch pass covering Next.js proxy boundaries, public API, Stripe billing/webhooks, API keys, exports, readiness, and production observability.
 
 ## Executive Summary
-The highest-risk launch issues found in this pass were fixed before deployment: public API v1 and Stripe webhook routes were session-gated by the app proxy, sensitive endpoints had no app-level rate limiting, and production readiness/health checks were not suitable for operational verification. The remaining launch risks are operational: production env values, Sentry/Upstash wiring, and live Stripe event verification must be confirmed after deployment.
+The highest-risk launch issues found in this pass were fixed before deployment: public API v1 and Stripe webhook routes were session-gated by the app proxy, sensitive endpoints had no app-level rate limiting, and production readiness/health checks were not suitable for operational verification. The remaining launch risks are operational: required production env values, Upstash wiring, Sentry visibility, and live Stripe event verification must be confirmed after deployment. Sentry is intentionally non-blocking: the app and readiness checks fail gracefully when Sentry auth or DSN values are missing or insufficient.
 
 ## Fixed Findings
 
@@ -54,12 +55,12 @@ The highest-risk launch issues found in this pass were fixed before deployment: 
 
 ### R-1: Production env readiness
 - Severity: High until verified
-- Evidence: App code now checks required env through protected readiness, but the deployed environment must actually have `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, Sentry, Upstash, Resend, and DB values configured.
-- Required verification: Call `/api/deployment/readiness` with `x-auth-key` after deploy and require `ok: true`.
+- Evidence: App code now checks required env through protected readiness, but the deployed environment must actually have `AUTH_SHARED_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, Upstash, Resend, and DB values configured. Sentry appears under `optionalChecks` and `degraded` instead of blocking readiness.
+- Required verification: Call `/api/deployment/readiness` with `x-auth-key` after deploy and require `ok: true`; investigate any required failed check and record optional Sentry degradation separately.
 
 ### R-2: Live Stripe webhook delivery
 - Severity: High until verified
-- Evidence: Code-level signature handling is present, but live webhook endpoint registration and secret pairing must match the deployed URL.
+- Evidence: Code-level signature handling is present, and the live Stripe endpoint should point at `https://www.billabled.com/api/webhooks/stripe` with the matching `STRIPE_WEBHOOK_SECRET`.
 - Required verification: Send a Stripe CLI or Dashboard test event to `/api/webhooks/stripe`, then perform real checkout and confirm workspace plan mutation.
 
 ### R-3: Public API abuse controls depend on Upstash in production

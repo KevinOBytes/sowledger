@@ -19,7 +19,7 @@ test.describe('Mobile Web Support', () => {
     expect(loginData?.success).toBe(true);
 
     await page.goto('/dashboard');
-    await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start timer', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Quick time entry' })).toBeVisible();
 
     await page.getByRole('link', { name: 'Calendar' }).click();

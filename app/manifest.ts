@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Billabled Workforce Intelligence",
     short_name: "Billabled",
-    description: "Plan work, track live timers, log manual time, and export billable proof.",
+    description: "Schedule work, track live timers, log completed work, and export billable proof.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

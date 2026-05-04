@@ -42,7 +42,7 @@ function localDate(date: string, time: string) {
 export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, defaultTaskId, defaultProjectId, defaultDescription }: ManualTimeDialogProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
-  const [taskId, setTaskId] = useState(defaultTaskId || "manual-entry");
+  const [taskId, setTaskId] = useState(defaultTaskId || "General work");
   const [projectId, setProjectId] = useState(defaultProjectId || "");
   const [actionId, setActionId] = useState("");
   const [description, setDescription] = useState(defaultDescription || "");
@@ -73,7 +73,7 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
     const startParts = parts(start);
     const endParts = parts(end);
 
-    setTaskId(scheduledBlock?.taskId || defaultTaskId || "manual-entry");
+    setTaskId(scheduledBlock?.taskId || defaultTaskId || "General work");
     setProjectId(scheduledBlock?.projectId || defaultProjectId || "");
     setActionId(scheduledBlock?.actionId || "");
     setDescription(scheduledBlock?.notes || scheduledBlock?.title || defaultDescription || "");
@@ -94,7 +94,7 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
 
   async function save() {
     if (!taskId.trim()) {
-      toast.error("Task reference is required.");
+      toast.error("Work label is required.");
       return;
     }
     const startedAt = localDate(startDate, startTime);
@@ -122,7 +122,7 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to log time");
-      toast.success("Manual time logged");
+      toast.success("Completed work logged");
       onOpenChange(false);
       await onSaved?.();
       window.dispatchEvent(new CustomEvent("billabled:time-saved"));
@@ -143,7 +143,7 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
             <div className="flex items-center gap-2 text-sm font-semibold text-cyan-700">
               <Clock3 className="h-4 w-4" /> Log time manually
             </div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Add a non-timer work block</h2>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Add completed work</h2>
             <p className="mt-1 text-sm text-slate-500">Use this for work you completed without starting a live timer.</p>
           </div>
           <button onClick={() => onOpenChange(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close manual time dialog">
@@ -153,8 +153,8 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
 
         <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
           <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">
-            Work reference
-            <input value={taskId} onChange={(e) => setTaskId(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="TASK-123 or short work label" />
+            Work label
+            <input value={taskId} onChange={(e) => setTaskId(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="Client call, research review, design QA" />
           </label>
 
           <label className="space-y-1 text-sm font-medium text-slate-700">
@@ -166,9 +166,9 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
           </label>
 
           <label className="space-y-1 text-sm font-medium text-slate-700">
-            Action / rate
+            Work type / rate
             <select value={actionId} onChange={(e) => setActionId(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white">
-              <option value="">No action rate</option>
+              <option value="">No work type rate</option>
               {actions.map((action) => <option key={action.id} value={action.id}>{action.name}{action.hourlyRate ? ` ($${action.hourlyRate}/hr)` : ""}</option>)}
             </select>
           </label>

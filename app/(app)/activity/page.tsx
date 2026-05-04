@@ -57,7 +57,7 @@ export default function ActivityPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittingStart, setSubmittingStart] = useState(false);
-  const [taskId, setTaskId] = useState("TASK-1");
+  const [taskId, setTaskId] = useState("General work");
   const [projectId, setProjectId] = useState("");
   const [description, setDescription] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
@@ -114,7 +114,7 @@ export default function ActivityPage() {
 
   async function startTimerNow() {
     if (!taskId.trim()) {
-      toast.error("Task reference is required to start a timer.");
+      toast.error("Work label is required to start a timer.");
       return;
     }
     setSubmittingStart(true);
@@ -146,11 +146,11 @@ export default function ActivityPage() {
                 <LayoutList className="h-7 w-7 text-cyan-700" />
                 Activity
               </h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Review timers and manual blocks by day. Use this page for corrections before approval, invoicing, analytics, or export.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Review timers and completed work by day. Use this page for corrections before approval, invoicing, analytics, or export.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => setManualOpen(true)} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800">
-                <Plus className="mr-2 inline h-4 w-4" />Log manual time
+                <Plus className="mr-2 inline h-4 w-4" />Log completed work
               </button>
             </div>
           </div>
@@ -175,7 +175,7 @@ export default function ActivityPage() {
             <p className="mt-2 text-3xl font-semibold">{entries.length}</p>
           </div>
           <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">Manual blocks</p>
+            <p className="text-sm font-semibold text-slate-500">Completed without timer</p>
             <p className="mt-2 text-3xl font-semibold">{manualCount}</p>
           </div>
           <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -192,7 +192,7 @@ export default function ActivityPage() {
             <div className="p-12 text-center text-slate-500">
               <Clock3 className="mx-auto mb-3 h-9 w-9 text-slate-400" />
               <p className="font-semibold text-slate-700">No time entries yet.</p>
-              <p className="mt-1 text-sm">Start a timer or log a manual block to build your activity trail.</p>
+              <p className="mt-1 text-sm">Start a timer or log completed work to build your activity trail.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">

@@ -10,7 +10,7 @@ export default function CalendarPage() {
           <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Planning surface</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Calendar</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">
-            Schedule work blocks, start timers from plans, and convert planned work into manual time when work happens offline.
+            Schedule work, start timers from the schedule, and log completed work when work happens offline.
           </p>
         </header>
         <div className="min-h-0 flex-1">

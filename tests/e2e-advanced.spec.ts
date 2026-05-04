@@ -14,9 +14,9 @@ test.describe('Deep Authenticated Workflows', () => {
   test('Test 11: schedule a work block from dashboard', async ({ page }) => {
     const title = `Dashboard Plan ${unique()}`;
     await page.goto('/dashboard');
-    await page.getByRole('button', { name: /Plan work/i }).click();
+    await page.getByRole('button', { name: /Schedule work/i }).first().click();
     await page.getByLabel('Title').fill(title);
-    await page.getByRole('button', { name: 'Save plan' }).click();
+    await page.getByRole('button', { name: 'Save scheduled work' }).click();
     await expect(page.getByText(title)).toBeVisible();
   });
 

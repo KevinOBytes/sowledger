@@ -27,6 +27,7 @@ The runner:
 
 ## Required Production Env
 - `NEXT_PUBLIC_APP_URL`
+- `AUTH_SHARED_KEY`
 - `AUTH_COOKIE_SECRET`
 - `AUDIT_SIGNING_SECRET`
 - `RESEND_API_KEY`
@@ -37,6 +38,10 @@ The runner:
 - `STRIPE_PRO_PRICE_ID`
 - `STRIPE_SMB_PRICE_ID`
 - `STRIPE_ENTERPRISE_PRICE_ID`
+
+## Optional Production Env
+Billabled runs without Sentry. When these values are missing or misconfigured, Sentry is reported as degraded in detailed readiness instead of failing the app.
+
 - `NEXT_PUBLIC_SENTRY_DSN`
 - `SENTRY_ORG`
 - `SENTRY_PROJECT`
@@ -45,8 +50,8 @@ The runner:
 ## Post-Deploy Checks
 - `GET /api/health` returns `{ ok: true }` and is safe for uptime checks.
 - `GET /api/deployment/readiness` returns public liveness only by default.
-- `GET /api/deployment/readiness` with `x-auth-key: $AUTH_SHARED_KEY` returns detailed env readiness.
-- Stripe webhook endpoint must be configured to `/api/webhooks/stripe`; `/api/stripe/webhook` remains a compatibility alias.
+- `GET /api/deployment/readiness` with `x-auth-key: $AUTH_SHARED_KEY` returns detailed required checks plus optional degraded checks.
+- Stripe webhook endpoint must be configured to `https://www.billabled.com/api/webhooks/stripe`; `/api/stripe/webhook` remains a compatibility alias.
 - Public API consumers call `/api/v1/*` with `Authorization: Bearer <key>` and do not need a browser session cookie.
 
 ## Stripe Verification
@@ -56,6 +61,7 @@ The runner:
   - Business: `STRIPE_ENTERPRISE_PRICE_ID`
 - Run a real checkout from `Settings -> Billing` with an owner account.
 - Confirm `checkout.session.completed` updates the workspace plan.
+- Confirm `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted` events keep the workspace subscription state synchronized.
 - Open the customer portal from `Settings -> Billing` on the paid workspace.
 - Send a Stripe CLI/webhook test event to `/api/webhooks/stripe` and verify a `200` response.
 

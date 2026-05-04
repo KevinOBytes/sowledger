@@ -168,7 +168,7 @@ export function ReportsPageClient() {
               <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm font-semibold text-slate-500">Billable pipeline</p>
                 <p className="mt-2 text-3xl font-semibold text-emerald-700">${data.totalBillableAmount.toFixed(0)}</p>
-                <p className="text-sm text-amber-700">{data.missedBlocks} missed planned block(s)</p>
+                <p className="text-sm text-amber-700">{data.missedBlocks} missed scheduled work item(s)</p>
               </div>
             </section>
 

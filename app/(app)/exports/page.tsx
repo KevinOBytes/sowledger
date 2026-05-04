@@ -24,7 +24,7 @@ const DATASETS = [
   { id: "clients", label: "Clients" },
   { id: "projects", label: "Projects" },
   { id: "tasks", label: "Project tasks" },
-  { id: "schedule", label: "Scheduled work blocks" },
+  { id: "schedule", label: "Scheduled work" },
   { id: "timeEntries", label: "Time entries" },
   { id: "tags", label: "Tags" },
   { id: "goals", label: "Goals" },

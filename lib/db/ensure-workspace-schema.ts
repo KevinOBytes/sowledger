@@ -129,6 +129,19 @@ async function runSchemaEnsure() {
   `);
 
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS onboarding_progress (
+      id varchar(255) PRIMARY KEY,
+      workspace_id varchar(255) NOT NULL,
+      user_id varchar(255) NOT NULL,
+      completed_steps jsonb DEFAULT '[]'::jsonb NOT NULL,
+      skipped_at timestamp,
+      completed_at timestamp,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )
+  `);
+
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS goals (
       id varchar(255) PRIMARY KEY,
       workspace_id varchar(255) NOT NULL,
@@ -230,6 +243,7 @@ async function runSchemaEnsure() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_time_entries_scheduled_block ON time_entries (scheduled_block_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_api_keys_workspace_id ON api_keys (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_api_key_requests_key_id ON api_key_requests (api_key_id)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_onboarding_progress_workspace_user ON onboarding_progress (workspace_id, user_id)`);
 }
 
 export async function ensureWorkspaceSchema() {

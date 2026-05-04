@@ -51,7 +51,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
   });
 
   test('Test 6: sidebar navigation works', async ({ page }) => {
-    await page.getByRole('link', { name: 'Workspace' }).click();
+    await page.getByRole('link', { name: 'Workspace', exact: true }).click();
     await expect(page).toHaveURL(/.*\/settings/);
   });
 
@@ -76,9 +76,9 @@ test.describe('Authenticated Flows (Free Plan)', () => {
 
   test('Test 10: global timer interface present', async ({ page }) => {
     await page.goto('/dashboard');
-    await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Log time' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Plan work/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start timer', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Log completed work', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Schedule work/i }).first()).toBeVisible();
   });
 
   test('Test 10b: first setup repairs a workspace with no manager', async ({ page }) => {
@@ -115,5 +115,19 @@ test.describe('Authenticated Flows (Free Plan)', () => {
     expect(billingData.plan).toBe('enterprise');
     expect(billingData.planSource).toBe('internal');
     expect(billingData.limits.projects).toBeGreaterThanOrEqual(200);
+  });
+
+  test('Test 10d: first-run setup can be skipped and resumed', async ({ page }) => {
+    const workspace = `onboarding-e2e-${Date.now()}`;
+    const login = await page.goto(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
+    const loginData = await login?.json();
+    expect(loginData?.success).toBe(true);
+
+    await page.goto('/dashboard');
+    await expect(page.getByText('First login setup')).toBeVisible();
+    await page.getByRole('button', { name: 'Skip for now' }).click();
+    await expect(page.getByText('Setup hidden')).toBeVisible();
+    await page.getByRole('button', { name: 'Resume setup' }).click();
+    await expect(page.getByText('First login setup')).toBeVisible();
   });
 });

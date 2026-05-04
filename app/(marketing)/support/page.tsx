@@ -9,8 +9,8 @@ const TOPICS = [
     icon: CalendarClock,
   },
   {
-    title: "Track live and manual time",
-    description: "Run concurrent timers, focus one active timer, and add manual time blocks when work happened outside the timer.",
+    title: "Track live and completed work",
+    description: "Run concurrent timers, focus one active timer, and add completed work when it happened outside the timer.",
     href: "/support#tracking",
     icon: TimerReset,
   },
@@ -44,7 +44,7 @@ export default function SupportPage() {
           <div className="max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Knowledge base</p>
             <h1 className="mt-4 text-5xl font-semibold tracking-tight sm:text-7xl">Get productive in Billabled.</h1>
-            <p className="mt-5 text-lg text-slate-600">Support articles are organized around the core workflow: plan work, track timers, log manual time, review analytics, approve or export data, then integrate by API.</p>
+            <p className="mt-5 text-lg text-slate-600">Support articles are organized around the core workflow: schedule work, track timers, log completed work, review analytics, approve or export data, then integrate by API.</p>
           </div>
           <div className="mt-12 grid gap-5 md:grid-cols-2">
             {TOPICS.map((topic) => {
@@ -67,14 +67,14 @@ export default function SupportPage() {
       <section id="planning" className="px-6 py-12">
         <div className="mx-auto max-w-5xl rounded-[36px] border border-slate-200 bg-white p-8 shadow-sm">
           <h2 className="text-3xl font-semibold">Planning workflow</h2>
-          <p className="mt-3 text-slate-600">Use Dashboard for today&apos;s plan and Calendar for future blocks. Each scheduled block can be started as a timer, logged manually, rescheduled, skipped, or exported later for audit history.</p>
+          <p className="mt-3 text-slate-600">Use Dashboard for today&apos;s work and Calendar for future scheduling. Each scheduled block can be started as a timer, logged as completed work, rescheduled, skipped, or exported later for audit history.</p>
         </div>
       </section>
 
       <section id="tracking" className="px-6 py-12">
         <div className="mx-auto max-w-5xl rounded-[36px] border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-3xl font-semibold">Timer and manual time workflow</h2>
-          <p className="mt-3 text-slate-600">Billabled supports concurrent timers while keeping one focused timer visually primary. Manual time is available from Dashboard, Activity, Calendar, and analytics empty states so offline work does not disappear.</p>
+          <h2 className="text-3xl font-semibold">Timer and completed work workflow</h2>
+          <p className="mt-3 text-slate-600">Billabled supports concurrent timers while keeping one focused timer visually primary. Completed work logging is available from Dashboard, Activity, Calendar, and analytics empty states so offline work does not disappear.</p>
         </div>
       </section>
 
@@ -90,6 +90,20 @@ export default function SupportPage() {
           <h2 className="text-3xl font-semibold">Billing plans</h2>
           <p className="mt-3 text-slate-600">Billabled uses flat workspace pricing so a solo operator can start paying without seat math. Free is for evaluation, Starter is $9/month for invoices and exports, Studio is $29/month for small-team API/webhook workflows, and Business is $79/month for larger operations.</p>
           <Link href="/#pricing" className="mt-5 inline-flex rounded-full bg-cyan-600 px-5 py-3 text-sm font-bold text-white hover:bg-cyan-500">Compare pricing</Link>
+        </div>
+      </section>
+
+      <section className="px-6 py-12">
+        <div className="mx-auto max-w-5xl rounded-[36px] border border-slate-200 bg-white p-8 shadow-sm">
+          <h2 className="text-3xl font-semibold">Trust, billing, and contact pages</h2>
+          <p className="mt-3 text-slate-600">Before inviting customers from ads, review the customer-facing trust surfaces so signup, security, billing, and support expectations are visible.</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link href="/security" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:border-cyan-200 hover:text-cyan-700">Security</Link>
+            <Link href="/privacy" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:border-cyan-200 hover:text-cyan-700">Privacy</Link>
+            <Link href="/terms" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:border-cyan-200 hover:text-cyan-700">Terms</Link>
+            <Link href="/billing-policy" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:border-cyan-200 hover:text-cyan-700">Billing policy</Link>
+            <Link href="/contact" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:border-cyan-200 hover:text-cyan-700">Contact</Link>
+          </div>
         </div>
       </section>
 

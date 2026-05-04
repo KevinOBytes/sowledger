@@ -53,7 +53,7 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
 
   test('Story 5: run overlapping timer blocks', async ({ page }) => {
     await page.goto('/dashboard');
-    await page.getByRole('button', { name: 'Start timer' }).click();
+    await page.getByRole('button', { name: 'Start timer', exact: true }).click();
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Start another timer' }).click();
     await page.waitForTimeout(1000);
@@ -66,13 +66,13 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
   test('Story 6: view historical records in activity board', async ({ page }) => {
     await page.goto('/activity');
     await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
-    await expect(page.getByText('TASK-1').first()).toBeVisible();
+    await expect(page.getByText('General work').first()).toBeVisible();
   });
 
-  test('Story 7: submit a retroactive manual time log', async ({ page }) => {
+  test('Story 7: submit a retroactive completed-work log', async ({ page }) => {
     await page.goto('/activity');
-    await page.getByRole('button', { name: 'Log manual time' }).click();
-    await page.getByLabel('Work reference').fill('retroactive-e2e');
+    await page.getByRole('button', { name: 'Log completed work' }).click();
+    await page.getByLabel('Work label').fill('retroactive-e2e');
     await page.getByLabel('Notes').fill('Retroactive E2E Task');
     const today = new Date().toISOString().split('T')[0];
     await page.getByLabel('Start date').fill(today);
@@ -88,7 +88,7 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
     await page.goto('/calendar');
     await page.getByRole('button', { name: 'Schedule work' }).click();
     await page.getByLabel('Title').fill(title);
-    await page.getByRole('button', { name: 'Save planned block' }).click();
+    await page.getByRole('button', { name: 'Save scheduled work' }).click();
     await expect(page.getByText(title).first()).toBeVisible();
   });
 
