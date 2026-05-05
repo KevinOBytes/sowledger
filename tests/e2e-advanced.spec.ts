@@ -42,6 +42,37 @@ test.describe('Deep Authenticated Workflows', () => {
     await expect(page.getByRole('button', { name: /Schedule/i })).toBeVisible();
   });
 
+  test('Test 13b: calendar drag selection creates and reschedules work', async ({ page }) => {
+    const title = `Drag Calendar ${unique()}`;
+    await page.goto('/calendar');
+    const slot = page.locator('[data-calendar-slot="true"]').first();
+    await expect(slot).toBeVisible();
+
+    const slotBox = await slot.boundingBox();
+    expect(slotBox).toBeTruthy();
+    await page.mouse.move(slotBox!.x + slotBox!.width / 2, slotBox!.y + 8);
+    await page.mouse.down();
+    await page.mouse.move(slotBox!.x + slotBox!.width / 2, slotBox!.y + 132, { steps: 4 });
+    await page.mouse.up();
+
+    await expect(page.getByRole('dialog', { name: 'Create calendar work block' })).toBeVisible();
+    await page.getByRole('button', { name: 'Plan work' }).click();
+    await page.getByLabel('Title').fill(title);
+    await page.getByRole('button', { name: 'Save scheduled work' }).click();
+    await expect(page.getByText(title).first()).toBeVisible();
+
+    const handle = page.getByRole('button', { name: new RegExp(`Drag to reschedule ${title}`) }).first();
+    const handleBox = await handle.boundingBox();
+    expect(handleBox).toBeTruthy();
+    await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + 110, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.getByRole('dialog', { name: 'Move scheduled work' })).toBeVisible();
+    await page.getByRole('button', { name: 'Move block' }).click();
+    await expect(page.getByText(title).first()).toBeVisible();
+  });
+
   test('Test 14: planner visualization renders', async ({ page }) => {
     await page.goto('/planner');
     await expect(page.getByRole('heading', { level: 1, name: 'Resource Planner' })).toBeVisible();
