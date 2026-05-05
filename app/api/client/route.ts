@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { projects, timeEntries, invoices } from "@/lib/db/schema";
-import { eq, and, ne, desc } from "drizzle-orm";
+import { auditLogs, projects, timeEntries, invoices } from "@/lib/db/schema";
+import { eq, and, ne, desc, inArray } from "drizzle-orm";
+import { buildInvoiceProofPack } from "@/lib/invoice-proof-pack";
 
 export async function GET() {
   try {
@@ -26,14 +27,34 @@ export async function GET() {
     });
 
     const workspaceInvoices = await db.select().from(invoices).where(eq(invoices.workspaceId, session.workspaceId)).orderBy(desc(invoices.createdAt));
+    const invoiceIds = workspaceInvoices.map((invoice) => invoice.id);
+    const signoffs = invoiceIds.length > 0
+      ? await db
+        .select()
+        .from(auditLogs)
+        .where(and(
+          eq(auditLogs.workspaceId, session.workspaceId),
+          eq(auditLogs.eventType, "client_invoice_signed_off"),
+          inArray(auditLogs.timeEntryId, invoiceIds),
+        ))
+      : [];
+    const latestSignoffByInvoiceId = new Map<string, string>();
+    for (const signoff of signoffs) {
+      const current = latestSignoffByInvoiceId.get(signoff.timeEntryId);
+      const next = signoff.createdAt.toISOString();
+      if (!current || next > current) latestSignoffByInvoiceId.set(signoff.timeEntryId, next);
+    }
     
-    const mappedInvoices = workspaceInvoices.map(i => {
+    const mappedInvoices = await Promise.all(workspaceInvoices.map(async (i) => {
         const project = i.projectId ? workspaceProjects.find(p => p.id === i.projectId) : null;
+        const proof = await buildInvoiceProofPack(session.workspaceId, i.id);
         return {
             ...i,
-            projectName: project?.name || "General Workspace"
+            projectName: project?.name || "General Workspace",
+            digest: proof?.digest ?? null,
+            signedOffAt: latestSignoffByInvoiceId.get(i.id) ?? null,
         };
-    });
+    }));
 
     return NextResponse.json({ ok: true, projects: projectAggregates, invoices: mappedInvoices });
   } catch {

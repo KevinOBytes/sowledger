@@ -40,6 +40,9 @@ build.log
 # vercel
 .vercel
 
+# superpowers visual companion
+.superpowers/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   BarChart3,
-  CalendarClock,
   Check,
   Clock3,
   DatabaseZap,
@@ -60,103 +59,117 @@ type FeatureCard = {
 
 const FEATURE_CARDS: FeatureCard[] = [
   {
-    title: "Calendar-style planning",
-    description: "Schedule work like an event, then start a timer, reschedule, skip, or log the completed time later.",
-    icon: CalendarClock,
-    eyebrow: "Plan",
-  },
-  {
-    title: "Focused live timers",
-    description: "Keep one timer visually primary while concurrent timers stay visible and easy to stop.",
-    icon: Clock3,
-    eyebrow: "Track",
-  },
-  {
-    title: "Completed work logging",
-    description: "Add non-timer work from Dashboard, Calendar, Activity, and empty states without hunting for a form.",
-    icon: Check,
-    eyebrow: "Log",
-  },
-  {
-    title: "Operational analytics",
-    description: "See planned vs actual, timer vs completed work, billable output, utilization, and project distribution.",
-    icon: BarChart3,
-    eyebrow: "Review",
-  },
-  {
-    title: "Exports and invoices",
-    description: "Download CSV or complete JSON with digest headers, then turn approved time into invoice-ready records.",
+    title: "Invoice Proof Packs",
+    description: "Attach source mix, linked work, planned vs actual context, approvals, and digest-backed evidence to every invoice.",
     icon: FileDown,
-    eyebrow: "Output",
+    eyebrow: "Proof",
   },
   {
-    title: "API and webhooks",
-    description: "Use scoped API keys and webhooks to sync clients, projects, tags, schedule, time, analytics, and exports.",
+    title: "Retainer Leak Radar",
+    description: "Spot budget pressure, unbilled approved work, missing rates, and projects drifting below target before renewal pain.",
+    icon: BarChart3,
+    eyebrow: "Protect",
+  },
+  {
+    title: "Client Sign-Off Portal",
+    description: "Give clients an approval-ready view of invoice evidence without exposing internal workspace controls.",
+    icon: ShieldCheck,
+    eyebrow: "Approve",
+  },
+  {
+    title: "Missing Billable Recovery",
+    description: "Surface scheduled work without completed time, approved-but-uninvoiced entries, stale drafts, and manual gaps.",
+    icon: Clock3,
+    eyebrow: "Recover",
+  },
+  {
+    title: "Developer/Agency Integration Layer",
+    description: "Use scoped API keys, proof-pack endpoints, revenue intelligence, exports, and webhooks to sync trusted billing data.",
     icon: Webhook,
     eyebrow: "Integrate",
   },
 ];
 
-const WORKFLOW = ["Schedule work", "Track timers", "Log completed work", "Review analytics", "Invoice or export", "Sync by API"];
+const WORKFLOW = ["Plan work", "Track timers", "Log manual/calendar time", "Review revenue risk", "Approve and invoice", "Integrate by API"];
+
+const PROOF_SUMMARY: Array<[label: string, value: string, detail: string]> = [
+  ["Recovered billables", "$4,820", "Approved work not yet invoiced"],
+  ["Proof digest", "SHA-256", "Evidence packet integrity"],
+  ["Sign-off status", "Ready", "Client approval packet prepared"],
+];
 
 export default function MarketingPage() {
   return (
     <div className="relative overflow-hidden bg-[#f6f3ee] text-slate-950">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[-10%] top-0 h-96 w-96 rounded-full bg-cyan-200/50 blur-[90px]" />
-        <div className="absolute right-[-12%] top-[18rem] h-[30rem] w-[30rem] rounded-full bg-amber-100/70 blur-[110px]" />
-        <div className="absolute inset-x-0 top-0 h-[42rem] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_62%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(246,243,238,0)_38%),linear-gradient(90deg,rgba(8,145,178,0.08)_1px,transparent_1px),linear-gradient(180deg,rgba(8,145,178,0.06)_1px,transparent_1px)] bg-[length:100%_100%,72px_72px,72px_72px]" />
+
+      <div className="relative border-b border-stone-200/80 bg-white/60 px-6 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 sm:justify-between">
+          <span>Billabled</span>
+          <span className="text-cyan-800">Proof-backed billing for service teams</span>
+        </div>
       </div>
 
-      <section className="relative px-6 pb-20 pt-32 sm:pt-40">
+      <section className="relative px-6 pb-20 pt-24 sm:pb-24 sm:pt-32">
         <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <motion.div initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.55 }}>
             <div className="inline-flex rounded-full border border-cyan-200 bg-white/80 px-4 py-1.5 text-sm font-bold text-cyan-800 shadow-sm">
-              Flat workspace pricing for operators
+              Competitive proof platform for agencies and operators
             </div>
-            <h1 className="mt-6 max-w-4xl text-5xl font-semibold tracking-tight text-slate-950 sm:text-7xl lg:text-8xl">
-              Plan the work. Prove every billable hour.
+            <h1 className="mt-6 max-w-4xl text-5xl font-semibold tracking-tight text-slate-950 sm:text-6xl lg:text-7xl">
+              Recover revenue. Prove every invoice.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
-              Billabled gives service teams one clean path from scheduled work to live timers, completed work logs, analytics, invoices, exports, and API integrations.
+              Billabled turns planning, timers, manual work, calendar logs, analytics, invoices, exports, and APIs into one defensible billing system for teams that cannot afford commodity time tracking.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/login" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-7 py-4 text-base font-bold text-white shadow-sm transition hover:bg-slate-800">
-                Start free
+                Start recovering time
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link href="#workflow" className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-7 py-4 text-base font-bold text-slate-800 shadow-sm transition hover:border-cyan-200 hover:text-cyan-700">
-                See workflow
+                See proof workflow
               </Link>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-slate-600">
-              <span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-cyan-700" />No per-seat surprise</span>
-              <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-cyan-700" />Scoped API keys</span>
-              <span className="inline-flex items-center gap-2"><DatabaseZap className="h-4 w-4 text-cyan-700" />Complete exports</span>
+              <span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-cyan-700" />Flat workspace pricing</span>
+              <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-cyan-700" />Client-ready evidence</span>
+              <span className="inline-flex items-center gap-2"><DatabaseZap className="h-4 w-4 text-cyan-700" />Digest-backed exports</span>
             </div>
           </motion.div>
 
-          <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.65, delay: 0.1 }} className="rounded-[40px] border border-stone-200 bg-white/90 p-5 shadow-2xl shadow-stone-900/10 backdrop-blur">
-            <div className="rounded-[32px] bg-slate-950 p-5 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-300">Today</p>
-                  <h2 className="mt-2 text-2xl font-semibold">Client delivery sprint</h2>
+          <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.65, delay: 0.1 }} className="rounded-[32px] border border-stone-200 bg-white p-5 shadow-xl shadow-stone-900/10">
+            <div className="flex items-start justify-between gap-4 border-b border-stone-100 pb-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-700">Invoice proof pack</p>
+                <h2 className="mt-2 text-2xl font-semibold">Acme May delivery</h2>
+                <p className="mt-1 text-sm text-slate-500">Evidence packet ready for client sign-off</p>
+              </div>
+              <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-800">Ready</span>
+            </div>
+            <div className="divide-y divide-stone-100">
+              {PROOF_SUMMARY.map(([label, value, detail]) => (
+                <div key={label} className="grid gap-3 py-5 sm:grid-cols-[0.9fr_0.55fr_1fr] sm:items-center">
+                  <p className="text-sm font-bold text-slate-700">{label}</p>
+                  <p className="text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+                  <p className="text-sm leading-6 text-slate-500">{detail}</p>
                 </div>
-                <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200">Timer running</span>
-              </div>
-              <div className="mt-7 rounded-[28px] bg-white/10 p-5">
-                <p className="text-sm text-slate-300">Focused timer</p>
-                <p className="mt-2 font-mono text-5xl font-semibold">01:24:18</p>
-                <p className="mt-3 text-sm text-slate-300">Proposal review · Acme onboarding</p>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {WORKFLOW.slice(0, 4).map((item, index) => (
-                  <div key={item} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-xs font-bold text-cyan-200">0{index + 1}</p>
-                    <p className="mt-1 text-sm font-semibold">{item}</p>
-                  </div>
-                ))}
+              ))}
+            </div>
+            <div className="mt-2 rounded-3xl border border-cyan-100 bg-cyan-50/70 p-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-cyan-800">Source mix</p>
+                  <p className="mt-2 text-sm text-slate-600">Timer, manual, and calendar logs reconciled.</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-cyan-800">Leak radar</p>
+                  <p className="mt-2 text-sm text-slate-600">Retainer risk and missed work called out.</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-cyan-800">Agency API</p>
+                  <p className="mt-2 text-sm text-slate-600">Proof and intelligence available by scope.</p>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -166,13 +179,13 @@ export default function MarketingPage() {
       <section id="workflow" className="relative px-6 py-20">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">One connected flow</p>
-            <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">Users should always know where they are.</h2>
-            <p className="mt-4 text-lg text-slate-600">Dashboard is for today. Calendar is for scheduling. Activity is for corrections. Analytics explains performance. Exports and invoices turn time into proof.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">One revenue recovery flow</p>
+            <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">The work path ends in proof, not a timesheet dump.</h2>
+            <p className="mt-4 text-lg leading-8 text-slate-600">Dashboard keeps today focused. Calendar captures planned work. Activity corrects the record. Analytics finds leakage. Invoices, exports, sign-off, and APIs make the bill defensible.</p>
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-3 lg:grid-cols-6">
             {WORKFLOW.map((step, index) => (
-              <div key={step} className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
+              <div key={step} className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
                 <p className="text-sm font-bold text-cyan-700">0{index + 1}</p>
                 <p className="mt-3 text-lg font-semibold">{step}</p>
               </div>
@@ -185,14 +198,14 @@ export default function MarketingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Product surfaces</p>
-              <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Clear jobs, visible next actions.</h2>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Competitive capabilities</p>
+              <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Built for proof, recovery, and trust.</h2>
             </div>
             <Link href="/support" className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-slate-800 shadow-sm hover:border-cyan-200 hover:text-cyan-700">
               Open support guide <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-5">
             {FEATURE_CARDS.map((feature, index) => {
               const Icon = feature.icon;
               return (
@@ -202,13 +215,13 @@ export default function MarketingPage() {
                   whileInView={{ y: 0, opacity: 1 }}
                   viewport={{ once: true, amount: 0.25 }}
                   transition={{ duration: 0.4, delay: index * 0.05 }}
-                  className="group rounded-[32px] border border-stone-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md"
+                  className="group rounded-3xl border border-stone-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md"
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="rounded-2xl bg-cyan-50 p-3 text-cyan-700"><Icon className="h-6 w-6" /></div>
-                    <span className="rounded-full border border-stone-200 px-3 py-1 text-xs font-bold uppercase tracking-wide text-stone-500">{feature.eyebrow}</span>
+                    <span className="rounded-full border border-stone-200 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-stone-500">{feature.eyebrow}</span>
                   </div>
-                  <h3 className="mt-5 text-2xl font-semibold">{feature.title}</h3>
+                  <h3 className="mt-5 text-xl font-semibold leading-tight">{feature.title}</h3>
                   <p className="mt-2 leading-7 text-slate-600">{feature.description}</p>
                 </motion.article>
               );
@@ -221,8 +234,8 @@ export default function MarketingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="mb-10 text-center">
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Pricing</p>
-            <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">Easy to approve. Useful on day one.</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">Flat monthly workspace pricing keeps the first paid step small while still creating revenue for TKOResearch.</p>
+            <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">Flat workspace pricing for proof-backed billing.</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">Start free, then move to fixed monthly workspace plans as recovery, sign-off, analytics, and integration needs grow.</p>
           </div>
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             {MARKETING_PLANS.map((plan, index) => (
@@ -259,9 +272,9 @@ export default function MarketingPage() {
       <section className="relative px-6 py-24">
         <div className="mx-auto flex max-w-5xl flex-col gap-5 rounded-[40px] border border-stone-200 bg-white p-8 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">Ready for a workspace?</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">Start with the first guided setup path.</h2>
-            <p className="mt-3 max-w-2xl text-slate-600">Create or join a workspace, schedule the first block, capture time, and export proof without needing a separate walkthrough.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">Ready to prove the bill?</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">Replace fragile timesheets with evidence clients can sign.</h2>
+            <p className="mt-3 max-w-2xl text-slate-600">Create a workspace, capture planned and completed work, recover missed billables, and turn approved time into proof-backed invoices.</p>
           </div>
           <Link href="/login" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-cyan-600 px-6 py-4 text-sm font-bold text-white transition hover:bg-cyan-500">
             Start free <ArrowRight className="h-4 w-4" />

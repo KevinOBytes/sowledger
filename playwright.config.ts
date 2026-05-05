@@ -23,7 +23,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'PORT=3008 npm run dev',
+    command: 'PORT=3008 npm run dev -- --webpack',
     url: 'http://localhost:3008',
     reuseExistingServer: !process.env.CI,
   },

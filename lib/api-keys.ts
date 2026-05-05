@@ -22,6 +22,8 @@ export const API_SCOPES = [
   "write:time",
   "read:analytics",
   "read:invoices",
+  "read:proof-packs",
+  "read:revenue-intelligence",
   "export:data",
 ] as const;
 

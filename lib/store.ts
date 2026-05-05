@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { users, workspaces, memberships, projects, goals, invitations, magicLinks, timeEntries, auditLogs, lockPeriods, userActions, projectTasks, notifications, invoices, webhooks, scheduledWorkBlocks, apiKeys, apiKeyRequests, organizations, workspacePeople } from "@/lib/db/schema";
 import { eq, and, gt, desc } from "drizzle-orm";
 
@@ -27,6 +28,7 @@ export type Organization = typeof organizations.$inferSelect;
 export type WorkspacePerson = typeof workspacePeople.$inferSelect;
 
 export async function ensureUser(email: string) {
+  await ensureWorkspaceSchema();
   const normalized = email.trim().toLowerCase();
   let [user] = await db.select().from(users).where(eq(users.email, normalized));
   if (user) return user;

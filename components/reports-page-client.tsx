@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -14,7 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CalendarIcon, DownloadIcon, LineChart, Timer, TrendingUp } from "lucide-react";
+import { AlertTriangle, CalendarIcon, DownloadIcon, LineChart, Search, Timer, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -36,6 +37,30 @@ type ReportData = {
   userDistribution: { userId: string; email: string; hours: number }[];
 };
 
+type IntelligenceItem = {
+  id?: string;
+  clientName?: string;
+  projectName?: string;
+  title?: string;
+  reason?: string;
+  notes?: string;
+  amount?: number;
+  amountAtRisk?: number;
+  leakAmount?: number;
+  recoverableAmount?: number;
+  plannedHours?: number;
+  actualHours?: number;
+  missingHours?: number;
+  hours?: number;
+};
+
+type RevenueIntelligenceData = {
+  ok: boolean;
+  summary?: Record<string, unknown>;
+  retainerRisks?: IntelligenceItem[];
+  recoveryOpportunities?: IntelligenceItem[];
+};
+
 const COLORS = ["#0891b2", "#0f766e", "#d97706", "#4f46e5", "#be123c", "#64748b"];
 
 function get30DaysAgo() {
@@ -48,8 +73,31 @@ function metric(value: number, suffix = "") {
   return `${value.toFixed(value >= 10 ? 0 : 1)}${suffix}`;
 }
 
+function money(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return `$${value.toFixed(value >= 100 ? 0 : 2)}`;
+}
+
+function itemAmount(item: IntelligenceItem, keys: (keyof IntelligenceItem)[]) {
+  for (const key of keys) {
+    const formatted = money(item[key] as number | undefined);
+    if (formatted) return formatted;
+  }
+  return null;
+}
+
+async function fetchJson<T>(url: string, fallbackMessage: string): Promise<T> {
+  const res = await fetch(url);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.ok === false) throw new Error(json.error || fallbackMessage);
+  return json as T;
+}
+
 export function ReportsPageClient() {
   const [data, setData] = useState<ReportData | null>(null);
+  const [intelligence, setIntelligence] = useState<RevenueIntelligenceData | null>(null);
+  const [intelligenceLoading, setIntelligenceLoading] = useState(false);
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"mine" | "team">("mine");
   const [startDate, setStartDate] = useState(get30DaysAgo());
@@ -58,19 +106,34 @@ export function ReportsPageClient() {
 
   async function fetchReports() {
     setLoading(true);
+    setIntelligenceLoading(true);
+    setIntelligenceError(null);
     try {
       const query = new URLSearchParams({ scope });
       if (startDate) query.append("start", startDate);
       if (endDate) query.append("end", endDate);
-      const res = await fetch(`/api/reports?${query.toString()}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Unable to load analytics");
-      setData(json);
-    } catch (error) {
-      if (scope === "team") setScope("mine");
-      toast.error("Analytics unavailable", { description: error instanceof Error ? error.message : "Unknown error" });
+      const queryString = query.toString();
+      const [reportResult, intelligenceResult] = await Promise.allSettled([
+        fetchJson<ReportData>(`/api/reports?${queryString}`, "Unable to load analytics"),
+        fetchJson<RevenueIntelligenceData>(`/api/revenue-intelligence?${queryString}`, "Unable to load revenue intelligence"),
+      ]);
+
+      if (reportResult.status === "fulfilled") {
+        setData(reportResult.value);
+      } else {
+        if (scope === "team") setScope("mine");
+        toast.error("Analytics unavailable", { description: reportResult.reason instanceof Error ? reportResult.reason.message : "Unknown error" });
+      }
+
+      if (intelligenceResult.status === "fulfilled") {
+        setIntelligence(intelligenceResult.value);
+      } else {
+        setIntelligence(null);
+        setIntelligenceError(intelligenceResult.reason instanceof Error ? intelligenceResult.reason.message : "Unable to load revenue intelligence");
+      }
     } finally {
       setLoading(false);
+      setIntelligenceLoading(false);
     }
   }
 
@@ -148,6 +211,12 @@ export function ReportsPageClient() {
           <div className="rounded-[32px] border border-slate-200 bg-white p-10 text-center text-rose-600 shadow-sm">Failed to load analytics.</div>
         ) : (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className={`space-y-6 transition-opacity ${loading ? "opacity-60" : "opacity-100"}`}>
+            <RevenueIntelligenceSection
+              intelligence={intelligence}
+              loading={intelligenceLoading}
+              error={intelligenceError}
+            />
+
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm font-semibold text-slate-500">Logged hours</p>
@@ -257,5 +326,111 @@ export function ReportsPageClient() {
       </div>
       <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} onSaved={fetchReports} />
     </main>
+  );
+}
+
+function RevenueIntelligenceSection({
+  intelligence,
+  loading,
+  error,
+}: {
+  intelligence: RevenueIntelligenceData | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const risks = intelligence?.retainerRisks || [];
+  const opportunities = intelligence?.recoveryOpportunities || [];
+
+  return (
+    <section className="grid gap-6 lg:grid-cols-2">
+      <IntelligencePanel
+        title="Retainer Leak Radar"
+        description="Spot retained work trending past plan before it leaks margin."
+        icon={<AlertTriangle className="h-5 w-5 text-amber-600" />}
+        items={risks}
+        empty="No retainer leaks detected for this range."
+        amountKeys={["amountAtRisk", "leakAmount", "amount"]}
+        loading={loading}
+        error={error}
+      />
+      <IntelligencePanel
+        title="Missing Billable Recovery"
+        description="Find completed work that looks recoverable but has not reached the billable pipeline."
+        icon={<Search className="h-5 w-5 text-cyan-700" />}
+        items={opportunities}
+        empty="No missing billable recovery opportunities found."
+        amountKeys={["recoverableAmount", "amount", "amountAtRisk"]}
+        loading={loading}
+        error={error}
+      />
+    </section>
+  );
+}
+
+function IntelligencePanel({
+  title,
+  description,
+  icon,
+  items,
+  empty,
+  amountKeys,
+  loading,
+  error,
+}: {
+  title: string;
+  description: string;
+  icon: ReactNode;
+  items: IntelligenceItem[];
+  empty: string;
+  amountKeys: (keyof IntelligenceItem)[];
+  loading: boolean;
+  error: string | null;
+}) {
+  return (
+    <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            {icon}
+            {title}
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">{description}</p>
+        </div>
+        {loading && <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-t-2 border-cyan-600" />}
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {error ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+            Revenue intelligence is unavailable: {error}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+            {empty}
+          </div>
+        ) : (
+          items.map((item, index) => {
+            const amount = itemAmount(item, amountKeys);
+            const label = item.title || item.projectName || item.clientName || `Signal ${index + 1}`;
+            const detail = item.reason || item.notes || "Review this billing signal before the next approval cycle.";
+            return (
+              <article key={item.id || `${label}-${index}`} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-950">{label}</h3>
+                    <p className="mt-1 text-sm text-slate-500">{detail}</p>
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      {metric(item.missingHours ?? item.hours ?? item.plannedHours ?? 0, "h")} flagged
+                      {item.actualHours != null ? ` / ${metric(item.actualHours, "h")} actual` : ""}
+                    </p>
+                  </div>
+                  {amount && <span className="shrink-0 rounded-full bg-white px-3 py-1 text-sm font-bold text-emerald-700">{amount}</span>}
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+    </div>
   );
 }

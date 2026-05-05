@@ -1,30 +1,38 @@
 import { test, expect } from '@playwright/test';
+import { gotoApp } from './helpers/navigation';
 
 test.describe('Unauthenticated Flows', () => {
   test('Test 1: marketing homepage loads with brand', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await gotoApp(page, '/');
+    await expect(page.getByRole('heading', { level: 1, name: 'Recover revenue. Prove every invoice.' })).toBeVisible();
+    await expect(page.getByText('Invoice Proof Packs')).toBeVisible();
+    await expect(page.getByText('Retainer Leak Radar')).toBeVisible();
+    await expect(page.getByText('Client Sign-Off Portal')).toBeVisible();
+    await expect(page.getByText('Missing Billable Recovery')).toBeVisible();
+    await expect(page.getByText('Developer/Agency Integration Layer')).toBeVisible();
     await expect(page.locator('a[href="/login"]').first()).toBeVisible();
   });
 
   test('Test 2: login page renders auth form', async ({ page }) => {
-    await page.goto('/login');
+    await gotoApp(page, '/login');
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
   });
 
   test('Test 3: unauthenticated request redirects to login', async ({ page }) => {
-    await page.goto('/dashboard');
+    await gotoApp(page, '/dashboard');
     await expect(page).toHaveURL(/.*\/login/);
   });
 
   test('Test 4: support and API docs are public', async ({ page }) => {
-    await page.goto('/support/api');
+    await gotoApp(page, '/support/api');
     await expect(page.getByRole('heading', { name: 'Build on Billabled.' })).toBeVisible();
     await expect(page.getByText(/oauth2-bearer/).first()).toBeVisible();
+    await expect(page.getByText('/api/v1/proof-packs?invoiceId=...')).toBeVisible();
+    await expect(page.getByText('/api/v1/revenue-intelligence').first()).toBeVisible();
 
     for (const path of ['/security', '/privacy', '/terms', '/billing-policy', '/contact']) {
-      await page.goto(path);
+      await gotoApp(page, path);
       await expect(page).not.toHaveURL(/.*\/login/);
     }
   });
@@ -42,11 +50,14 @@ test.describe('Unauthenticated Flows', () => {
 });
 
 test.describe('Authenticated Flows (Free Plan)', () => {
-  test.beforeEach(async ({ page }) => {
-    const res = await page.goto('/api/test/login?plan=free');
-    const data = await res?.json();
-    expect(data?.success).toBe(true);
-    await page.goto('/dashboard');
+  test.beforeEach(async ({ page }, testInfo) => {
+    const workspaceSlug = testInfo.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    const workspace = `free-e2e-${workspaceSlug}-${Date.now()}`;
+    const res = await page.request.get(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
+    expect(res.ok()).toBeTruthy();
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    await gotoApp(page, '/dashboard');
     await expect(page).toHaveURL(/.*\/dashboard/);
   });
 
@@ -61,35 +72,36 @@ test.describe('Authenticated Flows (Free Plan)', () => {
   });
 
   test('Test 7: billing settings shows plan and usage meters', async ({ page }) => {
-    await page.goto('/settings/billing');
+    await gotoApp(page, '/settings/billing');
     await expect(page.getByRole('heading', { name: 'Plans and subscription' })).toBeVisible();
     await expect(page.getByText('Workspace members')).toBeVisible();
     await expect(page.getByText('Active projects')).toBeVisible();
   });
 
   test('Test 8: invoices free plan paywall triggers', async ({ page }) => {
-    await page.goto('/invoices');
+    await gotoApp(page, '/invoices');
     await expect(page.locator('text=Invoicing is a Starter feature')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Move to Starter' })).toBeVisible();
   });
 
   test('Test 9: webhooks free plan paywall triggers', async ({ page }) => {
-    await page.goto('/settings/webhooks');
+    await gotoApp(page, '/settings/webhooks');
     await expect(page.getByText('Advanced integrations')).toBeVisible();
     await expect(page.getByRole('link', { name: /Move to Studio/i })).toBeVisible();
   });
 
   test('Test 10: global timer interface present', async ({ page }) => {
-    await page.goto('/dashboard');
+    await gotoApp(page, '/dashboard');
     await expect(page.getByRole('button', { name: 'Start timer', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Log completed work', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Schedule work/i }).first()).toBeVisible();
   });
 
   test('Test 10b: first setup repairs a workspace with no manager', async ({ page }) => {
-    const login = await page.goto('/api/test/login?plan=free&role=member&clean=true');
-    const loginData = await login?.json();
-    expect(loginData?.success).toBe(true);
+    const login = await page.request.get('/api/test/login?plan=free&role=member&clean=true');
+    expect(login.ok()).toBeTruthy();
+    const loginData = await login.json();
+    expect(loginData.success).toBe(true);
 
     const me = await page.request.get('/api/auth/me');
     expect(me.ok()).toBeTruthy();
@@ -104,9 +116,10 @@ test.describe('Authenticated Flows (Free Plan)', () => {
 
   test('Test 10c: internal accounts receive owner role and Business limits', async ({ page }) => {
     const workspace = `internal-e2e-${Date.now()}`;
-    const login = await page.goto(`/api/test/login?plan=free&role=member&email=kevin%40tkoresearch.com&workspace=${workspace}&clean=true`);
-    const loginData = await login?.json();
-    expect(loginData?.success).toBe(true);
+    const login = await page.request.get(`/api/test/login?plan=free&role=member&email=kevin%40tkoresearch.com&workspace=${workspace}&clean=true`);
+    expect(login.ok()).toBeTruthy();
+    const loginData = await login.json();
+    expect(loginData.success).toBe(true);
 
     const me = await page.request.get('/api/auth/me');
     expect(me.ok()).toBeTruthy();
@@ -124,11 +137,12 @@ test.describe('Authenticated Flows (Free Plan)', () => {
 
   test('Test 10d: first-run setup can be skipped and resumed', async ({ page }) => {
     const workspace = `onboarding-e2e-${Date.now()}`;
-    const login = await page.goto(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
-    const loginData = await login?.json();
-    expect(loginData?.success).toBe(true);
+    const login = await page.request.get(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
+    expect(login.ok()).toBeTruthy();
+    const loginData = await login.json();
+    expect(loginData.success).toBe(true);
 
-    await page.goto('/dashboard');
+    await gotoApp(page, '/dashboard');
     await expect(page.getByText('First login setup')).toBeVisible();
     await page.getByRole('button', { name: 'Skip for now' }).click();
     await expect(page.getByText('Setup hidden')).toBeVisible();

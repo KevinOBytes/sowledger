@@ -20,6 +20,8 @@ const API_SCOPES = [
   "write:time",
   "read:analytics",
   "read:invoices",
+  "read:proof-packs",
+  "read:revenue-intelligence",
   "export:data",
 ];
 
@@ -55,7 +57,7 @@ export default function DevelopersPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [usage, setUsage] = useState<Usage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("Production integration");
+  const [name, setName] = useState("Agency billing integration");
   const [expiresAt, setExpiresAt] = useState(defaultExpiry());
   const [selectedScopes, setSelectedScopes] = useState<string[]>(["read:clients", "read:projects", "read:time", "read:analytics", "export:data"]);
   const [rawKey, setRawKey] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export default function DevelopersPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to create key");
       setRawKey(data.rawKey);
-      setName("Production integration");
+      setName("Agency billing integration");
       await refresh();
       toast.success("API key created");
     } catch (error) {
@@ -159,8 +161,8 @@ export default function DevelopersPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Developers</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">API keys, usage, and docs</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Workspace managers can create scoped API keys for core Billabled data. Secrets are shown once, stored hashed, and usage is tracked per request.</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Agency integrations, API keys, usage, and docs</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Workspace managers can create scoped API keys for core Billabled data, invoice proof packs, revenue intelligence, and agency reporting systems. Secrets are shown once, stored hashed, and usage is tracked per request.</p>
             </div>
             <Link href="/support/api" className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700">
               API usage guide <ExternalLink className="h-4 w-4" />

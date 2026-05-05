@@ -17,10 +17,12 @@ import {
   workspaceTags,
 } from "@/lib/db/schema";
 import { createExportResponse, loadExportData } from "@/lib/export-data";
+import { buildInvoiceProofPack } from "@/lib/invoice-proof-pack";
+import { buildRevenueIntelligence } from "@/lib/revenue-intelligence";
 import { createTimeEntry } from "@/lib/security";
 import { normalizeTags } from "@/lib/validators";
 
-type Resource = "clients" | "projects" | "tags" | "tasks" | "schedule" | "time-entries" | "analytics" | "invoices" | "export";
+type Resource = "clients" | "projects" | "tags" | "tasks" | "schedule" | "time-entries" | "analytics" | "invoices" | "proof-packs" | "revenue-intelligence" | "export";
 type Ctx = { params: Promise<{ resource: string }> };
 type KanbanColumn = "todo" | "in_progress" | "review" | "done";
 
@@ -33,6 +35,8 @@ const READ_SCOPES: Record<Resource, ApiScope> = {
   "time-entries": "read:time",
   analytics: "read:analytics",
   invoices: "read:invoices",
+  "proof-packs": "read:proof-packs",
+  "revenue-intelligence": "read:revenue-intelligence",
   export: "export:data",
 };
 
@@ -46,7 +50,7 @@ const WRITE_SCOPES: Partial<Record<Resource, ApiScope>> = {
 };
 
 function normalizeResource(raw: string): Resource | null {
-  return (["clients", "projects", "tags", "tasks", "schedule", "time-entries", "analytics", "invoices", "export"] as Resource[]).includes(raw as Resource) ? raw as Resource : null;
+  return (["clients", "projects", "tags", "tasks", "schedule", "time-entries", "analytics", "invoices", "proof-packs", "revenue-intelligence", "export"] as Resource[]).includes(raw as Resource) ? raw as Resource : null;
 }
 
 function statusFrom(error: unknown) {
@@ -209,6 +213,25 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     if (resource === "invoices") {
       const rows = await db.select().from(invoices).where(eq(invoices.workspaceId, context.workspaceId)).orderBy(desc(invoices.createdAt));
       return NextResponse.json({ ok: true, invoices: rows });
+    }
+    if (resource === "proof-packs") {
+      const invoiceId = req.nextUrl.searchParams.get("invoiceId");
+      if (!invoiceId) return NextResponse.json({ error: "invoiceId is required" }, { status: 400 });
+      const result = await buildInvoiceProofPack(context.workspaceId, invoiceId);
+      if (!result) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+      return NextResponse.json(
+        { ok: true, proofPack: result.proofPack, digest: result.digest },
+        { headers: { "x-billabled-proof-sha256": result.digest } },
+      );
+    }
+    if (resource === "revenue-intelligence") {
+      const intelligence = await buildRevenueIntelligence(context.workspaceId, {
+        scope: "team",
+        projectId: req.nextUrl.searchParams.get("projectId"),
+        start: req.nextUrl.searchParams.get("start"),
+        end: req.nextUrl.searchParams.get("end"),
+      });
+      return NextResponse.json(intelligence);
     }
 
     const format = req.nextUrl.searchParams.get("format") === "json" ? "json" : "csv";

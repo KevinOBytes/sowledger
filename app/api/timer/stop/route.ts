@@ -3,7 +3,7 @@ import { requireSession, requireRole } from "@/lib/auth";
 import { appendAuditLog, createTimeEntry, enforceStopRateLimit, ensurePeriodUnlocked, fitTimeWindowSegmentsToDailyLimit, splitTimeWindowByUtcDay } from "@/lib/security";
 import { db } from "@/lib/db";
 import { scheduledWorkBlocks, timeEntries } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
           status: "completed",
           linkedTimeEntryId: entry.id,
           updatedAt: new Date(),
-        }).where(eq(scheduledWorkBlocks.id, entry.scheduledBlockId));
+        }).where(and(eq(scheduledWorkBlocks.id, entry.scheduledBlockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId), eq(scheduledWorkBlocks.userId, session.sub)));
       }
 
       await appendAuditLog({
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
         status: "completed",
         linkedTimeEntryId: entry.id,
         updatedAt: new Date(),
-      }).where(eq(scheduledWorkBlocks.id, entry.scheduledBlockId));
+      }).where(and(eq(scheduledWorkBlocks.id, entry.scheduledBlockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId), eq(scheduledWorkBlocks.userId, session.sub)));
     }
 
     await appendAuditLog({

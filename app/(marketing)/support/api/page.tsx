@@ -14,13 +14,15 @@ const ENDPOINTS = [
   ["POST", "/api/v1/time-entries", "Create completed work with write:time"],
   ["GET", "/api/v1/analytics", "Read analytics summaries"],
   ["GET", "/api/v1/invoices", "Read invoices"],
+  ["GET", "/api/v1/proof-packs?invoiceId=...", "Read digest-backed invoice proof packs with read:proof-packs"],
+  ["GET", "/api/v1/revenue-intelligence", "Read retainer risk and recovery summaries with read:revenue-intelligence"],
   ["GET", "/api/v1/export", "Download CSV or JSON exports with export:data"],
 ];
 
 const SCOPES = [
   "read:clients", "write:clients", "read:projects", "write:projects", "read:tags", "write:tags",
   "read:tasks", "write:tasks", "read:schedule", "write:schedule", "read:time", "write:time",
-  "read:analytics", "read:invoices", "export:data",
+  "read:analytics", "read:invoices", "read:proof-packs", "read:revenue-intelligence", "export:data",
 ];
 
 export const metadata = { title: "API Usage - Billabled Support" };
@@ -35,7 +37,7 @@ export default function ApiSupportPage() {
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">API usage</p>
               <h1 className="mt-4 text-5xl font-semibold tracking-tight sm:text-7xl">Build on Billabled.</h1>
-              <p className="mt-5 text-lg text-slate-600">Use scoped workspace API keys to read and write operational data without exposing billing, invites, or destructive admin actions.</p>
+              <p className="mt-5 text-lg text-slate-600">Use scoped workspace API keys to read and write operational data, pull invoice proof, and monitor revenue risk without exposing billing, invites, or destructive admin actions.</p>
             </div>
             <div className="rounded-[36px] border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-start gap-4">
@@ -68,6 +70,21 @@ curl https://your-domain.com/api/v1/projects \
   --oauth2-bearer "$BILLABLED_API_KEY"`}</code></pre>
             <pre className="overflow-x-auto rounded-3xl bg-slate-950 p-5 text-sm text-cyan-100"><code>{`export BILLABLED_API_KEY="blb_example_replace_me"
 curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
+  --oauth2-bearer "$BILLABLED_API_KEY"`}</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-6 py-8">
+        <div className="mx-auto max-w-6xl rounded-[36px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">Proof and revenue intelligence</h2></div>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Agency integrations can fetch invoice proof packs for client-facing evidence and revenue intelligence for retainer leak, missing billable, and recovery workflows. Proof-pack responses are designed for digest-backed invoice support; exports continue to include the <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">x-billabled-export-sha256</code> integrity header.</p>
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <pre className="overflow-x-auto rounded-3xl bg-slate-950 p-5 text-sm text-cyan-100"><code>{`export BILLABLED_API_KEY="blb_example_replace_me"
+curl "https://your-domain.com/api/v1/proof-packs?invoiceId=inv_123" \
+  --oauth2-bearer "$BILLABLED_API_KEY"`}</code></pre>
+            <pre className="overflow-x-auto rounded-3xl bg-slate-950 p-5 text-sm text-cyan-100"><code>{`export BILLABLED_API_KEY="blb_example_replace_me"
+curl "https://your-domain.com/api/v1/revenue-intelligence" \
   --oauth2-bearer "$BILLABLED_API_KEY"`}</code></pre>
           </div>
         </div>
