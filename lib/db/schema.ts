@@ -6,6 +6,7 @@ export const users = pgTable("users", {
   displayName: varchar("display_name", { length: 255 }),
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   preferredTags: jsonb("preferred_tags").$type<string[]>().default([]).notNull(),
+  calendarPreferences: jsonb("calendar_preferences").$type<{ visibleStartHour?: number; visibleEndHour?: number }>().default({}).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

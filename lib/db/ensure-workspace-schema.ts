@@ -174,6 +174,7 @@ async function runSchemaEnsure() {
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'active'`);
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS percent_complete real NOT NULL DEFAULT 0`);
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`);
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_preferences jsonb DEFAULT '{}'::jsonb NOT NULL`);
 
   await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS scheduled_block_id varchar(255)`);
   await db.execute(sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS client_id varchar(255)`);

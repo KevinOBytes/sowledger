@@ -9,6 +9,12 @@ import { normalizeTags } from "@/lib/validators";
 
 type ScheduleStatus = "planned" | "in_progress" | "completed" | "skipped" | "canceled";
 
+const SCHEDULE_STATUSES: ScheduleStatus[] = ["planned", "in_progress", "completed", "skipped", "canceled"];
+
+function isScheduleStatus(value: unknown): value is ScheduleStatus {
+  return typeof value === "string" && SCHEDULE_STATUSES.includes(value as ScheduleStatus);
+}
+
 function statusFrom(error: unknown) {
   const err = error as { status?: number; statusCode?: number };
   return err.status ?? err.statusCode ?? 500;
@@ -59,7 +65,7 @@ export async function GET(req: NextRequest) {
       conditions.push(eq(scheduledWorkBlocks.userId, session.sub));
     }
     if (projectId) conditions.push(eq(scheduledWorkBlocks.projectId, projectId));
-    if (status && ["planned", "in_progress", "completed", "skipped", "canceled"].includes(status)) conditions.push(eq(scheduledWorkBlocks.status, status));
+    if (status && isScheduleStatus(status)) conditions.push(eq(scheduledWorkBlocks.status, status));
     if (start) conditions.push(gte(scheduledWorkBlocks.startsAt, new Date(start)));
     if (end) conditions.push(lte(scheduledWorkBlocks.startsAt, new Date(end)));
 
@@ -171,7 +177,10 @@ export async function PATCH(req: NextRequest) {
     if (body.notes !== undefined) updates.notes = body.notes;
     if (body.tags !== undefined) updates.tags = normalizeTags(body.tags);
     if (body.linkedTimeEntryId !== undefined) updates.linkedTimeEntryId = body.linkedTimeEntryId;
-    if (body.status !== undefined) updates.status = body.status;
+    if (body.status !== undefined) {
+      if (!isScheduleStatus(body.status)) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      updates.status = body.status;
+    }
 
     const startForCheck = updates.startsAt ?? existing.startsAt;
     const endForCheck = updates.endsAt ?? existing.endsAt;

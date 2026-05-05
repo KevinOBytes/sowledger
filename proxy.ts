@@ -5,6 +5,12 @@ const AUTH_COOKIE_NAME = "billabled_session";
 const PUBLIC_PREFIXES = [
   "/login",
   "/support",
+  "/security",
+  "/privacy",
+  "/terms",
+  "/billing-policy",
+  "/contact",
+  "/monitoring",
   "/logo.png",
   "/manifest.webmanifest",
   "/api/auth/",
@@ -45,10 +51,13 @@ function addSecurityHeaders(response: NextResponse) {
 }
 
 function clientIdentifier(req: NextRequest) {
-  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const realIp = req.headers.get("x-real-ip")?.trim();
   const sessionPrefix = req.cookies.get(AUTH_COOKIE_NAME)?.value?.slice(0, 18);
-  return forwardedFor || realIp || sessionPrefix || "anonymous";
+  if (sessionPrefix) return `session:${sessionPrefix}`;
+
+  const vercelForwardedFor = req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+  const realIp = req.headers.get("x-real-ip")?.trim();
+  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return vercelForwardedFor || realIp || forwardedFor || "anonymous";
 }
 
 async function incrementWithUpstash(key: string, windowSeconds: number) {

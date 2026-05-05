@@ -22,6 +22,8 @@ export const API_SCOPES = [
   "write:time",
   "read:analytics",
   "read:invoices",
+  "read:proof-packs",
+  "read:revenue-intelligence",
   "export:data",
 ] as const;
 
@@ -102,7 +104,11 @@ export function requireApiScope(context: ApiKeyContext, scope: ApiScope) {
 }
 
 function safeIpHash(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "";
+  const ip =
+    req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "";
   if (!ip) return null;
   return createHash("sha256").update(ip).digest("hex");
 }

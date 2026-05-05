@@ -4,7 +4,7 @@ import { createTimeEntry } from "@/lib/security";
 import { db } from "@/lib/db";
 import { projects, goals, userActions, scheduledWorkBlocks } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         status: "in_progress",
         linkedTimeEntryId: entry.id,
         updatedAt: new Date(),
-      }).where(eq(scheduledWorkBlocks.id, body.scheduledBlockId));
+      }).where(and(eq(scheduledWorkBlocks.id, body.scheduledBlockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId), eq(scheduledWorkBlocks.userId, session.sub)));
     }
 
     return NextResponse.json({ ok: true, entry });

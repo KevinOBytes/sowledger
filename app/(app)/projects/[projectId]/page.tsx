@@ -1,7 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { projects as projectsTable } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { KanbanBoard } from "@/components/kanban-board";
 import { ActivityFeed } from "@/components/activity-feed";
@@ -12,8 +12,9 @@ import Link from "next/link";
 import { ChevronLeft, Activity, LayoutDashboard, Archive, LayoutList } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ projectId: string }> }) {
+  const session = await requireSession();
   const { projectId } = await params;
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.workspaceId, session.workspaceId)));
   return { title: project ? `${project.name} Workspace – Billabled` : "Workspace – Billabled" };
 }
 
@@ -28,7 +29,7 @@ export default async function ProjectBoardPage({
   const { projectId } = await params;
   const { tab = "board" } = await searchParams;
   
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.workspaceId, session.workspaceId)));
   if (!project || project.workspaceId !== session.workspaceId) {
     redirect("/projects");
   }

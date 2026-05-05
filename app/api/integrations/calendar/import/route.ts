@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { createTimeEntry } from "@/lib/security";
 import { db } from "@/lib/db";
-import { projects, goals } from "@/lib/db/schema";
+import { goals, memberships, projects } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
@@ -23,18 +23,25 @@ export async function POST(req: NextRequest) {
     };
 
     if (body.projectId) {
-      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
-      if (!project || project.workspaceId !== session.workspaceId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
+      if (!project) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
     }
 
     if (body.goalId) {
-      const [goal] = await db.select().from(goals).where(eq(goals.id, body.goalId));
-      if (!goal || goal.workspaceId !== session.workspaceId) {
+      const [goal] = await db.select().from(goals).where(and(eq(goals.id, body.goalId), eq(goals.workspaceId, session.workspaceId)));
+      if (!goal) {
         return NextResponse.json({ error: "Invalid goalId" }, { status: 400 });
       }
     }
+
+    const assigneeUserId = body.assigneeUserId ?? session.sub;
+    const [assignee] = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(and(eq(memberships.workspaceId, session.workspaceId), eq(memberships.userId, assigneeUserId)));
+    if (!assignee) return NextResponse.json({ error: "Invalid assigneeUserId" }, { status: 400 });
 
     const importedIds: string[] = [];
     for (const event of body.events ?? []) {
@@ -44,7 +51,7 @@ export async function POST(req: NextRequest) {
 
       const draft = await createTimeEntry({
         workspaceId: session.workspaceId,
-        userId: body.assigneeUserId ?? session.sub,
+        userId: assigneeUserId,
         taskId: `calendar:${event.id}`,
         projectId: body.projectId || null,
         goalId: body.goalId || null,

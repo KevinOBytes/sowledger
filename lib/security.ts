@@ -1,4 +1,6 @@
 import { createHmac } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { NextRequest } from "next/server";
 import { env } from "./env";
 import { UnauthorizedError } from "./auth";
@@ -7,6 +9,71 @@ import { webhooks, lockPeriods, timeEntries, auditLogs } from "./db/schema";
 import { eq, and, gte, lt, ne, sql, isNotNull } from "drizzle-orm";
 
 const timerStopCounters = new Map<string, { windowStart: number; count: number }>();
+const BLOCKED_WEBHOOK_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "::"]);
+
+function isPrivateIPv4(hostname: string) {
+  const parts = hostname.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [a, b] = parts;
+  return a === 10
+    || a === 127
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168);
+}
+
+function isPrivateIPv6(hostname: string) {
+  const host = hostname.toLowerCase();
+  if (host === "::" || host === "::1") return true;
+  if (host.startsWith("fe80:")) return true;
+  if (/^f[cd][0-9a-f]{2}:/i.test(host)) return true;
+  if (host.startsWith("::ffff:")) {
+    const mapped = host.slice("::ffff:".length);
+    return isPrivateIPv4(mapped);
+  }
+  return false;
+}
+
+function normalizeHostname(hostname: string) {
+  return hostname.replace(/^\[|\]$/g, "").toLowerCase();
+}
+
+function isBlockedWebhookHost(hostname: string) {
+  const host = normalizeHostname(hostname);
+  const ipVersion = isIP(host);
+  return BLOCKED_WEBHOOK_HOSTS.has(host)
+    || host.endsWith(".localhost")
+    || host.endsWith(".local")
+    || (ipVersion === 4 && isPrivateIPv4(host))
+    || (ipVersion === 6 && isPrivateIPv6(host));
+}
+
+export async function validateWebhookUrl(rawUrl: string) {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error("A valid HTTPS URL is required.");
+  }
+
+  const hostname = normalizeHostname(url.hostname);
+  if (
+    url.protocol !== "https:"
+    || Boolean(url.username || url.password)
+    || isBlockedWebhookHost(hostname)
+  ) {
+    throw new Error("Webhook URL must be a public HTTPS endpoint.");
+  }
+
+  if (!isIP(hostname)) {
+    const resolved = await lookup(hostname, { all: true, verbatim: true });
+    if (resolved.length === 0 || resolved.some((record) => isBlockedWebhookHost(record.address))) {
+      throw new Error("Webhook URL must resolve to a public address.");
+    }
+  }
+
+  return url.toString();
+}
 
 export async function dispatchWebhook(workspaceId: string, eventType: string, payload: unknown) {
   const hooks = await db.select().from(webhooks).where(eq(webhooks.workspaceId, workspaceId));
@@ -17,9 +84,13 @@ export async function dispatchWebhook(workspaceId: string, eventType: string, pa
   if (activeHooks.length === 0) return;
 
   for (const hook of activeHooks) {
+    const url = await validateWebhookUrl(hook.url).catch(() => null);
+    if (!url) continue;
+
     // Fire-and-forget
-    fetch(hook.url, {
+    fetch(url, {
       method: "POST",
+      redirect: "error",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event: eventType, data: payload, timestamp: new Date().toISOString() }),
     }).catch((e) => console.error("Webhook failed:", e));

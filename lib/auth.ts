@@ -13,7 +13,7 @@ import {
 } from "./store";
 import { db } from "./db";
 import { users, memberships, workspaces, magicLinks, invitations } from "./db/schema";
-import { eq, and } from "drizzle-orm";
+import { desc, eq, and, gt, isNull } from "drizzle-orm";
 
 export class UnauthorizedError extends Error {
   readonly status = 401;
@@ -127,6 +127,21 @@ export async function createMagicLink(email: string) {
     if (mems.length > 0) {
        const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, mems[0].workspaceId));
        if (ws) resolvedSlug = ws.slug;
+    }
+  }
+
+  // Invited users may not have an account yet, so resolve their magic link
+  // into the inviting workspace instead of creating a personal workspace slug.
+  if (!resolvedSlug) {
+    const [pendingInvite] = await db
+      .select({ workspaceSlug: workspaces.slug })
+      .from(invitations)
+      .innerJoin(workspaces, eq(invitations.workspaceId, workspaces.id))
+      .where(and(eq(invitations.email, normEmail), gt(invitations.expiresAt, Date.now()), isNull(invitations.acceptedAt)))
+      .orderBy(desc(invitations.expiresAt));
+
+    if (pendingInvite) {
+      resolvedSlug = pendingInvite.workspaceSlug;
     }
   }
   
