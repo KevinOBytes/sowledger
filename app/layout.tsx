@@ -3,10 +3,36 @@ import DatadogInit from "@/components/DatadogInit";
 import { Toaster } from "sonner";
 import "./globals.css";
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.billabled.com";
+const metadataTitle = "Billabled Workforce Intelligence";
+const metadataDescription = "Recover revenue and prove every invoice with proof-backed time tracking, retainer leak radar, client sign-off, and agency APIs.";
+
 export const metadata: Metadata = {
-  title: "Billabled Workforce Intelligence",
-  description: "Compliance-first time tracking with auditability and local-first resilience",
+  metadataBase: new URL(appUrl),
+  title: metadataTitle,
+  description: metadataDescription,
   manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: metadataTitle,
+    description: metadataDescription,
+    url: "/",
+    siteName: "Billabled",
+    images: [
+      {
+        url: "/images/marketing/billabled-og.png",
+        width: 1200,
+        height: 630,
+        alt: "Billabled proof-backed billing preview.",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: metadataTitle,
+    description: metadataDescription,
+    images: ["/images/marketing/billabled-og.png"],
+  },
   appleWebApp: {
     capable: true,
     title: "Billabled",

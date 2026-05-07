@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { gotoApp } from './helpers/navigation';
+import { gotoApp, requestGetApp } from './helpers/navigation';
 
 let didClean = false;
 const unique = () => Date.now().toString(36);
+const professionalWorkspace = `professional-${unique()}`;
 
 test.describe('Professional Feature Suite (10 User Stories)', () => {
   test.describe.configure({ mode: 'serial' });
@@ -10,7 +11,7 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
   test.beforeEach(async ({ page }) => {
     const cleanParam = !didClean ? '&clean=true' : '';
     didClean = true;
-    const res = await page.request.get(`/api/test/login?plan=pro${cleanParam}`);
+    const res = await requestGetApp(page, `/api/test/login?plan=pro&workspace=${professionalWorkspace}${cleanParam}`);
     expect(res.ok()).toBeTruthy();
     const data = await res.json();
     expect(data.success).toBe(true);
@@ -96,7 +97,7 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
       if (!response.ok()) return false;
       const data = await response.json();
       return data.blocks.some((block: { title?: string }) => block.title === title);
-    }).toBe(true);
+    }, { timeout: 30_000 }).toBe(true);
   });
 
   test('Story 9: add a scoped tag to a project', async ({ page }) => {

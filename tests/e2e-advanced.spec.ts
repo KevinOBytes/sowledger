@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoApp } from './helpers/navigation';
+import { gotoApp, requestGetApp } from './helpers/navigation';
 
 const unique = () => Date.now().toString(36);
 
@@ -8,7 +8,7 @@ test.describe('Deep Authenticated Workflows', () => {
 
   test.beforeEach(async ({ page }) => {
     const workspace = `advanced-${unique()}`;
-    const res = await page.request.get(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
+    const res = await requestGetApp(page, `/api/test/login?plan=free&workspace=${workspace}&clean=true`);
     expect(res.ok()).toBeTruthy();
     const data = await res.json();
     expect(data.success).toBe(true);
@@ -104,7 +104,7 @@ test.describe('Deep Authenticated Workflows', () => {
   });
 
   test('Test 18: Studio plan accesses invoices properly', async ({ page }) => {
-    const login = await page.request.get('/api/test/login?plan=smb');
+    const login = await requestGetApp(page, '/api/test/login?plan=smb');
     expect(login.ok()).toBeTruthy();
     await gotoApp(page, '/invoices');
     await expect(page.locator('text=Approved Billables Pipeline')).toBeVisible();
@@ -130,7 +130,7 @@ test.describe('Deep Authenticated Workflows', () => {
   });
 
   test('Test 21: integration endpoints reject unsafe cross-boundary input', async ({ page }) => {
-    const login = await page.request.get('/api/test/login?plan=smb');
+    const login = await requestGetApp(page, '/api/test/login?plan=smb');
     expect(login.ok()).toBeTruthy();
 
     const unsafeWebhook = await page.request.post('/api/webhooks', {
@@ -155,11 +155,11 @@ test.describe('Deep Authenticated Workflows', () => {
 
   test('Test 22: managers cannot promote other members to elevated roles', async ({ page }) => {
     const workspace = `rbac-${unique()}`;
-    const ownerLogin = await page.request.get(`/api/test/login?plan=smb&role=owner&email=owner-${workspace}%40example.com&workspace=${workspace}&clean=true`);
+    const ownerLogin = await requestGetApp(page, `/api/test/login?plan=smb&role=owner&email=owner-${workspace}%40example.com&workspace=${workspace}&clean=true`);
     expect(ownerLogin.ok()).toBeTruthy();
-    const memberLogin = await page.request.get(`/api/test/login?plan=smb&role=member&email=member-${workspace}%40example.com&workspace=${workspace}`);
+    const memberLogin = await requestGetApp(page, `/api/test/login?plan=smb&role=member&email=member-${workspace}%40example.com&workspace=${workspace}`);
     expect(memberLogin.ok()).toBeTruthy();
-    const managerLogin = await page.request.get(`/api/test/login?plan=smb&role=manager&email=manager-${workspace}%40example.com&workspace=${workspace}`);
+    const managerLogin = await requestGetApp(page, `/api/test/login?plan=smb&role=manager&email=manager-${workspace}%40example.com&workspace=${workspace}`);
     expect(managerLogin.ok()).toBeTruthy();
 
     const people = await page.request.get('/api/people');

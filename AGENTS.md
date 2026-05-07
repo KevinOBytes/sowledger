@@ -31,6 +31,17 @@ Preserve these first-class surfaces:
 - Mobile must support basic timer, manual logging, calendar, activity, analytics, exports, and settings navigation.
 - Avoid introducing a separate dark-dashboard design unless the whole app is intentionally being redesigned.
 
+## Figma Design System Rules
+- Start Figma implementation work by reading the target node with `get_design_context`; use `get_screenshot` and `get_metadata` only to resolve layout, token, or asset ambiguity.
+- Treat Figma output as a reference, not final code. Adapt generated React/Tailwind to this Next.js App Router codebase, existing page structure, local helpers, and Billabled product vocabulary.
+- Use Tailwind v4 utilities and the CSS variables in `app/globals.css` for core colors, fonts, surfaces, and accents. Add or adjust tokens there before scattering raw hex values through components.
+- Keep the Billabled visual system coherent: warm background, white/surface panels, slate copy, cyan accents, restrained shadows, rounded operational cards, and dense scannable SaaS layouts.
+- Reuse `lucide-react` for icons and existing dependencies for motion, charts, and UI behavior. Do not add a new visual library for a Figma handoff unless the design cannot be represented with current tooling.
+- Place durable marketing imagery under `public/images/marketing/`; use `next/image` with explicit dimensions, useful `sizes`, accessible alt text, and eager/high priority only for above-the-fold images.
+- Preserve product/security boundaries when translating designs: no secret values in client surfaces, no unscoped workspace data, no billing/admin mutations in public API v1, and Stripe checkout still accepts internal plan IDs only.
+- For marketing redesigns, keep the first screen focused on proof-backed billing and connect the visible story to the actual workflow: plan, track, log, review, approve/invoice/export, integrate by API.
+- Update focused Playwright coverage when Figma-driven changes alter homepage copy, public navigation, screenshots, responsive visibility, or primary calls to action.
+
 ## Security Rules
 - Treat workspace isolation as mandatory. Every query and mutation must be scoped by `workspaceId` unless a proven global resource is being accessed.
 - API keys must be shown once, stored hashed, scoped, revocable, expirable, and usage-tracked.

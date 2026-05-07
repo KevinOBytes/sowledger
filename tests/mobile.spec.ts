@@ -1,10 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { gotoApp } from './helpers/navigation';
+import { gotoApp, requestGetApp } from './helpers/navigation';
 
 test.describe('Mobile Web Support', () => {
   test('iPhone viewport supports public pages, auth, and core bottom navigation', async ({ page }) => {
     await gotoApp(page, '/');
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Recover revenue. Prove every invoice.' })).toBeVisible();
+    await expect(page.getByLabel('Billabled capability navigation')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Invoice Proof Packs', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Retainer Leak Radar', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Client Sign-Off Portal', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Missing Billable Recovery', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Developer/Agency Integration Layer', exact: true })).toBeVisible();
+    await expect(page.getByRole('img', { name: /Billabled invoice proof pack screenshot/i }).first()).toBeVisible();
 
     const manifest = await page.request.get('/manifest.webmanifest');
     expect(manifest.ok()).toBeTruthy();
@@ -15,7 +22,7 @@ test.describe('Mobile Web Support', () => {
     await expect(page.locator('button[type="submit"]')).toBeVisible();
 
     const workspace = `mobile-e2e-${Date.now()}`;
-    const login = await page.request.get(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
+    const login = await requestGetApp(page, `/api/test/login?plan=free&workspace=${workspace}&clean=true`);
     expect(login.ok()).toBeTruthy();
     const loginData = await login.json();
     expect(loginData.success).toBe(true);

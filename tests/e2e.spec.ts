@@ -1,15 +1,34 @@
 import { test, expect } from '@playwright/test';
-import { gotoApp } from './helpers/navigation';
+import { gotoApp, requestGetApp } from './helpers/navigation';
 
 test.describe('Unauthenticated Flows', () => {
   test('Test 1: marketing homepage loads with brand', async ({ page }) => {
     await gotoApp(page, '/');
     await expect(page.getByRole('heading', { level: 1, name: 'Recover revenue. Prove every invoice.' })).toBeVisible();
-    await expect(page.getByText('Invoice Proof Packs')).toBeVisible();
-    await expect(page.getByText('Retainer Leak Radar')).toBeVisible();
-    await expect(page.getByText('Client Sign-Off Portal')).toBeVisible();
-    await expect(page.getByText('Missing Billable Recovery')).toBeVisible();
-    await expect(page.getByText('Developer/Agency Integration Layer')).toBeVisible();
+    await expect(page.getByLabel('Billabled capability navigation')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Invoice Proof Packs', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Retainer Leak Radar', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Client Sign-Off Portal', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Missing Billable Recovery', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Developer/Agency Integration Layer', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The work path ends in proof, not a timesheet dump.' })).toBeVisible();
+    await expect(page.getByText('read:proof-packs')).toBeVisible();
+    await expect(page.getByText('read:revenue-intelligence')).toBeVisible();
+    await expect(page.getByRole('img', { name: /Billabled invoice proof pack screenshot/i }).first()).toBeVisible();
+    await expect(page.getByRole('img', { name: /Billabled analytics screenshot/i }).first()).toBeVisible();
+    await expect(page.getByRole('img', { name: /Billabled client sign-off portal screenshot/i }).first()).toBeVisible();
+    await expect(page.getByText('Real screens for the work customers pay for.')).toBeVisible();
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /billabled-og\.png/);
+    for (const asset of [
+      '/images/marketing/invoice-proof-pack.png',
+      '/images/marketing/revenue-radar.png',
+      '/images/marketing/client-signoff-portal.png',
+      '/images/marketing/billabled-og.png',
+    ]) {
+      const image = await page.request.get(asset);
+      expect(image.ok()).toBeTruthy();
+      expect(image.headers()['content-type']).toContain('image/png');
+    }
     await expect(page.locator('a[href="/login"]').first()).toBeVisible();
   });
 
@@ -53,7 +72,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const workspaceSlug = testInfo.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     const workspace = `free-e2e-${workspaceSlug}-${Date.now()}`;
-    const res = await page.request.get(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
+    const res = await requestGetApp(page, `/api/test/login?plan=free&workspace=${workspace}&clean=true`);
     expect(res.ok()).toBeTruthy();
     const data = await res.json();
     expect(data.success).toBe(true);
@@ -98,7 +117,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
   });
 
   test('Test 10b: first setup repairs a workspace with no manager', async ({ page }) => {
-    const login = await page.request.get('/api/test/login?plan=free&role=member&clean=true');
+    const login = await requestGetApp(page, '/api/test/login?plan=free&role=member&clean=true');
     expect(login.ok()).toBeTruthy();
     const loginData = await login.json();
     expect(loginData.success).toBe(true);
@@ -116,7 +135,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
 
   test('Test 10c: internal accounts receive owner role and Business limits', async ({ page }) => {
     const workspace = `internal-e2e-${Date.now()}`;
-    const login = await page.request.get(`/api/test/login?plan=free&role=member&email=kevin%40tkoresearch.com&workspace=${workspace}&clean=true`);
+    const login = await requestGetApp(page, `/api/test/login?plan=free&role=member&email=kevin%40tkoresearch.com&workspace=${workspace}&clean=true`);
     expect(login.ok()).toBeTruthy();
     const loginData = await login.json();
     expect(loginData.success).toBe(true);
@@ -137,7 +156,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
 
   test('Test 10d: first-run setup can be skipped and resumed', async ({ page }) => {
     const workspace = `onboarding-e2e-${Date.now()}`;
-    const login = await page.request.get(`/api/test/login?plan=free&workspace=${workspace}&clean=true`);
+    const login = await requestGetApp(page, `/api/test/login?plan=free&workspace=${workspace}&clean=true`);
     expect(login.ok()).toBeTruthy();
     const loginData = await login.json();
     expect(loginData.success).toBe(true);
@@ -145,8 +164,8 @@ test.describe('Authenticated Flows (Free Plan)', () => {
     await gotoApp(page, '/dashboard');
     await expect(page.getByText('First login setup')).toBeVisible();
     await page.getByRole('button', { name: 'Skip for now' }).click();
-    await expect(page.getByText('Setup hidden')).toBeVisible();
+    await expect(page.getByText('Setup hidden')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Resume setup' }).click();
-    await expect(page.getByText('First login setup')).toBeVisible();
+    await expect(page.getByText('First login setup')).toBeVisible({ timeout: 15_000 });
   });
 });

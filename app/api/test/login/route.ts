@@ -29,11 +29,12 @@ export async function GET(request: Request) {
     await db.update(workspaces).set({ plan }).where(eq(workspaces.id, workspace.id));
     
     // Cleanup prior test state to prevent constraint errors and 402 limits
-    const { projects, projectTasks, timeEntries, goals, clients, workspaceTags } = await import("@/lib/db/schema");
+    const { projects, projectTasks, timeEntries, goals, clients, workspaceTags, scheduledWorkBlocks } = await import("@/lib/db/schema");
     
     if (searchParams.get("clean") === "true") {
       // Delete leaf nodes first to satisfy foreign key constraints
       await db.delete(timeEntries).where(eq(timeEntries.workspaceId, workspace.id));
+      await db.delete(scheduledWorkBlocks).where(eq(scheduledWorkBlocks.workspaceId, workspace.id));
       await db.delete(projectTasks).where(eq(projectTasks.workspaceId, workspace.id));
       await db.delete(goals).where(eq(goals.workspaceId, workspace.id));
       await db.delete(projects).where(eq(projects.workspaceId, workspace.id));

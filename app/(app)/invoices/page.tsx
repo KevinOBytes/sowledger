@@ -27,7 +27,11 @@ type BillableEntry = {
 
 type ProofPack = {
   invoice?: Partial<InvoiceRecord>;
-  totals?: Record<string, unknown>;
+  totals?: {
+    plannedSeconds?: number;
+    actualSeconds?: number;
+    auditEventCount?: number;
+  };
   sourceMix?: Record<string, unknown> | { source?: string; label?: string; seconds?: number; hours?: number; count?: number }[];
   entries?: unknown[];
   plannedSeconds?: number;
@@ -294,6 +298,8 @@ function ProofPackSummary({ state }: { state: ProofPackState }) {
   const proofPack = state.proofPack || {};
   const invoiceNumber = proofPack.invoice?.number;
   const sourceMix = formatSourceMix(proofPack.sourceMix);
+  const plannedSeconds = proofPack.totals?.plannedSeconds ?? proofPack.plannedSeconds;
+  const actualSeconds = proofPack.totals?.actualSeconds ?? proofPack.actualSeconds;
   return (
     <div className="space-y-4">
       <div>
@@ -315,11 +321,11 @@ function ProofPackSummary({ state }: { state: ProofPackState }) {
         </div>
         <div className="rounded-2xl bg-white p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Planned</p>
-          <p className="mt-1 text-2xl font-semibold text-cyan-700">{formatHours(proofPack.plannedSeconds)}</p>
+          <p className="mt-1 text-2xl font-semibold text-cyan-700">{formatHours(plannedSeconds)}</p>
         </div>
         <div className="rounded-2xl bg-white p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Actual</p>
-          <p className="mt-1 text-2xl font-semibold text-emerald-700">{formatHours(proofPack.actualSeconds)}</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-700">{formatHours(actualSeconds)}</p>
         </div>
       </div>
 
