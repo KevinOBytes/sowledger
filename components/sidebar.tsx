@@ -16,6 +16,7 @@ import {
   FolderKanban,
   LayoutList,
   LogOut,
+  MoreHorizontal,
   Plus,
   Plug,
   Receipt,
@@ -24,6 +25,7 @@ import {
   UserRound,
   Users,
   Webhook,
+  X,
 } from "lucide-react";
 
 import { BILLABLED_WORKFLOW_STAGES } from "@/components/app-page-shell";
@@ -120,13 +122,28 @@ const mobileNav: NavItem[] = [
   { name: "Calendar", href: "/calendar", icon: CalendarDays },
   { name: "Activity", href: "/activity", icon: LayoutList },
   { name: "Analytics", href: "/reports", icon: BarChart3 },
-  { name: "More", href: "/settings", icon: Settings, prefix: "/settings", showBadge: true },
+  { name: "More", href: "#more", icon: MoreHorizontal, showBadge: true },
+];
+
+const mobileMoreItems: NavItem[] = [
+  { name: "Projects", description: "Tasks and billing context", href: "/projects", icon: FolderKanban },
+  { name: "Clients", description: "Client records", href: "/clients", icon: Building2 },
+  { name: "Planner", description: "Capacity and allocation", href: "/planner", icon: Users },
+  { name: "Approvals", description: "Approve or reject time", href: "/approvals", icon: CheckSquare },
+  { name: "Invoices", description: "Proof packs and billing", href: "/invoices", icon: Receipt },
+  { name: "Exports", description: "CSV and JSON output", href: "/exports", icon: FileDown },
+  { name: "People", description: "Members and contacts", href: "/people", icon: UserRound },
+  { name: "Integrations", description: "Calendar, Slack, accounting", href: "/integrations", icon: Plug },
+  { name: "Developers", description: "API keys and docs", href: "/settings/developers", icon: Code2 },
+  { name: "Billing", description: "Plan and subscription", href: "/settings/billing", icon: Receipt },
+  { name: "Settings", description: "Workspace defaults", href: "/settings", icon: Settings, exact: true },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   useEffect(() => {
     async function fetchNotifications() {
@@ -250,9 +267,28 @@ export function Sidebar() {
         aria-label="Mobile application navigation"
       >
         {mobileNav.map((item) => {
-          const isActive = routeIsActive(pathname, item);
+          const isMore = item.href === "#more";
+          const isActive = isMore ? mobileMoreOpen || mobileMoreItems.some((moreItem) => routeIsActive(pathname, moreItem)) : routeIsActive(pathname, item);
           const Icon = item.icon;
-          return (
+          return isMore ? (
+            <button
+              key={item.href}
+              type="button"
+              onClick={() => setMobileMoreOpen((open) => !open)}
+              aria-expanded={mobileMoreOpen}
+              aria-controls="mobile-more-hub"
+              aria-label={navItemLabel(item, unreadCount)}
+              className={`relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 transition ${
+                isActive ? "bg-[#163c36] text-white" : "text-stone-500 hover:text-[#17211d]"
+              }`}
+            >
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              <span className="max-w-full truncate text-[10px] font-semibold">{item.name}</span>
+              {item.showBadge && unreadCount > 0 && (
+                <span className="absolute right-2 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white shadow-sm ring-2 ring-white" />
+              )}
+            </button>
+          ) : (
             <Link
               key={item.href}
               href={item.href}
@@ -271,6 +307,49 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {mobileMoreOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm md:hidden" role="presentation" onClick={() => setMobileMoreOpen(false)}>
+          <section
+            id="mobile-more-hub"
+            role="dialog"
+            aria-modal="true"
+            aria-label="More Billabled navigation"
+            className="absolute inset-x-3 bottom-24 max-h-[72vh] overflow-hidden rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow-2xl shadow-stone-950/20"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-stone-200/80 px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-700">More</p>
+                <h2 className="mt-1 text-lg font-semibold">Workflow surfaces</h2>
+                <p className="mt-1 text-xs text-stone-500">Jump to billing, integration, and workspace controls without leaving mobile.</p>
+              </div>
+              <button type="button" onClick={() => setMobileMoreOpen(false)} className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700" aria-label="Close more navigation">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid max-h-[calc(72vh-5.5rem)] grid-cols-2 gap-2 overflow-y-auto p-3">
+              {mobileMoreItems.map((item) => {
+                const isActive = routeIsActive(pathname, item);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    onClick={() => setMobileMoreOpen(false)}
+                    className={`rounded-2xl border p-3 transition ${isActive ? "border-teal-200 bg-teal-50 text-teal-950" : "border-stone-200 bg-white text-stone-700 hover:border-teal-200 hover:text-teal-800"}`}
+                  >
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                    <span className="mt-2 block text-sm font-bold">{item.name}</span>
+                    <span className="mt-1 block text-[11px] leading-4 text-stone-500">{item.description}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
 
       <button
         type="button"

@@ -13,6 +13,7 @@ export async function PATCH(req: NextRequest) {
     const session = await requireSession();
     const body = await req.json() as {
       entryId?: string;
+      taskId?: string;
       startedAt?: string;
       stoppedAt?: string;
       description?: string;
@@ -35,6 +36,10 @@ export async function PATCH(req: NextRequest) {
 
     if (entry.status === "approved" || entry.status === "invoiced") {
       return NextResponse.json({ error: "Approved or invoiced entries are locked" }, { status: 409 });
+    }
+
+    if (!entry.stoppedAt) {
+      return NextResponse.json({ error: "Running entries cannot be corrected with this endpoint. Stop the timer first." }, { status: 409 });
     }
 
     if (body.projectId) {
@@ -70,7 +75,6 @@ export async function PATCH(req: NextRequest) {
 
     const rawStartedAt = body.startedAt ?? entry.startedAt;
     const rawStoppedAt = body.stoppedAt ?? entry.stoppedAt;
-    if (!rawStoppedAt) return NextResponse.json({ error: "Cannot edit open timer with this endpoint" }, { status: 400 });
 
     const nextStartedAt = new Date(rawStartedAt!);
     const nextStoppedAt = new Date(rawStoppedAt);
@@ -83,6 +87,11 @@ export async function PATCH(req: NextRequest) {
     await enforceDailyHoursLimit(entry.workspaceId, entry.userId, nextStartedAt, nextDurationSeconds, entry.id);
 
     const updates: Partial<typeof timeEntries.$inferInsert> = {};
+    if (body.taskId !== undefined) {
+      const nextTaskId = body.taskId.trim();
+      if (!nextTaskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
+      updates.taskId = nextTaskId;
+    }
     updates.startedAt = nextStartedAt;
     updates.stoppedAt = nextStoppedAt;
     updates.durationSeconds = nextDurationSeconds;

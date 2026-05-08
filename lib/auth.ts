@@ -115,40 +115,87 @@ function hashMagic(tokenSecret: string) {
   return createHash("sha256").update(`${tokenSecret}:${secret()}`).digest("hex");
 }
 
-export async function createMagicLink(email: string) {
+function generatedWorkspaceSlug(email: string) {
+  return `${email.split("@")[0].replace(/[^a-z0-9-]/g, "")}-workspace`;
+}
+
+async function memberCount(workspaceId: string) {
+  return (await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.workspaceId, workspaceId))).length;
+}
+
+async function resolveMagicLinkWorkspace(email: string) {
   const normEmail = email.trim().toLowerCase();
-  
+
   // Find their existing workspace if they have one
-  let resolvedSlug = "";
   const [userResult] = await db.select().from(users).where(eq(users.email, normEmail));
-  
+
   if (userResult) {
     const mems = await db.select().from(memberships).where(eq(memberships.userId, userResult.id));
     if (mems.length > 0) {
        const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, mems[0].workspaceId));
-       if (ws) resolvedSlug = ws.slug;
+       if (ws) return { email: normEmail, workspaceSlug: ws.slug, reason: "existing_member" as const, workspace: ws };
     }
   }
 
   // Invited users may not have an account yet, so resolve their magic link
   // into the inviting workspace instead of creating a personal workspace slug.
-  if (!resolvedSlug) {
-    const [pendingInvite] = await db
-      .select({ workspaceSlug: workspaces.slug })
-      .from(invitations)
-      .innerJoin(workspaces, eq(invitations.workspaceId, workspaces.id))
-      .where(and(eq(invitations.email, normEmail), gt(invitations.expiresAt, Date.now()), isNull(invitations.acceptedAt)))
-      .orderBy(desc(invitations.expiresAt));
+  const [pendingInvite] = await db
+    .select({ workspaceSlug: workspaces.slug, workspaceId: workspaces.id, workspaceName: workspaces.name })
+    .from(invitations)
+    .innerJoin(workspaces, eq(invitations.workspaceId, workspaces.id))
+    .where(and(eq(invitations.email, normEmail), gt(invitations.expiresAt, Date.now()), isNull(invitations.acceptedAt)))
+    .orderBy(desc(invitations.expiresAt));
 
-    if (pendingInvite) {
-      resolvedSlug = pendingInvite.workspaceSlug;
+  if (pendingInvite) {
+    return {
+      email: normEmail,
+      workspaceSlug: pendingInvite.workspaceSlug,
+      reason: "pending_invite" as const,
+      workspace: { id: pendingInvite.workspaceId, slug: pendingInvite.workspaceSlug, name: pendingInvite.workspaceName },
+    };
+  }
+
+  // If no existing workspace, dynamically generate one
+  const workspaceSlug = generatedWorkspaceSlug(normEmail);
+  const [workspace] = await db.select().from(workspaces).where(eq(workspaces.slug, workspaceSlug));
+  return { email: normEmail, workspaceSlug, reason: "generated" as const, workspace: workspace ?? null };
+}
+
+export async function checkMagicLinkEligibility(email: string) {
+  const resolved = await resolveMagicLinkWorkspace(email);
+
+  if (resolved.reason === "existing_member" || resolved.reason === "pending_invite") {
+    return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
+  }
+
+  if (isAdminEmail(resolved.email)) {
+    return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
+  }
+
+  if (env.ALLOW_SELF_REGISTRATION) {
+    return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
+  }
+
+  if (env.ALLOW_BOOTSTRAP_OWNER) {
+    if (!resolved.workspace) {
+      return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
+    }
+    if (await memberCount(resolved.workspace.id) === 0) {
+      return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
     }
   }
-  
-  // If no existing workspace, dynamically generate one
-  if (!resolvedSlug) {
-      resolvedSlug = normEmail.split("@")[0].replace(/[^a-z0-9-]/g, "") + "-workspace";
-  }
+
+  return {
+    eligible: false as const,
+    email: resolved.email,
+    workspaceSlug: resolved.workspaceSlug,
+    error: "This Billabled workspace is invite-only. Ask a workspace owner or manager to invite this email before requesting a sign-in link.",
+  };
+}
+
+export async function createMagicLink(email: string) {
+  const eligibility = await checkMagicLinkEligibility(email);
+  if (!eligibility.eligible) throw new ForbiddenError(eligibility.error);
 
   const tokenId = crypto.randomUUID();
   const tokenSecret = randomBytes(24).toString("base64url");
@@ -157,8 +204,8 @@ export async function createMagicLink(email: string) {
   await db.insert(magicLinks).values({
     tokenId,
     tokenHash,
-    email: normEmail,
-    workspaceSlug: resolvedSlug,
+    email: eligibility.email,
+    workspaceSlug: eligibility.workspaceSlug,
     // expires in 20 minutes
     expiresAt: Date.now() + 1000 * 60 * 20,
     usedAt: null,

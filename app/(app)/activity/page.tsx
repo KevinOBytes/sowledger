@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Clock3, LayoutList, Play, Plus } from "lucide-react";
+import { CalendarDays, Clock3, Lock, Pencil, LayoutList, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -68,6 +68,7 @@ export default function ActivityPage() {
   const [projectId, setProjectId] = useState("");
   const [description, setDescription] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
 
   const fetchEntries = async () => {
     setLoading(true);
@@ -142,6 +143,23 @@ export default function ActivityPage() {
     }
   }
 
+  function openManualLog() {
+    setEditingEntry(null);
+    setManualOpen(true);
+  }
+
+  function openCorrection(entry: Entry) {
+    setEditingEntry(entry);
+    setManualOpen(true);
+  }
+
+  function correctionLockReason(entry: Entry) {
+    if (!entry.stoppedAt) return "Running timers lock until stopped";
+    if (entry.status === "approved") return "Approved entries are locked";
+    if (entry.status === "invoiced") return "Invoiced entries are locked";
+    return null;
+  }
+
   return (
     <>
       <AppPageShell>
@@ -156,7 +174,7 @@ export default function ActivityPage() {
           ]}
           primaryAction={(
             <button
-              onClick={() => setManualOpen(true)}
+              onClick={openManualLog}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800 sm:w-auto"
             >
               <Plus className="h-4 w-4" />
@@ -235,7 +253,7 @@ export default function ActivityPage() {
             description="Start a timer or log completed work to build your activity trail before review and approval."
             action={(
               <button
-                onClick={() => setManualOpen(true)}
+                onClick={openManualLog}
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
               >
                 <Plus className="h-4 w-4" />
@@ -276,6 +294,22 @@ export default function ActivityPage() {
                           <div className="flex flex-wrap items-center gap-2 md:justify-end">
                             <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold capitalize ${statusPillClass(entry.status)}`}>{entry.status}</span>
                             <span className="text-xs font-bold uppercase tracking-wide text-slate-400">{entry.source}</span>
+                            {correctionLockReason(entry) ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-500" title={correctionLockReason(entry) ?? undefined}>
+                                <Lock className="h-3 w-3" />
+                                Locked
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openCorrection(entry)}
+                                className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-bold text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-100"
+                                aria-label={`Correct time entry ${title}`}
+                              >
+                                <Pencil className="h-3 w-3" />
+                                Correct
+                              </button>
+                            )}
                           </div>
                         </article>
                       );
@@ -287,7 +321,18 @@ export default function ActivityPage() {
           </section>
         )}
       </AppPageShell>
-      <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} onSaved={fetchEntries} defaultTaskId={taskId} defaultProjectId={projectId} defaultDescription={description} />
+      <ManualTimeDialog
+        open={manualOpen}
+        onOpenChange={(open) => {
+          setManualOpen(open);
+          if (!open) setEditingEntry(null);
+        }}
+        onSaved={fetchEntries}
+        editEntry={editingEntry}
+        defaultTaskId={taskId}
+        defaultProjectId={projectId}
+        defaultDescription={description}
+      />
     </>
   );
 }

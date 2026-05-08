@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
 import { requireRole, requireSession } from "@/lib/auth";
+import { getClientEntitlementIds, isInvoiceClientEntitled } from "@/lib/client-entitlements";
 import { db } from "@/lib/db";
 import { invoices } from "@/lib/db/schema";
 import { appendAuditLog } from "@/lib/security";
@@ -21,6 +22,10 @@ export async function POST(req: NextRequest) {
       .where(and(eq(invoices.id, body.invoiceId), eq(invoices.workspaceId, session.workspaceId)));
 
     if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    const clientIds = await getClientEntitlementIds(session);
+    if (!(await isInvoiceClientEntitled(session.workspaceId, invoice.id, clientIds))) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
 
     const signedOffAt = new Date().toISOString();
     await appendAuditLog({

@@ -16,6 +16,11 @@ function getErrorStatus(error: unknown, fallback = 500): number {
   return fallback;
 }
 
+function normalizeOptionalEmail(email?: string) {
+  const normalized = email?.trim().toLowerCase();
+  return normalized || undefined;
+}
+
 export async function GET() {
   try {
     const session = await requireSession();
@@ -48,7 +53,7 @@ export async function POST(req: NextRequest) {
       id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
       name: body.name,
-      email: body.email,
+      email: normalizeOptionalEmail(body.email),
       address: body.address,
       currencyOverride: body.currencyOverride,
     };
@@ -91,7 +96,7 @@ export async function PATCH(req: NextRequest) {
 
     const updates: Partial<typeof clients.$inferInsert> = {};
     if (body.name !== undefined) updates.name = body.name;
-    if (body.email !== undefined) updates.email = body.email;
+    if (body.email !== undefined) updates.email = normalizeOptionalEmail(body.email);
     if (body.address !== undefined) updates.address = body.address;
     if (body.currencyOverride !== undefined) updates.currencyOverride = body.currencyOverride;
     if (body.status !== undefined) updates.status = body.status;

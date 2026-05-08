@@ -92,8 +92,16 @@ test.describe('Mobile Web Support', () => {
     await gotoApp(page, '/dashboard');
     await expect(page.getByRole('button', { name: 'Start timer', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Quick time entry' })).toBeVisible();
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    const moreDialog = page.getByRole('dialog', { name: 'More Billabled navigation' });
+    await expect(moreDialog).toBeVisible();
+    for (const linkName of ['Projects', 'Clients', 'Planner', 'Approvals', 'Invoices', 'Exports', 'People', 'Integrations', 'Developers', 'Billing', 'Settings']) {
+      await expect(moreDialog.getByRole('link', { name: new RegExp(linkName) })).toBeVisible();
+    }
+    await moreDialog.getByRole('link', { name: /Integrations/i }).click();
+    await expect(page).toHaveURL(/.*\/integrations/);
 
-    await page.getByRole('link', { name: 'Calendar' }).click();
+    await page.getByRole('link', { name: 'Calendar', exact: true }).click();
     await expect(page).toHaveURL(/.*\/calendar/);
     await expect(page.getByRole('heading', { level: 1, name: 'Calendar', exact: true })).toBeVisible();
   });

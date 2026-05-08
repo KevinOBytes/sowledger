@@ -39,6 +39,7 @@ type TimeEntry = {
 };
 
 type Project = { id: string; name: string };
+type Action = { id: string; name: string; hourlyRate?: number | null };
 type Person = {
   id: string;
   linkedUserId: string | null;
@@ -253,6 +254,7 @@ export function CalendarView() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [blocks, setBlocks] = useState<ScheduledBlock[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [actions, setActions] = useState<Action[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -260,6 +262,7 @@ export function CalendarView() {
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
   const [eventTitle, setEventTitle] = useState("Focus block");
   const [eventProjectId, setEventProjectId] = useState("");
+  const [eventActionId, setEventActionId] = useState("");
   const [eventTaskId, setEventTaskId] = useState("");
   const [eventNotes, setEventNotes] = useState("");
   const [eventTags, setEventTags] = useState("");
@@ -415,10 +418,11 @@ export function CalendarView() {
 
   async function fetchData() {
     setLoading(true);
-    const [calendarRes, scheduleRes, projectsRes, peopleRes, settingsRes, authRes] = await Promise.all([
+    const [calendarRes, scheduleRes, projectsRes, actionsRes, peopleRes, settingsRes, authRes] = await Promise.all([
       fetch("/api/calendar").catch(() => null),
       fetch("/api/schedule?scope=team").catch(() => null),
       fetch("/api/projects").catch(() => null),
+      fetch("/api/user/actions").catch(() => null),
       fetch("/api/people").catch(() => null),
       fetch("/api/user/settings").catch(() => null),
       fetch("/api/auth/me").catch(() => null),
@@ -436,6 +440,7 @@ export function CalendarView() {
       setBlocks(data.blocks ?? []);
     }
     if (projectsRes?.ok) setProjects((await projectsRes.json()).projects ?? []);
+    if (actionsRes?.ok) setActions((await actionsRes.json()).actions ?? []);
     if (peopleRes?.ok) setPeople((await peopleRes.json()).people ?? []);
     if (settingsRes?.ok) {
       const data = await settingsRes.json();
@@ -559,6 +564,7 @@ export function CalendarView() {
     setEditingBlock(block);
     setEventTitle(block?.title ?? (mode === "calendar" ? "Completed work" : mode === "unavailable" ? "Unavailable" : "Focus block"));
     setEventProjectId(block?.projectId ?? "");
+    setEventActionId(block?.actionId ?? "");
     setEventTaskId(block?.taskId ?? "");
     setEventNotes(block?.notes ?? "");
     const tags = new Set(block?.tags ?? []);
@@ -622,6 +628,7 @@ export function CalendarView() {
     endsAt: Date;
     userId?: string | null;
     projectId?: string | null;
+    actionId?: string | null;
     taskId?: string | null;
     notes?: string | null;
     tags?: string[];
@@ -632,6 +639,7 @@ export function CalendarView() {
       body: JSON.stringify({
         title: input.title,
         projectId: input.projectId || null,
+        actionId: input.actionId || null,
         taskId: input.taskId || null,
         notes: input.notes || null,
         tags: input.tags ?? [],
@@ -704,6 +712,7 @@ export function CalendarView() {
             await patchBlock(editingBlock.id, {
               title,
               projectId: eventProjectId || null,
+              actionId: eventActionId || null,
               taskId: taskId || null,
               notes: eventNotes || null,
               tags: [...tags],
@@ -712,7 +721,7 @@ export function CalendarView() {
               userId: eventUserId || undefined,
             });
           } else {
-            const block = await createScheduledBlock({ title, startsAt: nextStart, endsAt: nextEnd, userId: eventUserId ?? session?.sub, projectId: eventProjectId, taskId, notes: eventNotes, tags: [...tags] });
+            const block = await createScheduledBlock({ title, startsAt: nextStart, endsAt: nextEnd, userId: eventUserId ?? session?.sub, projectId: eventProjectId, actionId: eventActionId, taskId, notes: eventNotes, tags: [...tags] });
             targetBlockId ??= block.id;
           }
         }
@@ -725,6 +734,7 @@ export function CalendarView() {
           body: JSON.stringify({
             taskId: taskId || title,
             projectId: eventProjectId || undefined,
+            actionId: editingBlock?.actionId || eventActionId || undefined,
             description: eventNotes || title,
             tags: [...tags],
             startedAt: startsAt.toISOString(),
@@ -755,6 +765,7 @@ export function CalendarView() {
       body: JSON.stringify({
         taskId: block.taskId || block.title,
         projectId: block.projectId || undefined,
+        actionId: block.actionId || undefined,
         description: block.notes || block.title,
         tags: block.tags,
         scheduledBlockId: block.id,
@@ -795,6 +806,7 @@ export function CalendarView() {
         endsAt: nextSlot.endsAt,
         userId: block.userId,
         projectId: block.projectId,
+        actionId: block.actionId,
         taskId: block.taskId,
         notes: block.notes,
         tags: block.tags,
@@ -1176,6 +1188,7 @@ export function CalendarView() {
             <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
               <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Title<input value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="Client review, proposal writing, design QA" /></label>
               <label className="space-y-1 text-sm font-medium text-slate-700">Project<select value={eventProjectId} onChange={(event) => setEventProjectId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+              <label className="space-y-1 text-sm font-medium text-slate-700">Work type / rate<select value={eventActionId} onChange={(event) => setEventActionId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No work type rate</option>{actions.map((action) => <option key={action.id} value={action.id}>{action.name}{action.hourlyRate ? ` ($${action.hourlyRate}/hr)` : ""}</option>)}</select></label>
               <label className="space-y-1 text-sm font-medium text-slate-700">Work label<input value={eventTaskId} onChange={(event) => setEventTaskId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="Client call, research review, design QA" /></label>
               {isManager && composerMode !== "calendar" && <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Assignee<select value={eventUserId ?? session?.sub ?? ""} onChange={(event) => setEventUserId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white">{members.map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}</select></label>}
               <label className="space-y-1 text-sm font-medium text-slate-700">Starts<input type="datetime-local" value={eventStart} onChange={(event) => setEventStart(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { AppEmptyState, AppMetricCard, AppPageHeader, AppPageShell, AppWorkflowRail } from "@/components/app-page-shell";
 import { ManualTimeDialog } from "@/components/manual-time-dialog";
+import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
 
 type Project = { id: string; name: string };
 type Action = { id: string; name: string; hourlyRate?: number | null };
@@ -243,6 +244,10 @@ export function TimerDashboard() {
 
   async function startTimer(block?: ScheduledBlock) {
     if (startingTimer) return;
+    if (block && isUnavailableScheduledBlock(block)) {
+      toast.error("Unavailable calendar blocks cannot become timers.");
+      return;
+    }
 
     const payload = block ? {
       taskId: block.taskId || block.title,
@@ -685,20 +690,26 @@ export function TimerDashboard() {
                 }
               />
             ) : blocks.map((block) => (
-              <article key={block.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <article key={block.id} className={`rounded-2xl border p-4 ${isUnavailableScheduledBlock(block) ? "border-slate-200 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="break-words font-semibold text-slate-950">{block.title}</p>
                     <p className="mt-1 text-sm text-slate-500">{timeRange(block)}{block.projectId ? ` · ${projectNameById.get(block.projectId) ?? "Project"}` : ""}</p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">scheduled</span>
+                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">{isUnavailableScheduledBlock(block) ? "blocked" : "scheduled"}</span>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
-                  <button onClick={() => startTimer(block)} disabled={startingTimer} className="min-h-10 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold leading-4 text-white disabled:cursor-not-allowed disabled:opacity-60">Start timer</button>
-                  <button onClick={() => { setSelectedBlock(block); setManualOpen(true); }} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Log completed work</button>
-                  <button onClick={() => rescheduleTomorrow(block)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Tomorrow</button>
-                  <button onClick={() => updateBlock(block, { status: "skipped" })} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Skip</button>
-                </div>
+                {isUnavailableScheduledBlock(block) ? (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
+                    Unavailable, OOO, and external-calendar blocks protect planning time and cannot be started or logged as completed work.
+                  </div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
+                    <button onClick={() => startTimer(block)} disabled={startingTimer} className="min-h-10 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold leading-4 text-white disabled:cursor-not-allowed disabled:opacity-60">Start timer</button>
+                    <button onClick={() => { setSelectedBlock(block); setManualOpen(true); }} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Log completed work</button>
+                    <button onClick={() => rescheduleTomorrow(block)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Tomorrow</button>
+                    <button onClick={() => updateBlock(block, { status: "skipped" })} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Skip</button>
+                  </div>
+                )}
               </article>
             ))}
           </div>
