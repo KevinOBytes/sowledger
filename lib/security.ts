@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import { lookup } from "node:dns/promises";
+import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
+import type { LookupFunction } from "node:net";
 import { NextRequest } from "next/server";
 import { env } from "./env";
 import { UnauthorizedError } from "./auth";
@@ -14,22 +16,41 @@ const BLOCKED_WEBHOOK_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1
 function isPrivateIPv4(hostname: string) {
   const parts = hostname.split(".").map((part) => Number(part));
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
-  const [a, b] = parts;
-  return a === 10
+  const [a, b, c] = parts;
+  return a === 0
+    || a === 10
     || a === 127
+    || (a === 100 && b >= 64 && b <= 127)
     || (a === 169 && b === 254)
     || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168);
+    || (a === 192 && b === 0)
+    || (a === 192 && b === 168)
+    || (a === 198 && (b === 18 || b === 19))
+    || (a === 192 && b === 0 && c === 2)
+    || (a === 198 && b === 51 && c === 100)
+    || (a === 203 && b === 0 && c === 113)
+    || a >= 224;
+}
+
+function parseMappedIpv4(mapped: string) {
+  if (mapped.includes(".")) return mapped;
+  const groups = mapped.split(":").filter(Boolean);
+  if (groups.length !== 2) return null;
+  const [high, low] = groups.map((group) => Number.parseInt(group, 16));
+  if ([high, low].some((value) => !Number.isInteger(value) || value < 0 || value > 0xffff)) return null;
+  return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
 }
 
 function isPrivateIPv6(hostname: string) {
   const host = hostname.toLowerCase();
   if (host === "::" || host === "::1") return true;
-  if (host.startsWith("fe80:")) return true;
-  if (/^f[cd][0-9a-f]{2}:/i.test(host)) return true;
+  if (/^fe[89ab][0-9a-f]?:/i.test(host)) return true;
+  if (/^f[cd][0-9a-f]{0,2}:/i.test(host)) return true;
+  if (/^ff[0-9a-f]{0,2}:/i.test(host)) return true;
+  if (host.startsWith("2001:db8:")) return true;
   if (host.startsWith("::ffff:")) {
-    const mapped = host.slice("::ffff:".length);
-    return isPrivateIPv4(mapped);
+    const mapped = parseMappedIpv4(host.slice("::ffff:".length));
+    return !mapped || isPrivateIPv4(mapped);
   }
   return false;
 }
@@ -75,6 +96,52 @@ export async function validateWebhookUrl(rawUrl: string) {
   return url.toString();
 }
 
+async function resolvePublicWebhookAddress(hostname: string) {
+  const normalized = normalizeHostname(hostname);
+  if (isBlockedWebhookHost(normalized)) throw new Error("Webhook URL must resolve to a public address.");
+  if (isIP(normalized)) return { address: normalized, family: isIP(normalized) };
+
+  const resolved = await lookup(normalized, { all: true, verbatim: true });
+  const publicRecords = resolved.filter((record) => !isBlockedWebhookHost(record.address));
+  if (publicRecords.length === 0 || publicRecords.length !== resolved.length) {
+    throw new Error("Webhook URL must resolve to a public address.");
+  }
+  return publicRecords[0];
+}
+
+function publicWebhookLookup(): LookupFunction {
+  return (hostname, _options, callback) => {
+    resolvePublicWebhookAddress(hostname)
+      .then((record) => callback(null, record.address, record.family))
+      .catch((error) => callback(error as NodeJS.ErrnoException, "", 0));
+  };
+}
+
+async function postWebhookPayload(url: string, payload: { event: string; data: unknown }) {
+  const body = JSON.stringify({ ...payload, timestamp: new Date().toISOString() });
+  const endpoint = new URL(url);
+
+  await new Promise<void>((resolve, reject) => {
+    const req = httpsRequest(endpoint, {
+      method: "POST",
+      lookup: publicWebhookLookup(),
+      timeout: 10_000,
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body).toString(),
+      },
+    }, (res) => {
+      res.resume();
+      res.on("end", () => resolve());
+    });
+
+    req.on("timeout", () => req.destroy(new Error("Webhook request timed out")));
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 export async function dispatchWebhook(workspaceId: string, eventType: string, payload: unknown) {
   const hooks = await db.select().from(webhooks).where(eq(webhooks.workspaceId, workspaceId));
   const activeHooks = hooks.filter(
@@ -87,25 +154,22 @@ export async function dispatchWebhook(workspaceId: string, eventType: string, pa
     const url = await validateWebhookUrl(hook.url).catch(() => null);
     if (!url) continue;
 
-    // Fire-and-forget
-    fetch(url, {
-      method: "POST",
-      redirect: "error",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event: eventType, data: payload, timestamp: new Date().toISOString() }),
-    }).catch((e) => console.error("Webhook failed:", e));
+    postWebhookPayload(url, { event: eventType, data: payload }).catch((e) => console.error("Webhook failed:", e));
   }
 }
 
 export async function enforceAuthKey(req: NextRequest) {
-  if (!env.AUTH_SHARED_KEY) {
+  if (!env.AUTH_SHARED_KEY && !env.CRON_SECRET) {
     if (env.NODE_ENV === "production") {
-      throw new UnauthorizedError("AUTH_SHARED_KEY must be configured");
+      throw new UnauthorizedError("AUTH_SHARED_KEY or CRON_SECRET must be configured");
     }
     return;
   }
   const key = req.headers.get("x-auth-key");
-  if (!key || key !== env.AUTH_SHARED_KEY) throw new UnauthorizedError("Invalid auth key");
+  const authorization = req.headers.get("authorization");
+  const validSharedKey = Boolean(env.AUTH_SHARED_KEY && key === env.AUTH_SHARED_KEY);
+  const validCronSecret = Boolean(env.CRON_SECRET && authorization === `Bearer ${env.CRON_SECRET}`);
+  if (!validSharedKey && !validCronSecret) throw new UnauthorizedError("Invalid auth key");
 }
 
 export async function enforceStopRateLimit(identity: string) {

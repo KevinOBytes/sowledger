@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { users, workspaces, memberships, projects, goals, invitations, magicLinks, timeEntries, auditLogs, lockPeriods, userActions, projectTasks, notifications, invoices, webhooks, scheduledWorkBlocks, apiKeys, apiKeyRequests, organizations, workspacePeople } from "@/lib/db/schema";
+import { users, workspaces, memberships, projects, goals, invitations, magicLinks, timeEntries, auditLogs, lockPeriods, userActions, projectTasks, notifications, invoices, webhooks, scheduledWorkBlocks, apiKeys, apiKeyRequests, organizations, workspacePeople, integrationConnections, integrationSyncRecords } from "@/lib/db/schema";
 import { eq, and, gt, desc } from "drizzle-orm";
 
 export type WorkspaceRole = "client" | "member" | "manager" | "owner";
@@ -21,6 +21,8 @@ export type Invoice = typeof invoices.$inferSelect;
 export type ProjectTask = typeof projectTasks.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type WebhookIntegration = typeof webhooks.$inferSelect;
+export type IntegrationConnection = typeof integrationConnections.$inferSelect;
+export type IntegrationSyncRecord = typeof integrationSyncRecords.$inferSelect;
 export type ScheduledWorkBlock = typeof scheduledWorkBlocks.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type ApiKeyRequest = typeof apiKeyRequests.$inferSelect;

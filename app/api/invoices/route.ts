@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { invoices as invoicesTable, memberships as membershipsTable, timeEntries as timeEntriesTable, projects as projectsTable, users as usersTable } from "@/lib/db/schema";
+import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
 import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
 
 export async function GET() {
@@ -129,6 +130,12 @@ export async function POST(req: NextRequest) {
         .set({ status: "invoiced" })
         .where(and(eq(timeEntriesTable.id, id), eq(timeEntriesTable.workspaceId, session.workspaceId)));
     }
+
+    dispatchIntegrationNotification(session.workspaceId, "invoice.created", {
+      title: `Invoice ${invoice.number} created`,
+      body: `$${invoice.amount.toFixed(2)} moved into invoice-ready output with ${body.timeEntryIds.length} linked entries.`,
+      url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/invoices`,
+    }).catch(() => {});
 
     return NextResponse.json({ ok: true, invoice });
   } catch (error) {

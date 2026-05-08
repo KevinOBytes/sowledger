@@ -20,6 +20,7 @@ Preserve these first-class surfaces:
 - Activity: review and correct logged time.
 - Analytics: planned vs actual, manual vs timer, billable output, utilization.
 - Exports: complete and filtered CSV/JSON exports with digest headers.
+- Integrations: first-class center for Google Calendar sync, Slack alerts, QuickBooks invoice push, and API/webhook fallbacks.
 - Developers: API keys, scopes, usage tracking, and API docs.
 - Billing: plan-based Stripe checkout, not client-submitted raw price IDs.
 - Pricing is flat per workspace for early revenue: `free` = Free, `pro` = Starter ($9/mo), `smb` = Studio ($29/mo), `enterprise` = Business ($79/mo). Keep these internal IDs stable unless you also migrate the database enum and webhook mapping.
@@ -48,7 +49,13 @@ Preserve these first-class surfaces:
 - Public API v1 must not expose billing changes, invites, subscription management, or destructive workspace admin actions.
 - Stripe checkout accepts internal `planId` values only. Do not accept arbitrary price IDs from the client.
 - Export responses must avoid secrets and keep `x-billabled-export-sha256` integrity headers.
-- API v1 and Stripe webhook routes are public at the proxy layer by design; keep authentication/signature checks inside the route handlers.
+- Native integration credentials must be encrypted at rest in `integration_connections.credentials`; never render raw provider tokens or webhook URLs after creation.
+- OAuth callbacks must validate signed state against the active session workspace/user and re-check manager authorization before storing credentials.
+- Integration sync records must be workspace-scoped, unique by workspace/provider/resource, and must not link records across workspaces or providers.
+- API v1, Stripe webhooks, and `/api/cron/*` routes are public at the proxy layer by design; keep authentication/signature/auth-key checks inside the route handlers.
+- Webhook URLs may be accepted and stored server-side only after public HTTPS validation, but client responses must render redacted endpoints only.
+- Vercel Cron uses `Authorization: Bearer $CRON_SECRET`; external monitors may use `x-auth-key: $AUTH_SHARED_KEY`.
+- Reminder jobs must skip unavailable, OOO, busy, and external-calendar blocks.
 - Run product-completion DB changes with `npm run db:migrate:product`; do not hand-run production DDL without a backup/snapshot.
 
 ## Validation

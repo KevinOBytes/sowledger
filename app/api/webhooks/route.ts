@@ -5,6 +5,26 @@ import { webhooks } from "@/lib/db/schema";
 import { validateWebhookUrl } from "@/lib/security";
 import { and, eq } from "drizzle-orm";
 
+type WebhookRow = typeof webhooks.$inferSelect;
+
+function maskWebhookUrl(rawUrl: string) {
+  try {
+    const url = new URL(rawUrl);
+    return url.pathname === "/" && !url.search ? url.origin : `${url.origin}/...`;
+  } catch {
+    return "Configured endpoint";
+  }
+}
+
+function toPublicWebhook(hook: WebhookRow) {
+  return {
+    id: hook.id,
+    maskedUrl: maskWebhookUrl(hook.url),
+    events: hook.events,
+    createdAt: hook.createdAt instanceof Date ? hook.createdAt.toISOString() : hook.createdAt,
+  };
+}
+
 export async function GET() {
   try {
     const session = await requireSession();
@@ -16,7 +36,7 @@ export async function GET() {
     if (!limits.allowed) return NextResponse.json({ error: limits.error }, { status: 402 });
 
     const workspaceWebhooks = await db.select().from(webhooks).where(eq(webhooks.workspaceId, session.workspaceId));
-    return NextResponse.json({ ok: true, webhooks: workspaceWebhooks });
+    return NextResponse.json({ ok: true, webhooks: workspaceWebhooks.map(toPublicWebhook) });
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -42,7 +62,7 @@ export async function POST(req: Request) {
       events: body.events && body.events.length > 0 ? body.events : ["*"],
     }).returning();
 
-    return NextResponse.json({ ok: true, webhook: hook });
+    return NextResponse.json({ ok: true, webhook: toPublicWebhook(hook) });
   } catch {
     return NextResponse.json({ error: "Failed to create webhook" }, { status: 400 });
   }

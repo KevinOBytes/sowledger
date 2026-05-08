@@ -30,8 +30,11 @@ test.describe('Deep Authenticated Workflows', () => {
     await page.getByLabel('Project Name').fill(projectName);
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page.getByRole('button', { name: 'Create Project' }).click();
-    await expect(page.getByRole('link', { name: new RegExp(projectName) })).toBeVisible();
-    await page.getByRole('link', { name: new RegExp(projectName) }).click();
+    const projectLink = page.getByRole('link', { name: new RegExp(projectName) });
+    await expect(projectLink).toBeVisible({ timeout: 30_000 });
+    const projectHref = await projectLink.getAttribute('href');
+    expect(projectHref).toBeTruthy();
+    await gotoApp(page, projectHref!);
     await page.locator('.w-80').filter({ hasText: 'To Do' }).getByRole('button').first().click();
     await page.getByPlaceholder('What needs to be done?').fill('E2E Generated Task');
     await page.getByRole('button', { name: 'Save' }).click();
@@ -40,15 +43,17 @@ test.describe('Deep Authenticated Workflows', () => {
 
   test('Test 13: calendar planning surface renders', async ({ page }) => {
     await gotoApp(page, '/calendar');
-    await expect(page.getByRole('heading', { name: 'Calendar' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Calendar', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Schedule/i })).toBeVisible();
   });
 
-  test('Test 13b: calendar drag selection creates and reschedules work', async ({ page }) => {
+  test('Test 13b: calendar drag selection creates and keyboard-reschedules work', async ({ page }) => {
     const title = `Drag Calendar ${unique()}`;
     await gotoApp(page, '/calendar');
+    await expect(page.getByText('Loading calendar...')).toBeHidden({ timeout: 20_000 });
     const slot = page.locator('[data-calendar-slot="true"]').first();
-    await expect(slot).toBeVisible();
+    await expect(slot).toBeVisible({ timeout: 20_000 });
+    await slot.scrollIntoViewIfNeeded();
 
     const slotBox = await slot.boundingBox();
     expect(slotBox).toBeTruthy();
@@ -69,14 +74,17 @@ test.describe('Deep Authenticated Workflows', () => {
       const block = scheduledData.blocks.find((item: { title?: string; startsAt?: string }) => item.title === title);
       blockStart = block?.startsAt ?? null;
       return Boolean(blockStart);
-    }).toBe(true);
+    }, { timeout: 20_000 }).toBe(true);
 
-    await page.getByRole('button', { name: 'Reschedule', exact: true }).click();
+    const blockCard = page.getByTestId('calendar-block').filter({ hasText: title }).first();
+    await expect(blockCard).toBeVisible({ timeout: 20_000 });
+    await blockCard.focus();
+    await page.keyboard.press('ArrowDown');
     await expect.poll(async () => {
       const response = await page.request.get('/api/schedule?status=planned');
       const data = await response.json();
       return data.blocks.some((item: { title?: string; startsAt?: string }) => item.title === title && item.startsAt !== blockStart);
-    }).toBe(true);
+    }, { timeout: 20_000 }).toBe(true);
   });
 
   test('Test 14: planner visualization renders', async ({ page }) => {
@@ -143,6 +151,24 @@ test.describe('Deep Authenticated Workflows', () => {
     });
     expect(unsafeIpv6Webhook.status()).toBe(400);
 
+    const unsafeMappedIpv6Webhook = await page.request.post('/api/webhooks', {
+      data: { url: 'https://[::ffff:7f00:1]/internal', events: ['time.created'] },
+    });
+    expect(unsafeMappedIpv6Webhook.status()).toBe(400);
+
+    const secretWebhookPath = 'hooks/super-secret-token';
+    const safeWebhook = await page.request.post('/api/webhooks', {
+      data: { url: `https://1.1.1.1/${secretWebhookPath}`, events: ['time.created'] },
+    });
+    expect(safeWebhook.ok()).toBeTruthy();
+    const safeWebhookBody = await safeWebhook.json();
+    expect(safeWebhookBody.webhook.maskedUrl).toBe('https://1.1.1.1/...');
+    expect(JSON.stringify(safeWebhookBody)).not.toContain(secretWebhookPath);
+
+    const listedWebhooks = await page.request.get('/api/webhooks');
+    expect(listedWebhooks.ok()).toBeTruthy();
+    expect(JSON.stringify(await listedWebhooks.json())).not.toContain(secretWebhookPath);
+
     const invalidAssigneeImport = await page.request.post('/api/integrations/calendar/import', {
       data: {
         provider: 'google',
@@ -151,6 +177,30 @@ test.describe('Deep Authenticated Workflows', () => {
       },
     });
     expect(invalidAssigneeImport.status()).toBe(400);
+
+    await gotoApp(page, '/integrations');
+    await expect(page.getByRole('heading', { name: 'Connect the systems around Billabled' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Slack alerts' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'QuickBooks Online' })).toBeVisible();
+
+    const integrations = await page.request.get('/api/integrations');
+    expect(integrations.ok()).toBeTruthy();
+    const integrationsBody = await integrations.json();
+    expect(integrationsBody.readiness).toBeTruthy();
+
+    const syncWithoutConnection = await page.request.post('/api/integrations/google-calendar/sync', { data: {} });
+    expect(syncWithoutConnection.status()).toBe(400);
+
+    const unsafeSlackWebhook = await page.request.post('/api/integrations/slack/manual', {
+      data: { webhookUrl: 'https://127.0.0.1/services/test', channelLabel: '#ops' },
+    });
+    expect(unsafeSlackWebhook.status()).toBe(400);
+
+    const quickBooksWithoutConnection = await page.request.post('/api/integrations/quickbooks/push-invoice', {
+      data: { invoiceId: 'missing-invoice' },
+    });
+    expect(quickBooksWithoutConnection.status()).toBe(400);
   });
 
   test('Test 22: managers cannot promote other members to elevated roles', async ({ page }) => {

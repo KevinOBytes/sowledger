@@ -19,10 +19,13 @@ Billabled is a Next.js 16.2 App Router application for planning, tracking, billi
 - `app/(app)`: authenticated app surfaces.
 - `app/(marketing)`: public marketing, support, and API docs.
 - `app/api`: authenticated app API, public API v1, Stripe, exports, timers, schedule.
+- `app/api/cron`: Vercel/external cron endpoints; these are public at the proxy layer and must enforce `CRON_SECRET` or `x-auth-key` in handlers.
 - `components`: shared client/server UI components.
 - `lib/db/schema.ts`: Drizzle schema source.
+- `lib/integrations`: provider helpers for encrypted credentials, OAuth state, Google Calendar, Slack, and QuickBooks.
 - `lib/db/ensure-workspace-schema.ts`: runtime schema hardening for existing databases.
 - `db/migrations`: SQL migrations.
+- `vercel.json`: production cron registration for reminders and unfinished timer checks.
 - `tests`: Playwright user-flow coverage.
 
 ## Common Mistakes
@@ -30,3 +33,5 @@ Billabled is a Next.js 16.2 App Router application for planning, tracking, billi
 - Do not add runtime dependencies where the existing stack already has a pattern.
 - Do not bypass `workspaceId` filters for convenience.
 - Do not claim UI work is done without checking reachability from navigation.
+- Do not return provider tokens, webhook URLs, or other bearer-like integration secrets from app APIs.
+- When adding integration schema, keep runtime schema hardening and SQL migrations aligned.

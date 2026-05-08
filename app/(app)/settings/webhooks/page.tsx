@@ -5,7 +5,7 @@ import { Plus, Trash2, Webhook, Zap } from "lucide-react";
 
 type WebhookIntegration = {
   id: string;
-  url: string;
+  maskedUrl: string;
   events: string[];
   createdAt: string;
 };
@@ -123,7 +123,7 @@ export default function WebhooksPage() {
 
       <div className="mb-8 overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
         <div className="grid grid-cols-12 gap-4 border-b border-stone-100 bg-stone-50 p-4 text-sm font-semibold text-stone-600">
-          <div className="col-span-6">Endpoint URL</div>
+          <div className="col-span-6">Endpoint</div>
           <div className="col-span-5">Subscribed Events</div>
           <div className="col-span-1 text-right"></div>
         </div>
@@ -136,7 +136,7 @@ export default function WebhooksPage() {
           ) : (
             webhooks.map((w) => (
               <div key={w.id} className="grid grid-cols-12 items-center gap-4 p-4 text-sm text-stone-700 hover:bg-stone-50">
-                <div className="col-span-6 truncate font-mono text-teal-700">{w.url}</div>
+                <div className="col-span-6 truncate font-mono text-teal-700">{w.maskedUrl}</div>
                 <div className="col-span-5 flex flex-wrap gap-1">
                   {w.events.map(ev => (
                     <span key={ev} className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{ev}</span>

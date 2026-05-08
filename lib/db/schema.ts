@@ -217,6 +217,41 @@ export const webhooks = pgTable("webhooks", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export type IntegrationProvider = "google_calendar" | "slack" | "quickbooks";
+export type IntegrationStatus = "connected" | "needs_setup" | "error" | "disabled";
+
+export const integrationConnections = pgTable("integration_connections", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { enum: ["google_calendar", "slack", "quickbooks"] }).notNull(),
+  status: varchar("status", { enum: ["connected", "needs_setup", "error", "disabled"] }).notNull().default("needs_setup"),
+  displayName: varchar("display_name", { length: 255 }),
+  externalAccountId: varchar("external_account_id", { length: 255 }),
+  credentials: jsonb("credentials").$type<Record<string, string>>().default({}).notNull(),
+  config: jsonb("config").$type<Record<string, unknown>>().default({}).notNull(),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastError: text("last_error"),
+  createdByUserId: varchar("created_by_user_id", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const integrationSyncRecords = pgTable("integration_sync_records", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  connectionId: varchar("connection_id", { length: 255 }).notNull().references(() => integrationConnections.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { enum: ["google_calendar", "slack", "quickbooks"] }).notNull(),
+  resourceType: varchar("resource_type", { length: 80 }).notNull(),
+  resourceId: varchar("resource_id", { length: 255 }).notNull(),
+  externalId: varchar("external_id", { length: 512 }).notNull(),
+  externalUrl: varchar("external_url", { length: 1024 }),
+  syncStatus: varchar("sync_status", { enum: ["synced", "error", "deleted"] }).notNull().default("synced"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
+  lastError: text("last_error"),
+});
+
 export const scheduledWorkBlocks = pgTable("scheduled_work_blocks", {
   id: varchar("id", { length: 255 }).primaryKey(),
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
@@ -231,6 +266,7 @@ export const scheduledWorkBlocks = pgTable("scheduled_work_blocks", {
   startsAt: timestamp("starts_at").notNull(),
   endsAt: timestamp("ends_at").notNull(),
   status: varchar("status", { enum: ["planned", "in_progress", "completed", "skipped", "canceled"] }).notNull().default("planned"),
+  reminderSentAt: timestamp("reminder_sent_at"),
   createdByUserId: varchar("created_by_user_id", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

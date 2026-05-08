@@ -824,7 +824,7 @@ export function CalendarView() {
     await fetchData();
   }
 
-  function beginSlotDrag(event: ReactPointerEvent<HTMLElement>, lane: Lane) {
+  function beginSlotDrag(event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>, lane: Lane) {
     if (event.button !== 0) return;
     const column = event.currentTarget.closest<HTMLElement>("[data-day-column]");
     if (!column) return;
@@ -1038,7 +1038,7 @@ export function CalendarView() {
                   {hours.map((hour) => {
                     const slotStart = new Date(`${dateKey(lane.date)}T${String(hour).padStart(2, "0")}:00`);
                     return (
-                      <button key={`${lane.key}-${hour}`} type="button" data-calendar-slot="true" onPointerDown={(event) => beginSlotDrag(event, lane)} className="block w-full border-b border-slate-100 px-2 text-left text-[11px] text-transparent transition hover:bg-cyan-50 hover:text-cyan-700" style={{ height: HOUR_HEIGHT }} aria-label={`Schedule work ${lane.label} ${timeLabel(slotStart)}`}>Drag to add</button>
+                      <button key={`${lane.key}-${hour}`} type="button" data-calendar-slot="true" onPointerDown={(event) => beginSlotDrag(event, lane)} onMouseDown={(event) => beginSlotDrag(event, lane)} className="block w-full border-b border-slate-100 px-2 text-left text-[11px] text-transparent transition hover:bg-cyan-50 hover:text-cyan-700" style={{ height: HOUR_HEIGHT }} aria-label={`Schedule work ${lane.label} ${timeLabel(slotStart)}`}>Drag to add</button>
                     );
                   })}
                   {!hasWork && <div data-testid="calendar-empty-day-hint" className="pointer-events-none absolute left-3 right-3 top-4 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-3 text-xs text-slate-400">Drag here to plan work, log time, or mark unavailable.</div>}
@@ -1084,7 +1084,7 @@ export function CalendarView() {
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Block the week. Log what happened.</h2>
             <p className="mt-1 max-w-2xl text-sm text-slate-500">Drag empty space to block time, use handles to resize, recover missed work, or switch to team lanes when assigning schedules.</p>
             <div data-testid="calendar-timezone-cue" className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              <Clock className="h-3.5 w-3.5" /> Times shown in {userTimezone} ({timezoneLabel(userTimezone)}){browserTimezone !== userTimezone ? ` · Browser ${browserTimezone}` : ""}
+              <Clock className="h-3.5 w-3.5" /> Times shown in browser timezone {browserTimezone} ({timezoneLabel(browserTimezone)}){browserTimezone !== userTimezone ? ` · Account timezone ${userTimezone}` : ""}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

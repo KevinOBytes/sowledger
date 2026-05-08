@@ -26,6 +26,7 @@ const SCOPES = [
 ];
 
 const EXTENSIONS = [
+  ["Native integrations", "Connect Google Calendar, Slack, and QuickBooks in the app, then use API keys for long-tail systems."],
   ["Proof packs", "Fetch client-ready invoice evidence for issued invoices and approval workflows."],
   ["Revenue intelligence", "Read retainer risk, missing billable, and recovery summaries for operating reviews."],
   ["Exports", "Pull CSV or JSON exports with integrity headers where supported."],
@@ -82,6 +83,10 @@ export default function ApiSupportPage() {
                 <p className="mt-1 text-sm leading-6 text-slate-600">{body}</p>
               </div>
             ))}
+          </div>
+          <div className="mt-5 rounded-2xl border border-cyan-100 bg-cyan-50 p-4 text-sm leading-6 text-cyan-950">
+            <p className="font-bold">Native app integrations</p>
+            <p className="mt-1">Use <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">/integrations</code> inside the authenticated app for Google Calendar sync, Slack alerts, and QuickBooks invoice push. OAuth routes stay session-authenticated and store provider credentials encrypted.</p>
           </div>
         </div>
       </section>

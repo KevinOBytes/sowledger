@@ -28,6 +28,7 @@ The runner:
 ## Required Production Env
 - `NEXT_PUBLIC_APP_URL`
 - `AUTH_SHARED_KEY`
+- `CRON_SECRET`
 - `AUTH_COOKIE_SECRET`
 - `AUDIT_SIGNING_SECRET`
 - `RESEND_API_KEY`
@@ -40,12 +41,22 @@ The runner:
 - `STRIPE_ENTERPRISE_PRICE_ID`
 
 ## Optional Production Env
-Billabled runs without Sentry. When these values are missing or misconfigured, Sentry is reported as degraded in detailed readiness instead of failing the app.
+Billabled runs without Sentry and without native provider integrations. When these values are missing or misconfigured, readiness reports them as degraded instead of failing the app.
 
 - `NEXT_PUBLIC_SENTRY_DSN`
 - `SENTRY_ORG`
 - `SENTRY_PROJECT`
 - `SENTRY_AUTH_TOKEN`
+- `GOOGLE_CALENDAR_CLIENT_ID`
+- `GOOGLE_CALENDAR_CLIENT_SECRET`
+- `GOOGLE_CALENDAR_REDIRECT_URI`
+- `SLACK_CLIENT_ID`
+- `SLACK_CLIENT_SECRET`
+- `SLACK_REDIRECT_URI`
+- `QUICKBOOKS_CLIENT_ID`
+- `QUICKBOOKS_CLIENT_SECRET`
+- `QUICKBOOKS_REDIRECT_URI`
+- `QUICKBOOKS_ENVIRONMENT` (`sandbox` or `production`)
 
 ## Post-Deploy Checks
 - `GET /api/health` returns `{ ok: true }` and is safe for uptime checks.
@@ -53,6 +64,20 @@ Billabled runs without Sentry. When these values are missing or misconfigured, S
 - `GET /api/deployment/readiness` with `x-auth-key: $AUTH_SHARED_KEY` returns detailed required checks plus optional degraded checks.
 - Stripe webhook endpoint must be configured to `https://www.billabled.com/api/webhooks/stripe`; `/api/stripe/webhook` remains a compatibility alias.
 - Public API consumers call `/api/v1/*` with `Authorization: Bearer <key>` and do not need a browser session cookie.
+- Integration Center is available at `/integrations`.
+- Google Calendar OAuth callback must be registered as `https://www.billabled.com/api/integrations/google-calendar/oauth/callback`.
+- Slack OAuth callback must be registered as `https://www.billabled.com/api/integrations/slack/oauth/callback`; manual incoming webhooks are supported as a fallback.
+- QuickBooks OAuth callback must be registered as `https://www.billabled.com/api/integrations/quickbooks/oauth/callback`.
+- Vercel Cron is registered in `vercel.json` for `/api/cron/scheduled-block-reminders` and `/api/cron/unfinished-timers`. Set `CRON_SECRET` so Vercel sends `Authorization: Bearer $CRON_SECRET`; external monitors may use `x-auth-key: $AUTH_SHARED_KEY`.
+
+## Integration Verification
+- Connect Google Calendar from `/integrations`, then run `Sync now` from `/calendar`.
+- Confirm Billabled planned blocks appear in Google Calendar with Billabled private extended properties.
+- Confirm external Google Calendar busy events import as unavailable blocks, not completed time.
+- Connect Slack with OAuth or a manual incoming webhook, then run `Test`.
+- Create a scheduled work block and confirm Slack receives reminder-capable event delivery after cron runs; imported unavailable/OOO/busy blocks must not produce reminders.
+- Connect QuickBooks in sandbox first, set `customerRefId` and `serviceItemRefId`, then push a test invoice from `/invoices`.
+- Confirm provider credentials are never visible after connection and are stored only in `integration_connections.credentials`.
 
 ## Stripe Verification
 - Confirm the live prices are configured in production env:

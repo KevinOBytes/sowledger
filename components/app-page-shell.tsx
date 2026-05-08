@@ -227,7 +227,7 @@ export function AppWorkflowRail({ current, items = BILLABLED_WORKFLOW_STAGES, cl
           const Icon = item.icon;
           const active = current === item.id;
           return (
-            <li key={item.id} className="relative" aria-current={active ? "step" : undefined}>
+            <li key={item.id} className="relative min-w-0" aria-current={active ? "step" : undefined}>
               {index > 0 && <span className="absolute -left-2 top-6 hidden h-px w-2 bg-slate-200 xl:block" aria-hidden="true" />}
               <div
                 className={cx(
@@ -235,9 +235,9 @@ export function AppWorkflowRail({ current, items = BILLABLED_WORKFLOW_STAGES, cl
                   active ? toneClasses.cyan.rail : toneClasses.slate.rail,
                 )}
               >
-                <div className="flex items-center gap-2">
-                  <Icon className={cx("h-4 w-4", active ? "text-cyan-700" : "text-slate-400")} />
-                  <span className="text-sm font-bold">{item.label}</span>
+                <div className="flex min-w-0 items-start gap-2">
+                  <Icon className={cx("mt-0.5 h-4 w-4 shrink-0", active ? "text-cyan-700" : "text-slate-400")} />
+                  <span className="min-w-0 break-words text-sm font-bold leading-5">{item.label}</span>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>
               </div>

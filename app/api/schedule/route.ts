@@ -5,6 +5,7 @@ import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { memberships, projects, scheduledWorkBlocks, timeEntries, userActions } from "@/lib/db/schema";
+import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
 import { normalizeTags } from "@/lib/validators";
 
 type ScheduleStatus = "planned" | "in_progress" | "completed" | "skipped" | "canceled";
@@ -118,6 +119,12 @@ export async function POST(req: NextRequest) {
       endsAt,
       createdByUserId: session.sub,
     }).returning();
+
+    dispatchIntegrationNotification(session.workspaceId, "scheduled_block.created", {
+      title: `Scheduled: ${block.title}`,
+      body: `${new Date(block.startsAt).toLocaleString()} - ${new Date(block.endsAt).toLocaleString()}`,
+      url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/calendar`,
+    }).catch(() => {});
 
     return NextResponse.json({ ok: true, block });
   } catch (error) {

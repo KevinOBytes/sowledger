@@ -14,6 +14,7 @@ const PUBLIC_PREFIXES = [
   "/logo.png",
   "/manifest.webmanifest",
   "/api/auth/",
+  "/api/cron/",
   "/api/deployment/readiness",
   "/api/health",
   "/api/stripe/webhook",
@@ -37,6 +38,7 @@ const RATE_LIMIT_RULES: RateLimitRule[] = [
   { name: "checkout", windowSeconds: 60, maxRequests: 12, matches: (path) => path === "/api/stripe/checkout" },
   { name: "api-keys", windowSeconds: 60, maxRequests: 30, matches: (path) => path.startsWith("/api/settings/api-keys") },
   { name: "exports", windowSeconds: 300, maxRequests: 20, matches: (path) => path.startsWith("/api/export/") },
+  { name: "integrations", windowSeconds: 60, maxRequests: 60, matches: (path) => path.startsWith("/api/integrations/") },
 ];
 
 const memoryCounters = new Map<string, { count: number; resetAt: number }>();

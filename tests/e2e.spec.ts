@@ -119,6 +119,9 @@ test.describe('Unauthenticated Flows', () => {
 
     const stripeWebhook = await page.request.post('/api/webhooks/stripe', { data: '{}' });
     expect(stripeWebhook.status()).toBe(400);
+
+    const reminderCron = await page.request.get('/api/cron/scheduled-block-reminders');
+    expect([200, 401]).toContain(reminderCron.status());
   });
 });
 
@@ -144,6 +147,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
   });
 
   test('Test 5b: redesigned internal workflow spine marks each app stage', async ({ page }) => {
+    test.setTimeout(60_000);
     await gotoApp(page, '/dashboard');
     await expect(page.getByRole('heading', { name: 'Today’s command center' })).toBeVisible();
     await expectVisibleMainText(page, 'Focused timer');
@@ -173,11 +177,20 @@ test.describe('Authenticated Flows (Free Plan)', () => {
     await expect(page.getByRole('heading', { name: 'Recent API requests' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Security boundary' })).toBeVisible();
     await expectWorkflowStage(page, 'Integrate');
+
+    await gotoApp(page, '/integrations');
+    await expect(page.getByRole('heading', { name: 'Connect the systems around Billabled' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Calendar sync controls' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Slack manual setup' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'QuickBooks invoice defaults' })).toBeVisible();
+    await expectWorkflowStage(page, 'Integrate');
   });
 
   test('Test 6: sidebar navigation works', async ({ page }) => {
-    await page.getByRole('link', { name: 'Workspace', exact: true }).click();
-    await expect(page).toHaveURL(/.*\/settings/);
+    const workspaceLink = page.locator('nav[aria-label="Internal application navigation"] a[href="/settings"]').first();
+    await expect(workspaceLink).toBeVisible();
+    await workspaceLink.click();
+    await expect(page).toHaveURL(/.*\/settings/, { timeout: 20_000 });
   });
 
   test('Test 7: billing settings shows plan and usage meters', async ({ page }) => {

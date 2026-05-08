@@ -17,6 +17,7 @@ import {
   LayoutList,
   LogOut,
   Plus,
+  Plug,
   Receipt,
   Settings,
   Tag,
@@ -98,6 +99,7 @@ const navSections: NavSection[] = [
     label: "Integrate",
     summary: "Connect Billabled to external systems.",
     items: [
+      { name: "Integrations", description: "Calendar, Slack, accounting", href: "/integrations", icon: Plug },
       { name: "Developers", description: "API keys, scopes, docs", href: "/settings/developers", icon: Code2 },
       { name: "Webhooks", description: "Event delivery controls", href: "/settings/webhooks", icon: Webhook },
     ],

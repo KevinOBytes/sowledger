@@ -177,17 +177,6 @@ export function ReportsPageClient() {
 
   const analyticsExportUnavailable = scope !== "team";
 
-  if (loading && !data) {
-    return (
-      <AppPageShell contentClassName="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-cyan-600" />
-          <p>Loading analytics...</p>
-        </div>
-      </AppPageShell>
-    );
-  }
-
   return (
     <>
       <AppPageShell>
@@ -246,28 +235,36 @@ export function ReportsPageClient() {
           </div>
         </section>
 
+        <RevenueIntelligenceSection
+          intelligence={intelligence}
+          loading={intelligenceLoading}
+          error={intelligenceError}
+        />
+
         {!data ? (
-          <AppEmptyState
-            icon={AlertTriangle}
-            title="Failed to load analytics."
-            description="Try a narrower date range or switch back to my analytics if team reporting is restricted."
-            action={(
-              <button
-                onClick={() => fetchReports().catch(() => null)}
-                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
-              >
-                Retry analytics
-              </button>
-            )}
-          />
+          loading ? (
+            <section className="flex min-h-[360px] flex-col items-center justify-center rounded-[32px] border border-slate-200 bg-white p-10 text-center shadow-sm" aria-live="polite">
+              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-cyan-600" />
+              <h2 className="text-xl font-semibold text-slate-950">Loading analytics...</h2>
+              <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">Preparing your planned vs actual, recovery, utilization, and billable output views.</p>
+            </section>
+          ) : (
+            <AppEmptyState
+              icon={AlertTriangle}
+              title="Failed to load analytics."
+              description="Try a narrower date range or switch back to my analytics if team reporting is restricted."
+              action={(
+                <button
+                  onClick={() => fetchReports().catch(() => null)}
+                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                >
+                  Retry analytics
+                </button>
+              )}
+            />
+          )
         ) : (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className={`space-y-6 transition-opacity ${loading ? "opacity-60" : "opacity-100"}`}>
-            <RevenueIntelligenceSection
-              intelligence={intelligence}
-              loading={intelligenceLoading}
-              error={intelligenceError}
-            />
-
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <AppMetricCard label="Logged hours" value={metric(data.totalHours, "h")} detail="Actual time in this range." accent="slate" icon={Timer} />
               <AppMetricCard label="Planned hours" value={metric(data.plannedHours, "h")} detail="Scheduled work for comparison." accent="slate" icon={CalendarIcon} />

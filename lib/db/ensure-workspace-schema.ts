@@ -129,6 +129,42 @@ async function runSchemaEnsure() {
   `);
 
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS integration_connections (
+      id varchar(255) PRIMARY KEY,
+      workspace_id varchar(255) NOT NULL,
+      provider varchar(40) NOT NULL,
+      status varchar(20) NOT NULL DEFAULT 'needs_setup',
+      display_name varchar(255),
+      external_account_id varchar(255),
+      credentials jsonb DEFAULT '{}'::jsonb NOT NULL,
+      config jsonb DEFAULT '{}'::jsonb NOT NULL,
+      token_expires_at timestamp,
+      last_synced_at timestamp,
+      last_error text,
+      created_by_user_id varchar(255) NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS integration_sync_records (
+      id varchar(255) PRIMARY KEY,
+      workspace_id varchar(255) NOT NULL,
+      connection_id varchar(255) NOT NULL,
+      provider varchar(40) NOT NULL,
+      resource_type varchar(80) NOT NULL,
+      resource_id varchar(255) NOT NULL,
+      external_id varchar(512) NOT NULL,
+      external_url varchar(1024),
+      sync_status varchar(20) NOT NULL DEFAULT 'synced',
+      metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+      last_synced_at timestamp NOT NULL DEFAULT now(),
+      last_error text
+    )
+  `);
+
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS onboarding_progress (
       id varchar(255) PRIMARY KEY,
       workspace_id varchar(255) NOT NULL,
@@ -177,6 +213,7 @@ async function runSchemaEnsure() {
   await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_preferences jsonb DEFAULT '{}'::jsonb NOT NULL`);
 
   await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS scheduled_block_id varchar(255)`);
+  await db.execute(sql`ALTER TABLE scheduled_work_blocks ADD COLUMN IF NOT EXISTS reminder_sent_at timestamp`);
   await db.execute(sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS client_id varchar(255)`);
   await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS linked_user_id varchar(255)`);
   await db.execute(sql`ALTER TABLE workspace_people ADD COLUMN IF NOT EXISTS display_name varchar(255)`);
@@ -232,6 +269,16 @@ async function runSchemaEnsure() {
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS is_billable_default boolean NOT NULL DEFAULT true`);
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'active'`);
 
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'needs_setup'`);
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS display_name varchar(255)`);
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS external_account_id varchar(255)`);
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS credentials jsonb DEFAULT '{}'::jsonb NOT NULL`);
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS config jsonb DEFAULT '{}'::jsonb NOT NULL`);
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS token_expires_at timestamp`);
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS last_synced_at timestamp`);
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS last_error text`);
+  await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS updated_at timestamp NOT NULL DEFAULT now()`);
+
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_clients_workspace_id ON clients (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_organizations_workspace_id ON organizations (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_workspace_people_workspace_id ON workspace_people (workspace_id)`);
@@ -245,6 +292,33 @@ async function runSchemaEnsure() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_api_keys_workspace_id ON api_keys (workspace_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_api_key_requests_key_id ON api_key_requests (api_key_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_onboarding_progress_workspace_user ON onboarding_progress (workspace_id, user_id)`);
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_integration_connections_workspace_provider' AND indexdef NOT ILIKE 'CREATE UNIQUE%') THEN
+        DROP INDEX idx_integration_connections_workspace_provider;
+      END IF;
+    END $$;
+  `);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_connections_workspace_provider ON integration_connections (workspace_id, provider)`);
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_integration_sync_records_resource' AND indexdef NOT ILIKE 'CREATE UNIQUE%') THEN
+        DROP INDEX idx_integration_sync_records_resource;
+      END IF;
+    END $$;
+  `);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_sync_records_resource ON integration_sync_records (workspace_id, provider, resource_type, resource_id)`);
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_integration_sync_records_external' AND indexdef NOT ILIKE 'CREATE UNIQUE%') THEN
+        DROP INDEX idx_integration_sync_records_external;
+      END IF;
+    END $$;
+  `);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_sync_records_external ON integration_sync_records (workspace_id, provider, external_id)`);
 }
 
 export async function ensureWorkspaceSchema() {

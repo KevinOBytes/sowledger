@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, Code2, CreditCard, FileDown, Settings, Tag, UserRound, Webhook } from "lucide-react";
+import { Bell, Code2, CreditCard, FileDown, Plug, Settings, Tag, UserRound, Webhook } from "lucide-react";
 
 type UserData = {
   id: string;
@@ -15,6 +15,7 @@ type UserData = {
 
 const SETTINGS_LINKS = [
   { href: "/settings/billing", title: "Billing", description: "Manage plans, Stripe checkout, and subscription portal.", icon: CreditCard },
+  { href: "/integrations", title: "Integrations", description: "Connect calendar, Slack, accounting, and automation systems.", icon: Plug },
   { href: "/settings/developers", title: "Developers", description: "Create API keys, inspect usage, and open API docs.", icon: Code2 },
   { href: "/exports", title: "Exports", description: "Download complete or filtered workspace data.", icon: FileDown },
   { href: "/settings/tags", title: "Tags", description: "Maintain workspace tag metadata and billing defaults.", icon: Tag },

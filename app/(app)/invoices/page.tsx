@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, DollarSign, Download, FileText, Receipt, ShieldCheck } from "lucide-react";
+import { AlertCircle, DollarSign, Download, FileText, Receipt, RefreshCcw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -82,6 +82,8 @@ export default function InvoicesPage() {
   const [requiresUpgrade, setRequiresUpgrade] = useState(false);
   const [proofPackState, setProofPackState] = useState<ProofPackState | null>(null);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [quickBooksConnected, setQuickBooksConnected] = useState(false);
+  const [pushingInvoiceId, setPushingInvoiceId] = useState<string | null>(null);
   const generatingInvoiceRef = useRef(false);
   const billableAmount = useMemo(() => billables.reduce((sum, entry) => sum + entry.amount, 0), [billables]);
   const selectedAmount = useMemo(
@@ -103,6 +105,11 @@ export default function InvoicesPage() {
         setBillables(data.billableEntries || []);
       } else if (res.status === 402) {
         setRequiresUpgrade(true);
+      }
+      const integrationsRes = await fetch("/api/integrations").catch(() => null);
+      if (integrationsRes?.ok) {
+        const integrations = await integrationsRes.json() as { connections?: Array<{ provider: string; status: string }> };
+        setQuickBooksConnected(Boolean(integrations.connections?.some((connection) => connection.provider === "quickbooks" && connection.status === "connected")));
       }
     } catch {
       // The visible page state stays useful; toast noise here would repeat on refresh.
@@ -162,6 +169,26 @@ export default function InvoicesPage() {
         loading: false,
         error: error instanceof Error ? error.message : "Unable to load proof pack",
       });
+    }
+  }
+
+  async function pushToQuickBooks(invoiceId: string) {
+    setPushingInvoiceId(invoiceId);
+    try {
+      const res = await fetch("/api/integrations/quickbooks/push-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceId }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; result?: { externalId?: string; reused?: boolean } };
+      if (!res.ok) throw new Error(data.error || "Could not push invoice");
+      toast.success(data.result?.reused ? "Invoice already linked to QuickBooks" : "Invoice pushed to QuickBooks", {
+        description: data.result?.externalId ? `QuickBooks invoice ID: ${data.result.externalId}` : undefined,
+      });
+    } catch (error) {
+      toast.error("QuickBooks push failed", { description: error instanceof Error ? error.message : "Unknown error" });
+    } finally {
+      setPushingInvoiceId(null);
     }
   }
 
@@ -300,6 +327,12 @@ export default function InvoicesPage() {
                       <Download className="h-4 w-4" />
                       Print
                     </button>
+                    {quickBooksConnected ? (
+                      <button onClick={() => void pushToQuickBooks(invoice.id)} disabled={pushingInvoiceId === invoice.id} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50">
+                        <RefreshCcw className={`h-4 w-4 ${pushingInvoiceId === invoice.id ? "animate-spin" : ""}`} />
+                        {pushingInvoiceId === invoice.id ? "Pushing..." : "Push QuickBooks"}
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               ))}

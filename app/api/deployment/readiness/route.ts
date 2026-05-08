@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
 
   const requiredChecks = {
     appUrl: Boolean(env.NEXT_PUBLIC_APP_URL),
+    authSharedKey: Boolean(env.AUTH_SHARED_KEY),
+    cronSecret: Boolean(env.CRON_SECRET),
     authCookieSecret: Boolean(env.AUTH_COOKIE_SECRET && env.AUTH_COOKIE_SECRET.length >= 24),
     auditSigningSecret: Boolean(env.AUDIT_SIGNING_SECRET),
     resendApiKey: Boolean(env.RESEND_API_KEY),
@@ -28,6 +30,9 @@ export async function GET(req: NextRequest) {
   const optionalChecks = {
     sentryDsn: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
     sentryReleaseUpload: Boolean(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT),
+    googleCalendarOAuth: Boolean(env.GOOGLE_CALENDAR_CLIENT_ID && env.GOOGLE_CALENDAR_CLIENT_SECRET),
+    slackOAuth: Boolean(env.SLACK_CLIENT_ID && env.SLACK_CLIENT_SECRET),
+    quickBooksOAuth: Boolean(env.QUICKBOOKS_CLIENT_ID && env.QUICKBOOKS_CLIENT_SECRET),
   };
 
   const passed = Object.values(requiredChecks).every(Boolean);

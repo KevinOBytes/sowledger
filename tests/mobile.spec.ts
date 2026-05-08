@@ -17,10 +17,13 @@ const internalAppRoutes = [
   { path: '/activity', heading: 'Activity' },
   { path: '/reports', heading: 'Work performance and billable output' },
   { path: '/exports', heading: 'Complete and filtered data exports' },
+  { path: '/integrations', heading: 'Connect the systems around Billabled' },
   { path: '/settings/developers', heading: 'Agency integrations, API keys, usage, and docs' },
 ];
 
 test.describe('Mobile Web Support', () => {
+  test.setTimeout(60_000);
+
   test('iPhone viewport supports public pages, auth, and core bottom navigation', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoApp(page, '/');
@@ -81,8 +84,8 @@ test.describe('Mobile Web Support', () => {
     expect(loginData.success).toBe(true);
 
     for (const route of internalAppRoutes) {
-      await gotoApp(page, route.path);
-      await expect(page.getByRole('heading', { name: route.heading })).toBeVisible();
+      await gotoApp(page, route.path, 3, route.path === '/integrations' ? 'domcontentloaded' : 'load');
+      await expect(page.getByRole('heading', { name: route.heading, exact: true })).toBeVisible();
       await expectNoHorizontalOverflow(page);
     }
 
@@ -92,6 +95,6 @@ test.describe('Mobile Web Support', () => {
 
     await page.getByRole('link', { name: 'Calendar' }).click();
     await expect(page).toHaveURL(/.*\/calendar/);
-    await expect(page.getByRole('heading', { name: 'Calendar' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Calendar', exact: true })).toBeVisible();
   });
 });

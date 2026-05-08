@@ -4,6 +4,7 @@ import { createTimeEntry, ensurePeriodUnlocked, enforceDailyHoursLimit } from "@
 import { db } from "@/lib/db";
 import { projects, goals, userActions, scheduledWorkBlocks } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
+import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
 import { and, eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
@@ -108,6 +109,12 @@ export async function POST(req: NextRequest) {
         updatedAt: new Date(),
       }).where(and(eq(scheduledWorkBlocks.id, body.scheduledBlockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId), eq(scheduledWorkBlocks.userId, session.sub)));
     }
+
+    dispatchIntegrationNotification(session.workspaceId, "time_entry.created", {
+      title: "Completed work logged",
+      body: `${entry.description || entry.taskId} (${Math.round(durationSeconds / 60)} min, ${entry.source})`,
+      url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/activity`,
+    }).catch(() => {});
 
     return NextResponse.json({ ok: true, entry });
   } catch (error) {

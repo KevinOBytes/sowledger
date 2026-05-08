@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/scheduled-block-reminders",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/unfinished-timers",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

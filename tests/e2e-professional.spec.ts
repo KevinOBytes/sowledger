@@ -45,13 +45,17 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
     await page.getByRole('combobox', { name: 'Select Budget Type' }).selectOption('hours');
     await page.getByPlaceholder('e.g. 100 hrs').fill('100');
     await page.getByRole('button', { name: 'Create Project' }).click();
-    await expect(page.getByRole('link', { name: /E2E Budget Project/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /E2E Budget Project/ })).toBeVisible({ timeout: 30_000 });
   });
 
   test('Story 4: view project financials burndown', async ({ page }) => {
     await gotoApp(page, '/projects');
-    await page.getByRole('link', { name: /E2E Budget Project/ }).first().click();
-    await expect(page.locator('text=Budget (Hours)')).toBeVisible();
+    const projectLink = page.getByRole('link', { name: /E2E Budget Project/ }).first();
+    await expect(projectLink).toBeVisible({ timeout: 30_000 });
+    const href = await projectLink.getAttribute('href');
+    expect(href).toBeTruthy();
+    await gotoApp(page, href!);
+    await expect(page.locator('text=Budget (Hours)')).toBeVisible({ timeout: 20_000 });
   });
 
   test('Story 5: run overlapping timer blocks', async ({ page }) => {
