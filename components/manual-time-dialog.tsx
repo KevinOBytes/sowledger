@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Clock3, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,6 +40,7 @@ function localDate(date: string, time: string) {
 }
 
 export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, defaultTaskId, defaultProjectId, defaultDescription }: ManualTimeDialogProps) {
+  const titleId = useId();
   const [projects, setProjects] = useState<Project[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
   const [taskId, setTaskId] = useState(defaultTaskId || "General work");
@@ -137,13 +138,18 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl text-slate-950">
+      <div
+        className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white text-slate-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-cyan-700">
               <Clock3 className="h-4 w-4" /> Log time manually
             </div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Add completed work</h2>
+            <h2 id={titleId} className="mt-1 text-2xl font-semibold tracking-tight">Add completed work</h2>
             <p className="mt-1 text-sm text-slate-500">Use this for work you completed without starting a live timer.</p>
           </div>
           <button onClick={() => onOpenChange(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close manual time dialog">

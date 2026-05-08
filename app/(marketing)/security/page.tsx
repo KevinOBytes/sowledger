@@ -1,36 +1,129 @@
 import Link from "next/link";
+import {
+  ArrowRight,
+  CreditCard,
+  Database,
+  FileCheck2,
+  KeyRound,
+  LockKeyhole,
+  Route,
+  ShieldCheck,
+  Siren,
+} from "lucide-react";
 
-export const metadata = { title: "Security - Billabled" };
-
-const POSTURE = [
-  "Workspace isolation is mandatory for app queries and public API calls.",
-  "API keys are scoped, revocable, expirable, usage-tracked, shown once, and stored hashed.",
-  "Stripe checkout accepts internal plan IDs, not arbitrary client-submitted price IDs.",
-  "Exports avoid secrets and include x-billabled-export-sha256 integrity headers where supported.",
-  "Stripe webhooks and API v1 routes stay public at the proxy layer but authenticate inside the route handlers.",
-  "Production migrations should run through the safe migration script with backup or catalog snapshot evidence.",
+const TRUST_CONTROLS = [
+  {
+    title: "Workspace isolation",
+    body: "Workspace data access is treated as scoped by workspaceId unless a proven global resource is being accessed.",
+    icon: Database,
+  },
+  {
+    title: "API key lifecycle",
+    body: "Keys are scoped, revocable, expirable, usage-tracked, shown once, and stored hashed rather than as raw secrets.",
+    icon: KeyRound,
+  },
+  {
+    title: "Billing boundary",
+    body: "Stripe checkout accepts internal plan IDs only. Public API v1 does not expose billing changes or subscription management.",
+    icon: CreditCard,
+  },
+  {
+    title: "Export integrity",
+    body: "Exports avoid secrets and include x-billabled-export-sha256 integrity headers where supported.",
+    icon: FileCheck2,
+  },
+  {
+    title: "Public-route checks",
+    body: "API v1 and Stripe webhook routes are public at the proxy layer by design, with authentication or signature checks inside handlers.",
+    icon: Route,
+  },
+  {
+    title: "Migration safety",
+    body: "Database changes are handled through the migration workflow instead of ad hoc production DDL.",
+    icon: LockKeyhole,
+  },
 ];
+
+export const metadata = {
+  title: "Security - Billabled",
+  description: "Billabled trust center for workspace isolation, API key lifecycle, billing boundaries, export integrity, public-route checks, and security reporting.",
+};
 
 export default function SecurityPage() {
   return (
-    <main className="bg-[#f6f3ee] px-6 pb-20 pt-32 text-slate-950">
-      <div className="mx-auto max-w-5xl">
-        <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Security posture</p>
-        <h1 className="mt-4 text-5xl font-semibold tracking-tight sm:text-7xl">Built around workspace boundaries.</h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-600">Billabled is early-stage software, so this page states the practical security posture customers need to understand before trusting it with operational time and billing data.</p>
-        <div className="mt-10 grid gap-4 md:grid-cols-2">
-          {POSTURE.map((item) => (
-            <div key={item} className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
-              <p className="leading-7 text-slate-700">{item}</p>
+    <div className="bg-background text-slate-950">
+      <section className="border-b border-border px-4 pb-12 pt-12 sm:px-6 lg:pt-16">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-surface px-4 py-1.5 text-sm font-bold text-cyan-800 shadow-sm">
+              <ShieldCheck className="h-4 w-4" />
+              Trust center
+            </p>
+            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Security posture for proof-backed billing.</h1>
+            <p className="mt-5 text-lg leading-8 text-slate-700">
+              Billabled handles operational time, billing evidence, exports, and API access. This page states practical controls without implying formal certifications or compliance programs.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-xl shadow-stone-900/10">
+            <h2 className="text-2xl font-semibold">Report a security concern</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Send the affected workspace, endpoint, timestamp, expected behavior, observed behavior, and safe reproduction details. Do not include passwords, API keys, bearer tokens, or payment data.
+            </p>
+            <Link href="/contact" className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
+              Contact security
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 py-12 sm:px-6">
+        <div className="mx-auto grid max-w-7xl gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {TRUST_CONTROLS.map((control) => {
+            const Icon = control.icon;
+            return (
+              <section key={control.title} className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">
+                <Icon className="h-6 w-6 text-cyan-700" />
+                <h2 className="mt-4 text-xl font-semibold">{control.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{control.body}</p>
+              </section>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="px-4 pb-20 pt-4 sm:px-6">
+        <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.75fr_1.25fr]">
+          <div className="rounded-2xl bg-slate-950 p-7 text-white shadow-sm">
+            <Siren className="h-6 w-6 text-cyan-300" />
+            <h2 className="mt-4 text-3xl font-semibold">Boundaries that stay out of public API v1</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Public API v1 is for scoped operational integrations. Billing changes, invites, subscription management, and destructive workspace administration remain inside authenticated app workflows.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">
+            <h2 className="text-2xl font-semibold">How to send a useful report</h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {[
+                "Workspace name or identifier",
+                "Affected route or endpoint",
+                "Approximate timestamp and timezone",
+                "Safe reproduction steps",
+                "Observed response code or error text",
+                "No secrets, tokens, or card data",
+              ].map((item) => (
+                <div key={item} className="rounded-xl border border-border bg-background/60 p-4 text-sm font-semibold text-slate-700">
+                  {item}
+                </div>
+              ))}
             </div>
-          ))}
+            <Link href="/support/api" className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-cyan-800 transition hover:text-cyan-600">
+              Review API support details
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
-        <div className="mt-8 rounded-[32px] bg-slate-950 p-6 text-white shadow-sm">
-          <h2 className="text-2xl font-semibold">Report a security concern</h2>
-          <p className="mt-2 text-slate-300">Send the affected workspace, endpoint, timestamp, and safe reproduction details. Do not include secrets in the initial report.</p>
-          <Link href="/contact" className="mt-5 inline-flex rounded-full bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-200">Contact support</Link>
-        </div>
-      </div>
-    </main>
+      </section>
+    </div>
   );
 }

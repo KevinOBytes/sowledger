@@ -19,6 +19,13 @@ import { AlertTriangle, CalendarIcon, DownloadIcon, LineChart, Search, Timer, Tr
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
+import {
+  AppEmptyState,
+  AppMetricCard,
+  AppPageHeader,
+  AppPageShell,
+  AppWorkflowRail,
+} from "@/components/app-page-shell";
 import { ManualTimeDialog } from "@/components/manual-time-dialog";
 
 type ReportData = {
@@ -121,6 +128,7 @@ export function ReportsPageClient() {
       if (reportResult.status === "fulfilled") {
         setData(reportResult.value);
       } else {
+        setData(null);
         if (scope === "team") setScope("mine");
         toast.error("Analytics unavailable", { description: reportResult.reason instanceof Error ? reportResult.reason.message : "Unknown error" });
       }
@@ -157,58 +165,101 @@ export function ReportsPageClient() {
   }, [data]);
 
   function exportAnalytics() {
-    const query = new URLSearchParams({ format: "csv", start: startDate, end: endDate, include: "projects,timeEntries,users,schedule" });
+    if (scope !== "team") {
+      toast.error("CSV export unavailable for personal analytics", {
+        description: "Use team analytics or the Exports page person filter so exported data matches the visible scope.",
+      });
+      return;
+    }
+    const query = new URLSearchParams({ format: "csv", scope, start: startDate, end: endDate, include: "projects,timeEntries,users,schedule" });
     window.location.href = `/api/export/csv?${query.toString()}`;
   }
 
+  const analyticsExportUnavailable = scope !== "team";
+
   if (loading && !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f6f3ee] p-8 text-slate-500">
+      <AppPageShell contentClassName="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center">
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-cyan-600" />
           <p>Loading analytics...</p>
         </div>
-      </div>
+      </AppPageShell>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Analytics</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Work performance and billable output</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Track planned vs actual work, manual vs timer entries, utilization, project allocation, and export-ready billing signals.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button onClick={() => setManualOpen(true)} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700">Log time</button>
-              <button onClick={exportAnalytics} disabled={!data} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
-                <DownloadIcon className="h-4 w-4" />Export CSV
-              </button>
-            </div>
-          </div>
+    <>
+      <AppPageShell>
+        <AppPageHeader
+          eyebrow="Analytics"
+          title="Work performance and billable output"
+          description="Track planned vs actual work, manual vs timer entries, utilization, project allocation, and export-ready billing signals."
+          icon={LineChart}
+          metadata={[
+            { label: scope === "mine" ? "My analytics" : "Team analytics", tone: "cyan", icon: TrendingUp },
+            { label: `${startDate || "Open"} to ${endDate || "today"}`, tone: "slate", icon: CalendarIcon },
+          ]}
+          secondaryAction={(
+            <button
+              onClick={() => setManualOpen(true)}
+              className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700 sm:w-auto"
+            >
+              Log time
+            </button>
+          )}
+          primaryAction={(
+            <button
+              onClick={exportAnalytics}
+              disabled={!data || analyticsExportUnavailable}
+              title={analyticsExportUnavailable ? "CSV export is available from team analytics or the Exports page person filter." : "Export visible team analytics to CSV"}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:w-auto"
+            >
+              <DownloadIcon className="h-4 w-4" />
+              {analyticsExportUnavailable ? "Export CSV unavailable" : "Export CSV"}
+            </button>
+          )}
+        />
 
-          <div className="mt-5 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex rounded-full bg-white p-1 shadow-sm">
-              {(["mine", "team"] as const).map((option) => (
-                <button key={option} onClick={() => setScope(option)} className={`rounded-full px-4 py-2 text-sm font-bold capitalize transition ${scope === option ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>
-                  {option === "mine" ? "My analytics" : "Team analytics"}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-500"><CalendarIcon className="h-4 w-4" />Date range</div>
-              <input type="date" title="Start Date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-cyan-500" />
-              <span className="text-slate-400">to</span>
-              <input type="date" title="End Date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-cyan-500" />
-            </div>
+        <AppWorkflowRail current="review" />
+
+        <section className="flex flex-col gap-3 rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div className="inline-flex w-full rounded-full bg-slate-100 p-1 text-sm font-bold shadow-inner sm:w-auto">
+            {(["mine", "team"] as const).map((option) => (
+              <button
+                key={option}
+                onClick={() => setScope(option)}
+                className={`flex-1 rounded-full px-4 py-2 text-sm font-bold capitalize transition sm:flex-none ${scope === option ? "bg-slate-950 text-white shadow-sm" : "text-slate-500 hover:text-slate-950"}`}
+              >
+                {option === "mine" ? "My analytics" : "Team analytics"}
+              </button>
+            ))}
           </div>
-        </header>
+          <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+              <CalendarIcon className="h-4 w-4" />
+              Date range
+            </div>
+            <input type="date" title="Start Date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" />
+            <span className="hidden text-slate-400 sm:inline">to</span>
+            <input type="date" title="End Date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" />
+          </div>
+        </section>
 
         {!data ? (
-          <div className="rounded-[32px] border border-slate-200 bg-white p-10 text-center text-rose-600 shadow-sm">Failed to load analytics.</div>
+          <AppEmptyState
+            icon={AlertTriangle}
+            title="Failed to load analytics."
+            description="Try a narrower date range or switch back to my analytics if team reporting is restricted."
+            action={(
+              <button
+                onClick={() => fetchReports().catch(() => null)}
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+              >
+                Retry analytics
+              </button>
+            )}
+          />
         ) : (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className={`space-y-6 transition-opacity ${loading ? "opacity-60" : "opacity-100"}`}>
             <RevenueIntelligenceSection
@@ -218,28 +269,23 @@ export function ReportsPageClient() {
             />
 
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-500">Logged hours</p>
-                <p className="mt-2 text-3xl font-semibold">{metric(data.totalHours, "h")}</p>
-              </div>
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-500">Planned hours</p>
-                <p className="mt-2 text-3xl font-semibold">{metric(data.plannedHours, "h")}</p>
-              </div>
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-500">Utilization</p>
-                <p className="mt-2 text-3xl font-semibold text-cyan-700">{utilizationLabel}</p>
-              </div>
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-500">Manual vs timer</p>
-                <p className="mt-2 text-3xl font-semibold">{metric(data.manualHours, "h")}</p>
-                <p className="text-sm text-slate-500">manual / {metric(data.timerHours, "h")} timer / {metric(data.calendarHours, "h")} calendar</p>
-              </div>
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-500">Billable pipeline</p>
-                <p className="mt-2 text-3xl font-semibold text-emerald-700">${data.totalBillableAmount.toFixed(0)}</p>
-                <p className="text-sm text-amber-700">{data.missedBlocks} missed scheduled work item(s)</p>
-              </div>
+              <AppMetricCard label="Logged hours" value={metric(data.totalHours, "h")} detail="Actual time in this range." accent="slate" icon={Timer} />
+              <AppMetricCard label="Planned hours" value={metric(data.plannedHours, "h")} detail="Scheduled work for comparison." accent="slate" icon={CalendarIcon} />
+              <AppMetricCard label="Utilization" value={utilizationLabel} detail="Actual time against plan." accent="cyan" icon={TrendingUp} />
+              <AppMetricCard
+                label="Manual vs timer"
+                value={metric(data.manualHours, "h")}
+                detail={`manual / ${metric(data.timerHours, "h")} timer / ${metric(data.calendarHours, "h")} calendar`}
+                accent="slate"
+                icon={Timer}
+              />
+              <AppMetricCard
+                label="Billable pipeline"
+                value={`$${data.totalBillableAmount.toFixed(0)}`}
+                detail={`${data.missedBlocks} missed scheduled work item(s)`}
+                accent="emerald"
+                icon={DownloadIcon}
+              />
             </section>
 
             <section className="grid gap-6 lg:grid-cols-2">
@@ -323,9 +369,9 @@ export function ReportsPageClient() {
             </section>
           </motion.div>
         )}
-      </div>
+      </AppPageShell>
       <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} onSaved={fetchReports} />
-    </main>
+    </>
   );
 }
 
@@ -413,16 +459,22 @@ function IntelligencePanel({
             const amount = itemAmount(item, amountKeys);
             const label = item.title || item.projectName || item.clientName || `Signal ${index + 1}`;
             const detail = item.reason || item.notes || "Review this billing signal before the next approval cycle.";
+            const flaggedHours = [item.missingHours, item.hours, item.plannedHours].find(
+              (value): value is number => typeof value === "number" && Number.isFinite(value),
+            );
+            const actualHours = typeof item.actualHours === "number" && Number.isFinite(item.actualHours) ? item.actualHours : null;
             return (
               <article key={item.id || `${label}-${index}`} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <h3 className="font-bold text-slate-950">{label}</h3>
                     <p className="mt-1 text-sm text-slate-500">{detail}</p>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                      {metric(item.missingHours ?? item.hours ?? item.plannedHours ?? 0, "h")} flagged
-                      {item.actualHours != null ? ` / ${metric(item.actualHours, "h")} actual` : ""}
-                    </p>
+                    {flaggedHours != null && (
+                      <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                        {metric(flaggedHours, "h")} flagged
+                        {actualHours != null ? ` / ${metric(actualHours, "h")} actual` : ""}
+                      </p>
+                    )}
                   </div>
                   {amount && <span className="shrink-0 rounded-full bg-white px-3 py-1 text-sm font-bold text-emerald-700">{amount}</span>}
                 </div>

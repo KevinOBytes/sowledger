@@ -4,6 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Archive, Download, FileJson, FileSpreadsheet, Filter, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  AppEmptyState,
+  AppMetricCard,
+  AppPageHeader,
+  AppPageShell,
+  AppWorkflowRail,
+} from "@/components/app-page-shell";
+
 type Project = { id: string; name: string };
 type Person = {
   id: string;
@@ -65,6 +73,7 @@ export default function ExportsPage() {
 
   const completeExport = include.length === DATASETS.length && !projectId && !start && !end && !userId && !status && !source;
   const selectedProjectName = useMemo(() => projects.find((project) => project.id === projectId)?.name, [projectId, projects]);
+  const activeFilterCount = [projectId, start, end, userId, status, source].filter(Boolean).length;
 
   function toggleDataset(id: string) {
     setInclude((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -108,21 +117,45 @@ export default function ExportsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Export center</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Complete and filtered data exports</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Download complete workspace backups or filtered project, date, member, status, and source exports in CSV or JSON. Every export includes a SHA-256 digest header.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => { setFormat("csv"); downloadExport("csv"); }} disabled={downloading} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700 disabled:opacity-50"><FileSpreadsheet className="h-4 w-4" />CSV</button>
-              <button onClick={() => { setFormat("json"); downloadExport("json"); }} disabled={downloading} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"><FileJson className="h-4 w-4" />JSON</button>
-            </div>
-          </div>
-        </header>
+    <AppPageShell>
+      <AppPageHeader
+        eyebrow="Export center"
+        title="Complete and filtered data exports"
+        description="Download complete workspace backups or filtered project, date, member, status, and source exports in CSV or JSON. Every export includes a SHA-256 digest header."
+        icon={Archive}
+        metadata={[
+          { label: completeExport ? "Complete export" : "Filtered export", tone: completeExport ? "emerald" : "cyan", icon: ShieldCheck },
+          { label: `${include.length} dataset${include.length === 1 ? "" : "s"}`, tone: "slate", icon: Archive },
+        ]}
+        secondaryAction={(
+          <button
+            onClick={() => { setFormat("csv"); downloadExport("csv"); }}
+            disabled={downloading || include.length === 0}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700 disabled:opacity-50 sm:w-auto"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            CSV
+          </button>
+        )}
+        primaryAction={(
+          <button
+            onClick={() => { setFormat("json"); downloadExport("json"); }}
+            disabled={downloading || include.length === 0}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:w-auto"
+          >
+            <FileJson className="h-4 w-4" />
+            JSON
+          </button>
+        )}
+      />
+
+      <AppWorkflowRail current="approve" />
+
+      <section className="grid gap-4 sm:grid-cols-3">
+        <AppMetricCard label="Datasets selected" value={`${include.length}/${DATASETS.length}`} detail={include.length === DATASETS.length ? "All export datasets are included." : "Dataset list has been narrowed."} accent="cyan" icon={Archive} />
+        <AppMetricCard label="Active filters" value={activeFilterCount} detail={activeFilterCount === 0 ? "Workspace-wide output." : "Project, person, date, status, or source filter applied."} accent={activeFilterCount > 0 ? "amber" : "slate"} icon={Filter} />
+        <AppMetricCard label="Last digest" value={lastDigest ? "Ready" : "None"} detail={lastDigest ? `${lastDigest.slice(0, 16)}...` : "Run an export to capture the latest digest."} accent={lastDigest ? "emerald" : "slate"} icon={ShieldCheck} />
+      </section>
 
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -157,6 +190,19 @@ export default function ExportsPage() {
           </div>
         </section>
 
+        {include.length === 0 && (
+          <AppEmptyState
+            icon={Archive}
+            title="Choose at least one dataset"
+            description="Exports need at least one dataset selected. Select all datasets for a complete backup or choose a smaller review set."
+            action={(
+              <button onClick={() => setInclude(DATASETS.map((item) => item.id))} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800">
+                Select all datasets
+              </button>
+            )}
+          />
+        )}
+
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -169,7 +215,6 @@ export default function ExportsPage() {
             </button>
           </div>
         </section>
-      </div>
-    </main>
+    </AppPageShell>
   );
 }

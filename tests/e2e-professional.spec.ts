@@ -75,14 +75,16 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
   test('Story 7: submit a retroactive completed-work log', async ({ page }) => {
     await gotoApp(page, '/activity');
     await page.getByRole('button', { name: 'Log completed work' }).click();
-    await page.getByLabel('Work label').fill('retroactive-e2e');
-    await page.getByLabel('Notes').fill('Retroactive E2E Task');
+    const dialog = page.getByRole('dialog', { name: 'Add completed work' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel('Work label').fill('retroactive-e2e');
+    await dialog.getByLabel('Notes').fill('Retroactive E2E Task');
     const today = new Date().toISOString().split('T')[0];
-    await page.getByLabel('Start date').fill(today);
-    await page.getByLabel('End date').fill(today);
-    await page.getByLabel('Start time').fill('09:00');
-    await page.getByLabel('End time').fill('11:00');
-    await page.getByRole('button', { name: 'Log time' }).click();
+    await dialog.getByLabel('Start date').fill(today);
+    await dialog.getByLabel('End date').fill(today);
+    await dialog.getByLabel('Start time').fill('09:00');
+    await dialog.getByLabel('End time').fill('11:00');
+    await dialog.getByRole('button', { name: 'Log time' }).click();
     await expect(page.getByText('Retroactive E2E Task')).toBeVisible();
   });
 
