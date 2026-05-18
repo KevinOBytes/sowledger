@@ -1,0 +1,15 @@
+---
+description: Microfirm coding and documentation rules
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+Use `AGENTS.md` as primary instructions.
+
+Key rules:
+- Prefer TypeScript over JavaScript.
+- Minimize unnecessary imports/dependencies.
+- Maintain strict security boundaries for upload, storage, auth, and tenant data.
+- Keep `README.md` and `/docs` current in the same change set.
+- Keep `FEATURES.md` in sync with `REQUIREMENTS.md`.
