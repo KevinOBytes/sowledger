@@ -210,7 +210,21 @@ async function runSchemaEnsure() {
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'active'`);
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS percent_complete real NOT NULL DEFAULT 0`);
   await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_preferences jsonb DEFAULT '{}'::jsonb NOT NULL`);
+
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name varchar(255)`);
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone varchar(100)`);
+  await db.execute(sql`UPDATE users SET timezone = 'UTC' WHERE timezone IS NULL`);
+  await db.execute(sql`ALTER TABLE users ALTER COLUMN timezone SET DEFAULT 'UTC'`);
+  await db.execute(sql`ALTER TABLE users ALTER COLUMN timezone SET NOT NULL`);
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_tags jsonb DEFAULT '[]'::jsonb`);
+  await db.execute(sql`UPDATE users SET preferred_tags = '[]'::jsonb WHERE preferred_tags IS NULL`);
+  await db.execute(sql`ALTER TABLE users ALTER COLUMN preferred_tags SET DEFAULT '[]'::jsonb`);
+  await db.execute(sql`ALTER TABLE users ALTER COLUMN preferred_tags SET NOT NULL`);
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_preferences jsonb DEFAULT '{}'::jsonb`);
+  await db.execute(sql`UPDATE users SET calendar_preferences = '{}'::jsonb WHERE calendar_preferences IS NULL`);
+  await db.execute(sql`ALTER TABLE users ALTER COLUMN calendar_preferences SET DEFAULT '{}'::jsonb`);
+  await db.execute(sql`ALTER TABLE users ALTER COLUMN calendar_preferences SET NOT NULL`);
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`);
 
   await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS scheduled_block_id varchar(255)`);
   await db.execute(sql`ALTER TABLE scheduled_work_blocks ADD COLUMN IF NOT EXISTS reminder_sent_at timestamp`);
