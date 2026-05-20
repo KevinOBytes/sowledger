@@ -18,11 +18,23 @@ type ScheduledBlock = {
   endsAt: string;
 };
 
+type EditableTimeEntry = {
+  id: string;
+  taskId: string;
+  projectId: string | null;
+  action: string | null;
+  tags: string[];
+  description: string | null;
+  startedAt: string;
+  stoppedAt: string | null;
+};
+
 type ManualTimeDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved?: () => void | Promise<void>;
   scheduledBlock?: ScheduledBlock | null;
+  editEntry?: EditableTimeEntry | null;
   defaultTaskId?: string;
   defaultProjectId?: string;
   defaultDescription?: string;
@@ -39,7 +51,9 @@ function localDate(date: string, time: string) {
   return new Date(`${date}T${time}`);
 }
 
-export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, defaultTaskId, defaultProjectId, defaultDescription }: ManualTimeDialogProps) {
+const PRESERVE_ACTION_VALUE = "__preserve_current_action__";
+
+export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, editEntry, defaultTaskId, defaultProjectId, defaultDescription }: ManualTimeDialogProps) {
   const titleId = useId();
   const [projects, setProjects] = useState<Project[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
@@ -69,21 +83,21 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
     if (!open) return;
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    const start = scheduledBlock ? new Date(scheduledBlock.startsAt) : oneHourAgo;
-    const end = scheduledBlock ? new Date(scheduledBlock.endsAt) : now;
+    const start = editEntry ? new Date(editEntry.startedAt) : scheduledBlock ? new Date(scheduledBlock.startsAt) : oneHourAgo;
+    const end = editEntry?.stoppedAt ? new Date(editEntry.stoppedAt) : scheduledBlock ? new Date(scheduledBlock.endsAt) : now;
     const startParts = parts(start);
     const endParts = parts(end);
 
-    setTaskId(scheduledBlock?.taskId || defaultTaskId || "General work");
-    setProjectId(scheduledBlock?.projectId || defaultProjectId || "");
-    setActionId(scheduledBlock?.actionId || "");
-    setDescription(scheduledBlock?.notes || scheduledBlock?.title || defaultDescription || "");
-    setTags((scheduledBlock?.tags ?? []).join(", "));
+    setTaskId(editEntry?.taskId || scheduledBlock?.taskId || defaultTaskId || "General work");
+    setProjectId(editEntry?.projectId || scheduledBlock?.projectId || defaultProjectId || "");
+    setActionId(editEntry?.action ? PRESERVE_ACTION_VALUE : scheduledBlock?.actionId || "");
+    setDescription(editEntry?.description || scheduledBlock?.notes || scheduledBlock?.title || defaultDescription || "");
+    setTags((editEntry?.tags ?? scheduledBlock?.tags ?? []).join(", "));
     setStartDate(startParts.date);
     setStartTime(startParts.time);
     setEndDate(endParts.date);
     setEndTime(endParts.time);
-  }, [defaultDescription, defaultProjectId, defaultTaskId, open, scheduledBlock]);
+  }, [defaultDescription, defaultProjectId, defaultTaskId, editEntry, open, scheduledBlock]);
 
   const durationLabel = useMemo(() => {
     if (!startDate || !startTime || !endDate || !endTime) return "";
@@ -107,28 +121,35 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
 
     setSaving(true);
     try {
-      const response = await fetch("/api/timer/manual", {
-        method: "POST",
+      const payload: Record<string, unknown> = {
+        taskId: taskId.trim(),
+        projectId: projectId || undefined,
+        description: description || undefined,
+        tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+        startedAt: startedAt.toISOString(),
+        stoppedAt: stoppedAt.toISOString(),
+      };
+      if (editEntry) {
+        if (actionId !== PRESERVE_ACTION_VALUE) payload.actionId = actionId;
+      } else if (actionId) {
+        payload.actionId = actionId;
+      }
+      if (scheduledBlock?.id) payload.scheduledBlockId = scheduledBlock.id;
+      if (editEntry?.id) payload.entryId = editEntry.id;
+
+      const response = await fetch(editEntry ? "/api/timer/edit" : "/api/timer/manual", {
+        method: editEntry ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId: taskId.trim(),
-          projectId: projectId || undefined,
-          actionId: actionId || undefined,
-          description: description || undefined,
-          tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
-          startedAt: startedAt.toISOString(),
-          stoppedAt: stoppedAt.toISOString(),
-          scheduledBlockId: scheduledBlock?.id,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to log time");
-      toast.success("Completed work logged");
+      if (!response.ok) throw new Error(data.error || (editEntry ? "Unable to correct time" : "Unable to log time"));
+      toast.success(editEntry ? "Time entry corrected" : "Completed work logged");
       onOpenChange(false);
       await onSaved?.();
       window.dispatchEvent(new CustomEvent("billabled:time-saved"));
     } catch (error) {
-      toast.error("Could not log time", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error(editEntry ? "Could not correct time" : "Could not log time", { description: error instanceof Error ? error.message : "Unknown error" });
     } finally {
       setSaving(false);
     }
@@ -147,10 +168,10 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-cyan-700">
-              <Clock3 className="h-4 w-4" /> Log time manually
+              <Clock3 className="h-4 w-4" /> {editEntry ? "Correct logged time" : "Log time manually"}
             </div>
-            <h2 id={titleId} className="mt-1 text-2xl font-semibold tracking-tight">Add completed work</h2>
-            <p className="mt-1 text-sm text-slate-500">Use this for work you completed without starting a live timer.</p>
+            <h2 id={titleId} className="mt-1 text-2xl font-semibold tracking-tight">{editEntry ? "Edit completed work" : "Add completed work"}</h2>
+            <p className="mt-1 text-sm text-slate-500">{editEntry ? "Correct draft or submitted time before approval and invoicing lock it." : "Use this for work you completed without starting a live timer."}</p>
           </div>
           <button onClick={() => onOpenChange(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close manual time dialog">
             <X className="h-5 w-5" />
@@ -174,6 +195,7 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
           <label className="space-y-1 text-sm font-medium text-slate-700">
             Work type / rate
             <select value={actionId} onChange={(e) => setActionId(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white">
+              {editEntry?.action && actionId === PRESERVE_ACTION_VALUE ? <option value={PRESERVE_ACTION_VALUE}>Keep current: {editEntry.action}</option> : null}
               <option value="">No work type rate</option>
               {actions.map((action) => <option key={action.id} value={action.id}>{action.name}{action.hourlyRate ? ` ($${action.hourlyRate}/hr)` : ""}</option>)}
             </select>
@@ -204,7 +226,7 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
           <span className="text-sm text-slate-500">Duration: <span className="font-semibold text-slate-900">{durationLabel || "Set a range"}</span></span>
           <div className="flex gap-2">
             <button onClick={() => onOpenChange(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white">Cancel</button>
-            <button onClick={save} disabled={saving} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">{saving ? "Saving..." : "Log time"}</button>
+            <button onClick={save} disabled={saving} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">{saving ? "Saving..." : editEntry ? "Save correction" : "Log time"}</button>
           </div>
         </div>
       </div>

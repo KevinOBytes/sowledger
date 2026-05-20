@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -8,6 +8,14 @@ export default function LoginPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const linkError = params.get("error");
+    if (!linkError) return;
+    setError(linkError === "missing_link" ? "Sign-in link is missing. Enter your email to request a fresh secure link." : `Sign-in link could not be used: ${linkError}. Request a fresh link below.`);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,8 +60,8 @@ export default function LoginPage() {
           <div className="mt-8 rounded-[28px] border border-stone-200 bg-[#fffdf8]/85 p-5 text-left shadow-xl shadow-stone-900/10">
             <p className="text-sm font-bold uppercase tracking-[0.22em] text-teal-700">What happens next</p>
             <div className="mt-4 space-y-4 text-sm text-stone-600">
-              <p><span className="font-semibold text-[#17211d]">New workspace:</span> enter your email and Billabled will guide you through creating a workspace when self-serve setup is available.</p>
-              <p><span className="font-semibold text-[#17211d]">Invited teammate:</span> use the invited email and the secure link will place you into the right workspace.</p>
+              <p><span className="font-semibold text-[#17211d]">Self-serve:</span> if workspace creation is enabled for this launch environment, your email can create a new workspace.</p>
+              <p><span className="font-semibold text-[#17211d]">Invite-only:</span> if self-serve is disabled, use the exact email your workspace owner invited. Other emails will be asked to request access.</p>
               <p><span className="font-semibold text-[#17211d]">Existing workspace:</span> the same secure link signs you back in without a password.</p>
             </div>
           </div>
@@ -62,7 +70,7 @@ export default function LoginPage() {
         <div className="rounded-[28px] border border-stone-200 bg-[#fffdf8] p-6 shadow-xl shadow-stone-900/10">
           <h2 className="mb-1 text-lg font-semibold text-[#17211d]">Continue to your workspace</h2>
           <p className="mb-6 text-sm text-stone-500">
-            Enter your email to receive a secure link. New users get setup guidance; invited users join the workspace they were invited to.
+            Enter your email to receive a secure link. Eligible self-serve users can create a workspace; invite-only users must use the email their owner or manager invited.
           </p>
 
           {success ? (
@@ -138,7 +146,7 @@ export default function LoginPage() {
             </form>
           )}
           <div className="mt-5 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-500">
-            By continuing, you can create or join a workspace if your email is eligible. Workspace owners can invite teammates later from People.
+            By continuing, you can create or join a workspace only if this environment allows self-serve signup or your email has a pending invitation. Workspace owners can invite teammates later from People.
           </div>
         </div>
 

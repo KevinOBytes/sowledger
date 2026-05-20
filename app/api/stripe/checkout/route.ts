@@ -5,6 +5,7 @@ import { workspaces } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import { getPaidPlanById } from "@/lib/billing-plans";
+import { buildStripeCheckoutParams, hasActivePaidBilling } from "@/lib/stripe-checkout";
 
 export async function POST(req: Request) {
   try {
@@ -31,30 +32,34 @@ export async function POST(req: Request) {
     const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, session.workspaceId));
     if (!ws) throw new Error("Workspace not found");
 
-    const checkoutSession = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      customer: ws.stripeCustomerId || undefined,
-      client_reference_id: ws.id,
-      line_items: [
-        {
-          price: plan.priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/settings/billing?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/settings/billing?canceled=true`,
-      subscription_data: {
-        metadata: {
-          workspaceId: ws.id,
-          planId: plan.planId,
-        },
-      },
-      metadata: {
-        workspaceId: ws.id,
-        planId: plan.planId,
-      },
-      customer_email: ws.stripeCustomerId ? undefined : session.email,
+    if (hasActivePaidBilling(ws)) {
+      if (ws.stripeCustomerId) {
+        const portalSession = await stripe.billingPortal.sessions.create({
+          customer: ws.stripeCustomerId,
+          return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/settings/billing`,
+        });
+        return NextResponse.json({
+          error: "Workspace billing is already active. Use the billing portal to manage the subscription.",
+          portalUrl: portalSession.url,
+          url: portalSession.url,
+        }, { status: 409 });
+      }
+
+      return NextResponse.json({
+        error: "Workspace billing is already active. Open billing settings to manage the subscription.",
+        portalPath: "/settings/billing",
+      }, { status: 409 });
+    }
+
+    const checkoutParams = buildStripeCheckoutParams({
+      workspaceId: ws.id,
+      plan,
+      customerEmail: session.email,
+      stripeCustomerId: ws.stripeCustomerId,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
     });
+
+    const checkoutSession = await stripe.checkout.sessions.create(checkoutParams);
 
     return NextResponse.json({ url: checkoutSession.url });
 

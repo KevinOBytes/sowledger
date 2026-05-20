@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { projects, goals, userActions, scheduledWorkBlocks } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
+import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
 import { and, eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
@@ -65,21 +66,26 @@ export async function POST(req: NextRequest) {
 
     let actionName: string | undefined;
     let hourlyRate: number | undefined;
-
-    if (body.actionId) {
-      const [uAction] = await db.select().from(userActions).where(eq(userActions.id, body.actionId));
-      if (!uAction || uAction.workspaceId !== session.workspaceId || uAction.userId !== session.sub) {
-        return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
-      }
-      actionName = uAction.name;
-      hourlyRate = uAction.hourlyRate || undefined;
-    }
+    let inheritedActionId = body.actionId;
 
     if (body.scheduledBlockId) {
       const [block] = await db.select().from(scheduledWorkBlocks).where(eq(scheduledWorkBlocks.id, body.scheduledBlockId));
       if (!block || block.workspaceId !== session.workspaceId || block.userId !== session.sub) {
         return NextResponse.json({ error: "Invalid scheduledBlockId" }, { status: 400 });
       }
+      if (isUnavailableScheduledBlock(block)) {
+        return NextResponse.json({ error: "Unavailable, OOO, and external-calendar blocks cannot be logged as completed work" }, { status: 409 });
+      }
+      inheritedActionId = inheritedActionId ?? block.actionId ?? undefined;
+    }
+
+    if (inheritedActionId) {
+      const [uAction] = await db.select().from(userActions).where(eq(userActions.id, inheritedActionId));
+      if (!uAction || uAction.workspaceId !== session.workspaceId || uAction.userId !== session.sub) {
+        return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
+      }
+      actionName = uAction.name;
+      hourlyRate = uAction.hourlyRate || undefined;
     }
 
     const entry = await createTimeEntry({

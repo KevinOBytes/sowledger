@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createMagicLink } from "@/lib/auth";
+import { checkMagicLinkEligibility, createMagicLink } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { isValidEmail } from "@/lib/validators";
 import { Resend } from "resend";
@@ -13,6 +13,11 @@ export async function POST(req: NextRequest) {
     }
     if (!isValidEmail(email)) {
       return NextResponse.json({ error: "email is invalid" }, { status: 400 });
+    }
+
+    const eligibility = await checkMagicLinkEligibility(email);
+    if (!eligibility.eligible) {
+      return NextResponse.json({ error: eligibility.error }, { status: 403 });
     }
 
     const token = await createMagicLink(email);
@@ -46,6 +51,7 @@ export async function POST(req: NextRequest) {
     }, { status: 503 });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
+    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 500;
+    return NextResponse.json({ error: errorMsg }, { status });
   }
 }

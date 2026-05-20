@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { projects, goals, userActions, scheduledWorkBlocks } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
+import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
 import { and, eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
@@ -57,6 +58,9 @@ export async function POST(req: NextRequest) {
       const [block] = await db.select().from(scheduledWorkBlocks).where(eq(scheduledWorkBlocks.id, body.scheduledBlockId));
       if (!block || block.workspaceId !== session.workspaceId || block.userId !== session.sub) {
         return NextResponse.json({ error: "Invalid scheduledBlockId" }, { status: 400 });
+      }
+      if (isUnavailableScheduledBlock(block)) {
+        return NextResponse.json({ error: "Unavailable, OOO, and external-calendar blocks cannot be started as timers" }, { status: 409 });
       }
     }
 

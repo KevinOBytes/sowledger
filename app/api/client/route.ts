@@ -4,16 +4,28 @@ import { db } from "@/lib/db";
 import { auditLogs, projects, timeEntries, invoices } from "@/lib/db/schema";
 import { eq, and, ne, desc, inArray } from "drizzle-orm";
 import { buildInvoiceProofPack } from "@/lib/invoice-proof-pack";
+import { getClientEntitledInvoiceIds, getClientEntitlementIds } from "@/lib/client-entitlements";
 
 export async function GET() {
   try {
     const session = await requireSession();
     requireRole("client", session.role);
 
-    const workspaceProjects = await db.select().from(projects).where(eq(projects.workspaceId, session.workspaceId));
+    const clientIds = await getClientEntitlementIds(session);
+    if (clientIds.length === 0) {
+      return NextResponse.json({ ok: true, projects: [], invoices: [] });
+    }
+
+    const workspaceProjects = await db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.workspaceId, session.workspaceId), inArray(projects.clientId, clientIds)));
+    const projectIds = workspaceProjects.map((project) => project.id);
     
     // Aggregate hours per project
-    const allEntries = await db.select().from(timeEntries).where(and(eq(timeEntries.workspaceId, session.workspaceId), ne(timeEntries.status, "draft")));
+    const allEntries = projectIds.length > 0
+      ? await db.select().from(timeEntries).where(and(eq(timeEntries.workspaceId, session.workspaceId), inArray(timeEntries.projectId, projectIds), ne(timeEntries.status, "draft")))
+      : [];
 
     const projectAggregates = workspaceProjects.map(p => {
        const entries = allEntries.filter(e => e.projectId === p.id);
@@ -26,7 +38,10 @@ export async function GET() {
        };
     });
 
-    const workspaceInvoices = await db.select().from(invoices).where(eq(invoices.workspaceId, session.workspaceId)).orderBy(desc(invoices.createdAt));
+    const entitledInvoiceIds = await getClientEntitledInvoiceIds(session.workspaceId, clientIds);
+    const workspaceInvoices = entitledInvoiceIds.size > 0
+      ? await db.select().from(invoices).where(and(eq(invoices.workspaceId, session.workspaceId), inArray(invoices.id, [...entitledInvoiceIds]))).orderBy(desc(invoices.createdAt))
+      : [];
     const invoiceIds = workspaceInvoices.map((invoice) => invoice.id);
     const signoffs = invoiceIds.length > 0
       ? await db

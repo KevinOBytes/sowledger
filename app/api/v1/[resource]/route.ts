@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, gte, isNotNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lt, or } from "drizzle-orm";
 
 import { authenticateApiKey, requireApiScope, recordApiKeyRequest, type ApiKeyContext, type ApiScope } from "@/lib/api-keys";
 import { db } from "@/lib/db";
@@ -13,18 +13,23 @@ import {
   projects,
   scheduledWorkBlocks,
   timeEntries,
+  userActions,
   workspacePeople,
   workspaceTags,
 } from "@/lib/db/schema";
 import { createExportResponse, loadExportData } from "@/lib/export-data";
 import { buildInvoiceProofPack } from "@/lib/invoice-proof-pack";
 import { buildRevenueIntelligence } from "@/lib/revenue-intelligence";
+import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
 import { createTimeEntry } from "@/lib/security";
 import { normalizeTags } from "@/lib/validators";
 
 type Resource = "clients" | "projects" | "tags" | "tasks" | "schedule" | "time-entries" | "analytics" | "invoices" | "proof-packs" | "revenue-intelligence" | "export";
 type Ctx = { params: Promise<{ resource: string }> };
 type KanbanColumn = "todo" | "in_progress" | "review" | "done";
+type PublicWritableTimeStatus = "draft" | "submitted";
+
+const PUBLIC_WRITABLE_TIME_STATUSES = new Set(["draft", "submitted"]);
 
 const READ_SCOPES: Record<Resource, ApiScope> = {
   clients: "read:clients",
@@ -56,6 +61,12 @@ function normalizeResource(raw: string): Resource | null {
 function statusFrom(error: unknown) {
   const err = error as { status?: number; statusCode?: number };
   return err.status ?? err.statusCode ?? 500;
+}
+
+function validationError(message: string, status = 400) {
+  const error = new Error(message) as Error & { status: number };
+  error.status = status;
+  return error;
 }
 
 function endExclusive(value: string) {
@@ -109,8 +120,9 @@ function entryConditions(workspaceId: string, req: NextRequest) {
 }
 
 async function assertWorkspaceMember(workspaceId: string, userId: string) {
+  if (!userId) throw validationError("userId is required");
   const [membership] = await db.select().from(memberships).where(and(eq(memberships.workspaceId, workspaceId), eq(memberships.userId, userId)));
-  if (!membership) throw new Error("userId is not a workspace member");
+  if (!membership) throw validationError("userId is not a workspace member");
 }
 
 async function assertWorkspaceClient(workspaceId: string, clientId?: string | null) {
@@ -132,9 +144,45 @@ async function assertWorkspaceGoal(workspaceId: string, goalId?: string | null) 
 }
 
 async function assertWorkspaceScheduleBlock(workspaceId: string, scheduledBlockId?: string | null) {
-  if (!scheduledBlockId) return;
-  const [block] = await db.select({ id: scheduledWorkBlocks.id }).from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.workspaceId, workspaceId), eq(scheduledWorkBlocks.id, scheduledBlockId)));
-  if (!block) throw new Error("scheduledBlockId is not in this workspace");
+  if (!scheduledBlockId) return null;
+  const [block] = await db
+    .select({
+      id: scheduledWorkBlocks.id,
+      userId: scheduledWorkBlocks.userId,
+      title: scheduledWorkBlocks.title,
+      notes: scheduledWorkBlocks.notes,
+      tags: scheduledWorkBlocks.tags,
+      status: scheduledWorkBlocks.status,
+      actionId: scheduledWorkBlocks.actionId,
+    })
+    .from(scheduledWorkBlocks)
+    .where(and(eq(scheduledWorkBlocks.workspaceId, workspaceId), eq(scheduledWorkBlocks.id, scheduledBlockId)));
+  if (!block) throw validationError("scheduledBlockId is not in this workspace");
+  return block;
+}
+
+async function assertWorkspaceAction(workspaceId: string, userId: string, actionId?: string | null) {
+  if (!actionId) return;
+  const [action] = await db
+    .select({ id: userActions.id })
+    .from(userActions)
+    .where(and(eq(userActions.workspaceId, workspaceId), eq(userActions.userId, userId), eq(userActions.id, actionId)));
+  if (!action) throw validationError("actionId is not available for this scheduled user");
+}
+
+function safePublicTimeStatus(status: unknown): PublicWritableTimeStatus | null {
+  if (status === undefined || status === null || status === "") return "draft";
+  return typeof status === "string" && PUBLIC_WRITABLE_TIME_STATUSES.has(status)
+    ? status as PublicWritableTimeStatus
+    : null;
+}
+
+function normalizeOptionalEmail(email: unknown) {
+  if (email === undefined) return undefined;
+  if (email === null) return null;
+  if (typeof email !== "string") return undefined;
+  const normalized = email.trim().toLowerCase();
+  return normalized || null;
 }
 
 async function assertWorkspacePerson(workspaceId: string, assigneeId?: string | null) {
@@ -250,7 +298,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     if (resource === "clients") {
       const name = typeof body.name === "string" ? body.name.trim() : "";
       if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
-      const [client] = await db.insert(clients).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, name, email: body.email, address: body.address, currencyOverride: body.currencyOverride }).returning();
+      const [client] = await db.insert(clients).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, name, email: normalizeOptionalEmail(body.email), address: body.address, currencyOverride: body.currencyOverride }).returning();
       return NextResponse.json({ ok: true, client }, { status: 201 });
     }
     if (resource === "projects") {
@@ -281,15 +329,26 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       const endsAt = new Date(body.endsAt);
       if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) return NextResponse.json({ error: "Invalid schedule window" }, { status: 400 });
       await assertWorkspaceProject(context.workspaceId, body.projectId);
+      await assertWorkspaceAction(context.workspaceId, body.userId, body.actionId);
       const [block] = await db.insert(scheduledWorkBlocks).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, userId: body.userId, projectId: body.projectId || null, taskId: body.taskId || null, actionId: body.actionId || null, title: body.title, notes: body.notes || null, tags: normalizeTags(body.tags), startsAt, endsAt, createdByUserId: body.userId }).returning();
       return NextResponse.json({ ok: true, block }, { status: 201 });
     }
 
     if (!body.userId || !body.startedAt || !body.stoppedAt) return NextResponse.json({ error: "userId, startedAt, and stoppedAt are required" }, { status: 400 });
+    const status = safePublicTimeStatus(body.status);
+    if (!status) return NextResponse.json({ error: "Public API time entries can only be created as draft or submitted" }, { status: 400 });
     await assertWorkspaceMember(context.workspaceId, body.userId);
     await assertWorkspaceProject(context.workspaceId, body.projectId);
     await assertWorkspaceGoal(context.workspaceId, body.goalId);
-    await assertWorkspaceScheduleBlock(context.workspaceId, body.scheduledBlockId);
+    const scheduledBlock = await assertWorkspaceScheduleBlock(context.workspaceId, body.scheduledBlockId);
+    if (scheduledBlock) {
+      if (isUnavailableScheduledBlock(scheduledBlock)) {
+        throw validationError("Unavailable, OOO, and external-calendar blocks cannot be logged as time entries");
+      }
+      if (scheduledBlock.userId !== body.userId) {
+        throw validationError("scheduledBlockId must belong to the time entry userId");
+      }
+    }
     const startedAt = new Date(body.startedAt);
     const stoppedAt = new Date(body.stoppedAt);
     if (Number.isNaN(startedAt.getTime()) || Number.isNaN(stoppedAt.getTime()) || stoppedAt <= startedAt) return NextResponse.json({ error: "Invalid time window" }, { status: 400 });
@@ -307,7 +366,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       description: body.description || null,
       action: body.action || null,
       hourlyRate: body.hourlyRate ?? null,
-      status: body.status ?? "draft",
+      status,
       source: "manual",
       collaborators: [],
       expenses: [],
@@ -325,7 +384,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     const body = await req.json();
     if (resource === "clients") {
       if (!body.clientId) return NextResponse.json({ error: "clientId is required" }, { status: 400 });
-      const [client] = await db.update(clients).set({ name: body.name, email: body.email, address: body.address, currencyOverride: body.currencyOverride, status: body.status }).where(and(eq(clients.id, body.clientId), eq(clients.workspaceId, context.workspaceId))).returning();
+      const [client] = await db.update(clients).set({ name: body.name, email: normalizeOptionalEmail(body.email), address: body.address, currencyOverride: body.currencyOverride, status: body.status }).where(and(eq(clients.id, body.clientId), eq(clients.workspaceId, context.workspaceId))).returning();
       return NextResponse.json({ ok: true, client });
     }
     if (resource === "projects") {
@@ -349,12 +408,49 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (resource === "schedule") {
       if (!body.blockId) return NextResponse.json({ error: "blockId is required" }, { status: 400 });
       await assertWorkspaceProject(context.workspaceId, body.projectId);
-      const [block] = await db.update(scheduledWorkBlocks).set({ title: body.title, notes: body.notes, status: body.status, startsAt: body.startsAt ? new Date(body.startsAt) : undefined, endsAt: body.endsAt ? new Date(body.endsAt) : undefined, projectId: body.projectId, taskId: body.taskId, tags: body.tags ? normalizeTags(body.tags) : undefined, updatedAt: new Date() }).where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, context.workspaceId))).returning();
+      const [existingBlock] = await db
+        .select({
+          id: scheduledWorkBlocks.id,
+          userId: scheduledWorkBlocks.userId,
+          actionId: scheduledWorkBlocks.actionId,
+          startsAt: scheduledWorkBlocks.startsAt,
+          endsAt: scheduledWorkBlocks.endsAt,
+        })
+        .from(scheduledWorkBlocks)
+        .where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, context.workspaceId)));
+      if (!existingBlock) return NextResponse.json({ error: "Block not found" }, { status: 404 });
+      const nextUserId = body.userId !== undefined ? body.userId : existingBlock.userId;
+      if (body.userId !== undefined) await assertWorkspaceMember(context.workspaceId, nextUserId);
+      await assertWorkspaceAction(context.workspaceId, nextUserId, body.actionId !== undefined ? body.actionId : existingBlock.actionId);
+      const startsAt = body.startsAt ? new Date(body.startsAt) : existingBlock.startsAt;
+      const endsAt = body.endsAt ? new Date(body.endsAt) : existingBlock.endsAt;
+      if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) return NextResponse.json({ error: "Invalid schedule window" }, { status: 400 });
+      const [block] = await db.update(scheduledWorkBlocks).set({ title: body.title, notes: body.notes, status: body.status, startsAt: body.startsAt ? startsAt : undefined, endsAt: body.endsAt ? endsAt : undefined, userId: body.userId, projectId: body.projectId, taskId: body.taskId, actionId: body.actionId, tags: body.tags ? normalizeTags(body.tags) : undefined, updatedAt: new Date() }).where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, context.workspaceId))).returning();
       return NextResponse.json({ ok: true, block });
     }
     if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
+    const requestedStatus = body.status === undefined ? undefined : safePublicTimeStatus(body.status);
+    if (body.status !== undefined && !requestedStatus) {
+      return NextResponse.json({ error: "Public API time entries can only transition to draft or submitted" }, { status: 400 });
+    }
+    const status = requestedStatus ?? undefined;
     await assertWorkspaceProject(context.workspaceId, body.projectId);
-    const [entry] = await db.update(timeEntries).set({ description: body.description, projectId: body.projectId, tags: body.tags ? normalizeTags(body.tags) : undefined, status: body.status }).where(and(eq(timeEntries.id, body.entryId), eq(timeEntries.workspaceId, context.workspaceId))).returning();
+    const [entry] = await db.update(timeEntries)
+      .set({ description: body.description, projectId: body.projectId, tags: body.tags ? normalizeTags(body.tags) : undefined, status })
+      .where(and(
+        eq(timeEntries.id, body.entryId),
+        eq(timeEntries.workspaceId, context.workspaceId),
+        inArray(timeEntries.status, ["draft", "submitted"]),
+      ))
+      .returning();
+    if (!entry) {
+      const [existingEntry] = await db
+        .select({ id: timeEntries.id, status: timeEntries.status })
+        .from(timeEntries)
+        .where(and(eq(timeEntries.id, body.entryId), eq(timeEntries.workspaceId, context.workspaceId)));
+      if (!existingEntry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+      return NextResponse.json({ error: "Approved or invoiced entries are locked" }, { status: 409 });
+    }
     return NextResponse.json({ ok: true, entry });
   });
 }
