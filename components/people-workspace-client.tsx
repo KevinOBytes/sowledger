@@ -262,7 +262,7 @@ export function PeopleWorkspaceClient({
                 }}
                 className="mt-1 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"
               >
-                <option value="member">Internal member</option>
+                <option value="member">Team member</option>
                 <option value="client">Client contact</option>
                 <option value="contractor">Contractor</option>
                 <option value="contact">General contact</option>
@@ -307,7 +307,7 @@ export function PeopleWorkspaceClient({
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold text-slate-950">Workspace access</h2>
-              <p className="mt-1 text-sm text-slate-500">Manage internal member roles and pending invitations without leaving the people workspace.</p>
+              <p className="mt-1 text-sm text-slate-500">Manage team member roles and pending invitations without leaving the people workspace.</p>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{workspaceMembers.length} records</span>
           </div>
@@ -386,7 +386,7 @@ export function PeopleWorkspaceClient({
               </select>
               <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500">
                 <option value="">All types</option>
-                <option value="internal">Internal</option>
+                <option value="internal">Team</option>
                 <option value="client">Client</option>
                 <option value="vendor">Vendor</option>
                 <option value="partner">Partner</option>
@@ -417,7 +417,7 @@ export function PeopleWorkspaceClient({
                           onChange={(event) => setOrganizationDrafts((current) => ({ ...current, [organization.id]: { name: current[organization.id]?.name ?? organization.name, type: event.target.value as Organization["type"] } }))}
                           className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-cyan-500"
                         >
-                          <option value="internal">Internal</option>
+                          <option value="internal">Team</option>
                           <option value="client">Client</option>
                           <option value="vendor">Vendor</option>
                           <option value="partner">Partner</option>

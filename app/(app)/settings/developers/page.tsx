@@ -295,7 +295,7 @@ export default function DevelopersPage() {
       <AppPageHeader
         eyebrow="Developers"
         title="Agency integrations, API keys, usage, and docs"
-        description="Create scoped workspace keys for agency systems, then review request-level usage without opening billing or workspace-admin mutation paths."
+        description="Create scoped workspace keys for agency systems, then review request-level usage while keeping billing and workspace administration in the app."
         icon={Code2}
         metadata={[
           { label: "Scoped keys", tone: "cyan", icon: KeyRound },
@@ -451,7 +451,7 @@ export default function DevelopersPage() {
                 <ul className="mt-3 space-y-2 text-sm leading-6">
                   <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />Secrets are shown once, then stored only as hashes.</li>
                   <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />Keys stay scoped, revocable, expirable, and usage-tracked.</li>
-                  <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />Public API v1 does not expose billing, admin, invite, or destructive workspace-admin mutations.</li>
+                  <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />The API does not expose billing, invite, or workspace administration changes.</li>
                 </ul>
               </div>
             </div>
@@ -473,7 +473,7 @@ export default function DevelopersPage() {
             <AppEmptyState
               icon={KeyRound}
               title="No API keys created yet."
-              description="Create a scoped key for a reporting integration, agency data sync, or internal API client."
+              description="Create a scoped key for a reporting integration, agency data sync, or trusted automation."
               className="border-slate-200 bg-slate-50 shadow-none"
             />
           ) : (

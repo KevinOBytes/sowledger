@@ -28,7 +28,7 @@ export default async function PeoplePage({
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Manage</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">People & organizations</h1>
               <p className="mt-2 max-w-3xl text-sm text-slate-500">
-                Keep internal teammates, client contacts, and contractors organized under a company or team, then assign them across planning and project delivery.
+                Keep team members, client contacts, and contractors organized under a company or team, then assign them across planning and project delivery.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
