@@ -86,7 +86,7 @@ export default function ContactPage() {
             <ShieldCheck className="h-6 w-6 text-cyan-300" />
             <h2 className="mt-4 text-3xl font-semibold">Security reports</h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              Include the affected route, workspace context, timestamp, and safe reproduction details. Do not include raw keys, tokens, passwords, or payment data.
+              Include the affected route, workspace context, timestamp, and safe reproduction details. Do not include full key values, tokens, passwords, or payment data.
             </p>
           </div>
           <div className="grid gap-3 rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5 sm:grid-cols-2">

@@ -122,7 +122,7 @@ export default function ActionsSettingsPage() {
           <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Rates</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Work types and rates</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-            Define the work labels and optional hourly rates you reuse while tracking time. This keeps timer setup simple without making users understand internal action IDs.
+            Define the work labels and optional hourly rates you reuse while tracking time. This keeps timer setup simple without exposing system labels to your team.
           </p>
         </header>
 

@@ -171,7 +171,7 @@ export function Sidebar() {
             <Image src="/logo.png" alt="Billabled" width={30} height={30} className="mr-3 rounded-lg" unoptimized />
             <div>
               <p className="text-lg font-semibold tracking-tight text-[#17211d]">Billabled</p>
-              <p className="text-xs font-medium text-stone-500">Internal billing control surface</p>
+              <p className="text-xs font-medium text-stone-500">Proof-backed billing workspace</p>
             </div>
           </Link>
           <div className="mt-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-3">
@@ -186,7 +186,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Internal application navigation">
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Application navigation">
           {navSections.map((section) => (
             <section key={section.label} className="mb-5">
               <div className="px-2 pb-2">

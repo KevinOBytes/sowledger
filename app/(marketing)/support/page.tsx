@@ -39,7 +39,7 @@ const SUPPORT_TILES = [
   },
   {
     title: "Sign-Off",
-    description: "Route corrected work into client-facing approval without exposing internal timers, API keys, or admin settings.",
+    description: "Route corrected work into client-facing approval without exposing team timers, API keys, or workspace settings.",
     href: "#sign-off",
     icon: BadgeCheck,
   },
@@ -183,7 +183,7 @@ export default function SupportPage() {
             {[
               ["proof-packs", "Proof Packs", "Use planned vs actual hours, source mix, invoice status, and export digest evidence to explain a bill."],
               ["recovery-radar", "Recovery Radar", "Review gaps before billing: scheduled work without time, approved unbilled entries, missing rates, and stale invoices."],
-              ["sign-off", "Sign-Off", "Send client-facing proof packets for approval while keeping internal workspace controls private."],
+              ["sign-off", "Sign-Off", "Send client-facing proof packets for approval while keeping team workspace controls private."],
               ["billing", "Billing", "Plans are flat per workspace: Free, Starter ($9/month), Studio ($29/month), and Business ($79/month)."],
             ].map(([id, title, body]) => (
               <section key={id} id={id} className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">

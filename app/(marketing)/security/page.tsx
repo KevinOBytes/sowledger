@@ -19,12 +19,12 @@ const TRUST_CONTROLS = [
   },
   {
     title: "API key lifecycle",
-    body: "Keys are scoped, revocable, expirable, usage-tracked, shown once, and stored hashed rather than as raw secrets.",
+    body: "Keys are scoped, revocable, expirable, usage-tracked, shown once, and stored as hashes rather than full secret values.",
     icon: KeyRound,
   },
   {
     title: "Billing boundary",
-    body: "Stripe checkout accepts internal plan IDs only. Public API v1 does not expose billing changes or subscription management.",
+    body: "Stripe checkout accepts Billabled workspace plans only. The API does not expose billing changes or subscription management.",
     icon: CreditCard,
   },
   {
@@ -34,12 +34,12 @@ const TRUST_CONTROLS = [
   },
   {
     title: "Public-route checks",
-    body: "API v1 and Stripe webhook routes are public at the proxy layer by design, with authentication or signature checks inside handlers.",
+    body: "API and Stripe webhook routes are internet-facing by design, with authentication or signature checks on every protected request.",
     icon: Route,
   },
   {
     title: "Migration safety",
-    body: "Database changes are handled through the migration workflow instead of ad hoc production DDL.",
+    body: "Database changes are handled through a reviewed migration workflow instead of one-off production edits.",
     icon: LockKeyhole,
   },
 ];
@@ -96,9 +96,9 @@ export default function SecurityPage() {
         <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.75fr_1.25fr]">
           <div className="rounded-2xl bg-slate-950 p-7 text-white shadow-sm">
             <Siren className="h-6 w-6 text-cyan-300" />
-            <h2 className="mt-4 text-3xl font-semibold">Boundaries that stay out of public API v1</h2>
+            <h2 className="mt-4 text-3xl font-semibold">Boundaries that stay inside Billabled</h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              Public API v1 is for scoped operational integrations. Billing changes, invites, subscription management, and destructive workspace administration remain inside authenticated app workflows.
+              The API is for scoped operational integrations. Billing changes, invites, subscription management, and workspace administration remain inside authenticated app workflows.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">
