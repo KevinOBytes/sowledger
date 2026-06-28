@@ -1,16 +1,16 @@
-# Billabled Agent Instructions
+# SOWLedger Agent Instructions
 
-You are working in the Billabled application. You are expected to behave like an expert software engineer with strong security judgment. Do not break existing functionality unless a refactor is explicitly necessary and validated.
+You are working in the SOWLedger application. You are expected to behave like an expert software engineer with strong security judgment. Do not break existing functionality unless a refactor is explicitly necessary and validated.
 
 ## Non-Negotiable Setup
-- Confirm the repo root before editing: `/Users/example/Projects/billabled`.
+- Confirm the repo root before editing: `/Users/example/Projects/sowledger`.
 - Check the worktree before and after edits with `git status --short`; never revert unrelated user changes.
 - This is Next.js `16.2.4`, not older Next.js. Before changing routing, server actions, metadata, proxy/middleware, caching, or build behavior, read the relevant guide in `node_modules/next/dist/docs/`.
 - Use `rg` and `rg --files` for code search.
 - Do not expose secrets. `.env*` is ignored; update `.env.example` only with non-secret names or public IDs.
 
 ## Product Model
-Billabled should express one connected workflow:
+SOWLedger should express one connected workflow:
 
 `Plan work -> Track live timers -> Log manual/calendar time -> Review analytics -> Approve/invoice/export -> Integrate by API`
 
@@ -34,9 +34,9 @@ Preserve these first-class surfaces:
 
 ## Figma Design System Rules
 - Start Figma implementation work by reading the target node with `get_design_context`; use `get_screenshot` and `get_metadata` only to resolve layout, token, or asset ambiguity.
-- Treat Figma output as a reference, not final code. Adapt generated React/Tailwind to this Next.js App Router codebase, existing page structure, local helpers, and Billabled product vocabulary.
+- Treat Figma output as a reference, not final code. Adapt generated React/Tailwind to this Next.js App Router codebase, existing page structure, local helpers, and SOWLedger product vocabulary.
 - Use Tailwind v4 utilities and the CSS variables in `app/globals.css` for core colors, fonts, surfaces, and accents. Add or adjust tokens there before scattering raw hex values through components.
-- Keep the Billabled visual system coherent: warm background, white/surface panels, slate copy, cyan accents, restrained shadows, rounded operational cards, and dense scannable SaaS layouts.
+- Keep the SOWLedger visual system coherent: warm background, white/surface panels, slate copy, cyan accents, restrained shadows, rounded operational cards, and dense scannable SaaS layouts.
 - Reuse `lucide-react` for icons and existing dependencies for motion, charts, and UI behavior. Do not add a new visual library for a Figma handoff unless the design cannot be represented with current tooling.
 - Place durable marketing imagery under `public/images/marketing/`; use `next/image` with explicit dimensions, useful `sizes`, accessible alt text, and eager/high priority only for above-the-fold images.
 - Preserve product/security boundaries when translating designs: no secret values in client surfaces, no unscoped workspace data, no billing/admin mutations in public API v1, and Stripe checkout still accepts internal plan IDs only.
@@ -48,7 +48,7 @@ Preserve these first-class surfaces:
 - API keys must be shown once, stored hashed, scoped, revocable, expirable, and usage-tracked.
 - Public API v1 must not expose billing changes, invites, subscription management, or destructive workspace admin actions.
 - Stripe checkout accepts internal `planId` values only. Do not accept arbitrary price IDs from the client.
-- Export responses must avoid secrets and keep `x-billabled-export-sha256` integrity headers.
+- Export responses must avoid secrets and keep `x-sowledger-export-sha256` integrity headers.
 - Native integration credentials must be encrypted at rest in `integration_connections.credentials`; never render raw provider tokens or webhook URLs after creation.
 - OAuth callbacks must validate signed state against the active session workspace/user and re-check manager authorization before storing credentials.
 - Integration sync records must be workspace-scoped, unique by workspace/provider/resource, and must not link records across workspaces or providers.
@@ -73,6 +73,6 @@ If a check cannot be run, state the exact reason and the residual risk.
 ## Agentic File Maintenance
 Keep the agent guidance in sync when product architecture changes:
 - `AGENTS.md` is the root source of truth.
-- `CLAUDE.md`, `.github/copilot-instructions.md`, and `.cursor/rules/billabled.mdc` should delegate to `AGENTS.md`.
+- `CLAUDE.md`, `.github/copilot-instructions.md`, and `.cursor/rules/sowledger.mdc` should delegate to `AGENTS.md`.
 - Repo-local Codex skill drafts live in `.codex/skills/*/SKILL.md`.
 - Run `npm run agentic:check` after editing these files.

@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       name: body.name.trim().toLowerCase(),
       color: body.color || "#3b82f6",
       projectId: body.projectId || null,
-      isBillableDefault: body.isBillableDefault ?? true,
+      isBillableDefault: body.isBillableDefault ?? false,
     }).returning();
 
     return NextResponse.json({ ok: true, tag });

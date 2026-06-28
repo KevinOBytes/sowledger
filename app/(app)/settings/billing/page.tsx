@@ -19,6 +19,7 @@ type BillingData = {
   plan: "free" | "pro" | "smb" | "enterprise";
   storedPlan?: "free" | "pro" | "smb" | "enterprise";
   planSource?: "stripe" | "internal";
+  hasStripeCustomer: boolean;
   isOwner: boolean;
   usage: { members: number; projects: number };
   limits: { members: number; projects: number; storageMB: number; goals: number };
@@ -44,8 +45,12 @@ export default function BillingPage() {
   const [data, setData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [checkoutNotice, setCheckoutNotice] = useState<"success" | "canceled" | null>(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nextCheckoutNotice = params.get("success") === "true" ? "success" : params.get("canceled") === "true" ? "canceled" : null;
+
     fetch("/api/billing")
       .then((res) => res.json())
       .then((result) => {
@@ -53,7 +58,10 @@ export default function BillingPage() {
         else toast.error(result.error || "Unable to load billing");
       })
       .catch(() => toast.error("Unable to load billing"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setCheckoutNotice(nextCheckoutNotice);
+        setLoading(false);
+      });
   }, []);
 
   async function handleUpgrade(planId: Plan["planId"]) {
@@ -126,13 +134,18 @@ export default function BillingPage() {
                 <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">Internal Business access</span>
               )}
               <Link href="/settings" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700">Settings</Link>
-              {data.isOwner && data.plan !== "free" && (
+              {data.isOwner && data.hasStripeCustomer && data.plan !== "free" && (
                 <button onClick={handlePortal} disabled={processing === "portal"} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
                   {processing === "portal" ? "Opening..." : "Manage subscription"}
                 </button>
               )}
             </div>
           </div>
+          {checkoutNotice && (
+            <div className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${checkoutNotice === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+              {checkoutNotice === "success" ? "Stripe checkout returned to billing. Your plan updates after Stripe confirms the subscription." : "Checkout was canceled. You can choose a plan again when you are ready."}
+            </div>
+          )}
         </header>
 
         <section className="grid gap-4 md:grid-cols-2">

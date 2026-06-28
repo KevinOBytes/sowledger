@@ -121,8 +121,8 @@ test.describe('Deep Authenticated Workflows', () => {
     const login = await requestGetApp(page, '/api/test/login?plan=smb');
     expect(login.ok()).toBeTruthy();
     await gotoApp(page, '/invoices');
-    await expect(page.locator('text=Approved Billables Pipeline')).toBeVisible();
-    await expect(page.locator('text=Invoicing is a Starter feature')).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Approved Billables Pipeline' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Invoicing is a Starter feature' })).not.toBeVisible();
   });
 
   test('Test 19: export center returns digest header', async ({ page }) => {
@@ -130,7 +130,7 @@ test.describe('Deep Authenticated Workflows', () => {
     await expect(page.getByRole('heading', { name: 'Complete and filtered data exports' })).toBeVisible();
     const response = await page.request.get('/api/export/csv?format=json');
     expect(response.ok()).toBeTruthy();
-    expect(response.headers()['x-billabled-export-sha256']).toBeTruthy();
+    expect(response.headers()['x-sowledger-export-sha256']).toBeTruthy();
   });
 
   test('Test 20: developers page creates a scoped API key once', async ({ page }) => {
@@ -185,7 +185,7 @@ test.describe('Deep Authenticated Workflows', () => {
     expect(invalidAssigneeImport.status()).toBe(400);
 
     await gotoApp(page, '/integrations');
-    await expect(page.getByRole('heading', { name: 'Connect the systems around Billabled' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Connect the systems around SOWLedger' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Slack alerts' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'QuickBooks Online' })).toBeVisible();
@@ -747,7 +747,7 @@ test.describe('Deep Authenticated Workflows', () => {
       plan: plan!,
       customerEmail: 'owner@example.com',
       stripeCustomerId: retainedCustomerId,
-      appUrl: 'https://billabled.test',
+      appUrl: 'https://sowledger.test',
     });
 
     expect(params.customer).toBe(retainedCustomerId);
@@ -755,7 +755,7 @@ test.describe('Deep Authenticated Workflows', () => {
     expect(params.line_items).toEqual([{ price: plan!.priceId, quantity: 1 }]);
     expect(params.metadata).toMatchObject({ workspaceId: 'ws_retained_customer', planId: plan!.planId });
     expect(params.subscription_data?.metadata).toMatchObject({ workspaceId: 'ws_retained_customer', planId: plan!.planId });
-    expect(params.success_url).toBe('https://billabled.test/settings/billing?success=true');
-    expect(params.cancel_url).toBe('https://billabled.test/settings/billing?canceled=true');
+    expect(params.success_url).toBe('https://sowledger.test/settings/billing?success=true');
+    expect(params.cancel_url).toBe('https://sowledger.test/settings/billing?canceled=true');
   });
 });

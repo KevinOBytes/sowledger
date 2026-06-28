@@ -29,7 +29,7 @@ const TRUST_CONTROLS = [
   },
   {
     title: "Export integrity",
-    body: "Exports avoid secrets and include x-billabled-export-sha256 integrity headers where supported.",
+    body: "Exports avoid secrets and include x-sowledger-export-sha256 integrity headers where supported.",
     icon: FileCheck2,
   },
   {
@@ -45,8 +45,8 @@ const TRUST_CONTROLS = [
 ];
 
 export const metadata = {
-  title: "Security - Billabled",
-  description: "Billabled trust center for workspace isolation, API key lifecycle, billing boundaries, export integrity, public-route checks, and security reporting.",
+  title: "Security - SOWLedger",
+  description: "SOWLedger trust center for workspace isolation, API key lifecycle, billing boundaries, export integrity, public-route checks, and security reporting.",
 };
 
 export default function SecurityPage() {
@@ -61,7 +61,7 @@ export default function SecurityPage() {
             </p>
             <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Security posture for proof-backed billing.</h1>
             <p className="mt-5 text-lg leading-8 text-slate-700">
-              Billabled handles operational time, billing evidence, exports, and API access. This page states practical controls without implying formal certifications or compliance programs.
+              SOWLedger handles operational time, billing evidence, exports, and API access. This page states practical controls without implying formal certifications or compliance programs.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-xl shadow-stone-900/10">

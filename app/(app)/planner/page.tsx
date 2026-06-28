@@ -3,7 +3,7 @@ import { ArrowRight, CalendarClock, FolderKanban, Users } from "lucide-react";
 
 import { ResourcePlanner } from "@/components/resource-planner";
 
-export const metadata = { title: "Resource Planner - Billabled" };
+export const metadata = { title: "Resource Planner - SOWLedger" };
 
 export default function PlannerPage() {
   return (

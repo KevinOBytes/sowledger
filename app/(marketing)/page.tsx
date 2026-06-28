@@ -127,7 +127,7 @@ const PROOF_ROWS = [
   { label: "Invoice record", value: "Issued invoices, totals, client, project, and status" },
   { label: "Work basis", value: "Planned vs actual hours with timer, manual, and calendar source mix" },
   { label: "Approval trail", value: "Sign-off state, audit events, and client-facing context" },
-  { label: "Integrity", value: "CSV/JSON exports with x-billabled-export-sha256 digest headers" },
+  { label: "Integrity", value: "CSV/JSON exports with x-sowledger-export-sha256 digest headers" },
 ];
 
 const INTEGRATION_ROWS = [
@@ -141,21 +141,21 @@ const PRODUCT_SCREENSHOTS = [
   {
     title: "Invoice proof pack",
     src: "/images/marketing/invoice-proof-pack.png",
-    alt: "Billabled invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours.",
+    alt: "SOWLedger invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours.",
     width: 1152,
     height: 1000,
   },
   {
     title: "Revenue recovery radar",
     src: "/images/marketing/revenue-radar.png",
-    alt: "Billabled analytics screenshot showing Retainer Leak Radar and Missing Billable Recovery cards.",
+    alt: "SOWLedger analytics screenshot showing Retainer Leak Radar and Missing Billable Recovery cards.",
     width: 1152,
     height: 1623,
   },
   {
     title: "Client sign-off portal",
     src: "/images/marketing/client-signoff-portal.png",
-    alt: "Billabled client sign-off portal screenshot showing active projects and approval-ready proof packets.",
+    alt: "SOWLedger client sign-off portal screenshot showing active projects and approval-ready proof packets.",
     width: 1440,
     height: 936,
   },
@@ -182,7 +182,7 @@ export default function MarketingPage() {
                 Recover revenue. Prove every invoice.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-700 sm:text-xl">
-                Billabled connects planning, timers, manual work, calendar logs, analytics, invoices, exports, sign-off, and APIs into one defensible billing system.
+                SOWLedger connects planning, timers, manual work, calendar logs, analytics, invoices, exports, sign-off, and APIs into one defensible billing system.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/login" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-7 py-4 text-base font-bold text-white shadow-sm transition hover:bg-slate-800">
@@ -203,7 +203,7 @@ export default function MarketingPage() {
             >
               <Image
                 src="/images/marketing/invoice-proof-pack.png"
-                alt="Billabled invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours."
+                alt="SOWLedger invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours."
                 width={1152}
                 height={1000}
                 priority
@@ -226,7 +226,7 @@ export default function MarketingPage() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.16 }}
             className="grid overflow-hidden rounded-2xl border border-border bg-border shadow-sm md:grid-cols-5"
-            aria-label="Billabled capability navigation"
+            aria-label="SOWLedger capability navigation"
           >
             {CAPABILITIES.map((capability) => {
               const Icon = capability.icon;
@@ -298,7 +298,7 @@ export default function MarketingPage() {
           >
             <Image
               src="/images/marketing/invoice-proof-pack.png"
-              alt="Billabled invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours."
+              alt="SOWLedger invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours."
               width={1152}
               height={1000}
               sizes="(min-width: 1024px) 52vw, 100vw"
@@ -319,7 +319,7 @@ export default function MarketingPage() {
           >
             <Image
               src="/images/marketing/revenue-radar.png"
-              alt="Billabled analytics screenshot showing Retainer Leak Radar and Missing Billable Recovery cards."
+              alt="SOWLedger analytics screenshot showing Retainer Leak Radar and Missing Billable Recovery cards."
               width={1152}
               height={1623}
               sizes="(min-width: 1024px) 52vw, 100vw"
@@ -331,7 +331,7 @@ export default function MarketingPage() {
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Revenue intelligence</p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Find leakage before the retainer meeting.</h2>
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              Billabled turns analytics into operator queues for work that should be protected, corrected, invoiced, or explained with evidence.
+              SOWLedger turns analytics into operator queues for work that should be protected, corrected, invoiced, or explained with evidence.
             </p>
             <div className="mt-8 divide-y divide-border border-y border-border">
               {[
@@ -397,7 +397,7 @@ export default function MarketingPage() {
           >
             <Image
               src="/images/marketing/client-signoff-portal.png"
-              alt="Billabled client sign-off portal screenshot showing active projects and approval-ready proof packets."
+              alt="SOWLedger client sign-off portal screenshot showing active projects and approval-ready proof packets."
               width={1440}
               height={936}
               sizes="(min-width: 1024px) 58vw, 100vw"

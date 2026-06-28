@@ -225,7 +225,7 @@ export async function pushInvoiceToQuickBooks(input: { workspaceId: string; invo
 
   try {
     const description = [
-      `Billabled invoice ${invoice.number}`,
+      `SOWLedger invoice ${invoice.number}`,
       proof ? `Proof digest: ${proof.digest}` : null,
       proof ? `${proof.proofPack.totals.actualHours} actual hours across ${proof.proofPack.totals.entryCount} entries` : null,
     ].filter(Boolean).join("\n");
@@ -243,7 +243,7 @@ export async function pushInvoiceToQuickBooks(input: { workspaceId: string; invo
           },
         },
       ],
-      PrivateNote: proof ? `Billabled proof digest ${proof.digest}` : "Created from Billabled.",
+      PrivateNote: proof ? `SOWLedger proof digest ${proof.digest}` : "Created from SOWLedger.",
     };
     const data = await quickBooksFetch<QuickBooksInvoiceResponse>(connection, "/invoice?minorversion=75", {
       method: "POST",

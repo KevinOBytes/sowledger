@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ projectId
   const session = await requireSession();
   const { projectId } = await params;
   const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.workspaceId, session.workspaceId)));
-  return { title: project ? `${project.name} Workspace – Billabled` : "Workspace – Billabled" };
+  return { title: project ? `${project.name} Workspace – SOWLedger` : "Workspace – SOWLedger" };
 }
 
 export default async function ProjectBoardPage({ 

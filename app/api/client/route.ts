@@ -72,7 +72,7 @@ export async function GET() {
     }));
 
     return NextResponse.json({ ok: true, projects: projectAggregates, invoices: mappedInvoices });
-  } catch {
-     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error) {
+     return NextResponse.json({ error: (error as Error).message }, { status: 401 });
   }
 }

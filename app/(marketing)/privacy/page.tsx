@@ -4,15 +4,15 @@ import { ArrowRight, Database, Mail, ShieldCheck } from "lucide-react";
 const SECTIONS = [
   ["What we collect", "Account email, workspace metadata, clients, projects, time records, schedule records, billing identifiers, API key metadata, and support messages you submit."],
   ["How we use it", "We use workspace data to provide scheduling, timers, completed work logging, analytics, exports, invoices, API access, support, security monitoring, and billing operations."],
-  ["What we do not store", "API key secrets are shown once and stored only as hashes. Payment card details are handled by Stripe, not stored directly by Billabled."],
+  ["What we do not store", "API key secrets are shown once and stored only as hashes. Payment card details are handled by Stripe, not stored directly by SOWLedger."],
   ["Data exports", "Workspace owners and managers can export operational data in CSV or JSON. Exports exclude secrets and include integrity headers where supported."],
   ["Retention", "Operational records stay available until deleted through product workflows or by a verified workspace request, subject to legal, billing, and security obligations."],
   ["Contact", "Privacy questions can be sent through the contact page. Include the workspace name and the email tied to your account."],
 ];
 
 export const metadata = {
-  title: "Privacy - Billabled",
-  description: "Billabled privacy notice covering workspace data, API key handling, Stripe payment boundaries, exports, retention, and support contact guidance.",
+  title: "Privacy - SOWLedger",
+  description: "SOWLedger privacy notice covering workspace data, API key handling, Stripe payment boundaries, exports, retention, and support contact guidance.",
 };
 
 export default function PrivacyPage() {
@@ -29,7 +29,7 @@ export default function PrivacyPage() {
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Privacy notice</h1>
           <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700">
-            This page explains what Billabled needs to operate planning, timers, billing evidence, exports, API access, and support. It is not a request to send secrets or payment data to support.
+            This page explains what SOWLedger needs to operate planning, timers, billing evidence, exports, API access, and support. It is not a request to send secrets or payment data to support.
           </p>
         </section>
 
@@ -38,7 +38,7 @@ export default function PrivacyPage() {
             <Database className="h-6 w-6 text-cyan-700" />
             <h2 className="mt-4 text-2xl font-semibold">Summary</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Billabled stores operational workspace data, stores only API key metadata and hashes, uses Stripe for card handling, and provides exports for workspace review.
+              SOWLedger stores operational workspace data, stores only API key metadata and hashes, uses Stripe for card handling, and provides exports for workspace review.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <span className="rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-800">Workspace data</span>

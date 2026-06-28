@@ -6,7 +6,7 @@ async function main() {
   ];
   for (const url of urls) {
     try {
-      const res = await fetch(url, { headers: { cookie: "billabled_session=test" } }); // Send a dummy cookie to force SSR to attempt a session parse, though we will get standard error
+      const res = await fetch(url, { headers: { cookie: "sowledger_session=test" } }); // Send a dummy cookie to force SSR to attempt a session parse, though we will get standard error
       console.log(`\n\n--- ${url} ---`);
       console.log("Status:", res.status);
       const text = await res.text();

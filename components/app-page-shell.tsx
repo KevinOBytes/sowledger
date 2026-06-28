@@ -204,7 +204,7 @@ export type WorkflowRailItem = {
   icon: LucideIcon;
 };
 
-export const BILLABLED_WORKFLOW_STAGES: WorkflowRailItem[] = [
+export const SOWLEDGER_WORKFLOW_STAGES: WorkflowRailItem[] = [
   { id: "plan", label: "Plan", description: "Shape scheduled work", icon: CalendarDays },
   { id: "track", label: "Track", description: "Run live timers", icon: Clock3 },
   { id: "log", label: "Log", description: "Add manual or calendar time", icon: CheckCircle2 },
@@ -219,9 +219,9 @@ export type AppWorkflowRailProps = {
   className?: string;
 };
 
-export function AppWorkflowRail({ current, items = BILLABLED_WORKFLOW_STAGES, className }: AppWorkflowRailProps) {
+export function AppWorkflowRail({ current, items = SOWLEDGER_WORKFLOW_STAGES, className }: AppWorkflowRailProps) {
   return (
-    <section aria-label="Billabled workflow" className={cx("rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm", className)}>
+    <section aria-label="SOWLedger workflow" className={cx("rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm", className)}>
       <ol className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
         {items.map((item, index) => {
           const Icon = item.icon;

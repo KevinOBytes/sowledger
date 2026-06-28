@@ -154,8 +154,8 @@ export function ReportsPageClient() {
     const onTimeSaved = () => {
       fetchReports().catch(() => null);
     };
-    window.addEventListener("billabled:time-saved", onTimeSaved);
-    return () => window.removeEventListener("billabled:time-saved", onTimeSaved);
+    window.addEventListener("sowledger:time-saved", onTimeSaved);
+    return () => window.removeEventListener("sowledger:time-saved", onTimeSaved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, startDate, endDate]);
 

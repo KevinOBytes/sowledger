@@ -80,13 +80,13 @@ const HOW_TO = [
     id: "exports",
     title: "Export workspace data",
     icon: FileDown,
-    body: "Workspace managers can export complete JSON backups or filtered CSV files by project, user, status, source, and date range. Export responses avoid secrets and include x-billabled-export-sha256 where supported.",
+    body: "Workspace managers can export complete JSON backups or filtered CSV files by project, user, status, source, and date range. Export responses avoid secrets and include x-sowledger-export-sha256 where supported.",
   },
 ];
 
 export const metadata = {
-  title: "Support - Billabled",
-  description: "Support for Billabled proof-backed billing operations, from planning and timers through approvals, exports, billing, security, and API integrations.",
+  title: "Support - SOWLedger",
+  description: "Support for SOWLedger proof-backed billing operations, from planning and timers through approvals, exports, billing, security, and API integrations.",
 };
 
 export default function SupportPage() {
@@ -103,7 +103,7 @@ export default function SupportPage() {
               Get help moving work into invoice proof.
             </h1>
             <p className="mt-5 text-lg leading-8 text-slate-700">
-              Billabled support follows the operational workflow: plan the work, capture it, correct it, review the billing record, approve or export it, then integrate it by API.
+              SOWLedger support follows the operational workflow: plan the work, capture it, correct it, review the billing record, approve or export it, then integrate it by API.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Link href="/support/api" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800">
@@ -204,7 +204,7 @@ export default function SupportPage() {
             </p>
           </div>
           <Link href="/contact" className="inline-flex items-center justify-center gap-2 rounded-full bg-cyan-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-500">
-            Contact Billabled
+            Contact SOWLedger
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

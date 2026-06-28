@@ -193,13 +193,13 @@ function googleEventForBlock(block: typeof scheduledWorkBlocks.$inferSelect) {
   const notes = block.notes ? `\n\n${block.notes}` : "";
   return {
     summary: block.title,
-    description: `Scheduled in Billabled.${notes}`,
+    description: `Scheduled in SOWLedger.${notes}`,
     start: { dateTime: new Date(block.startsAt).toISOString() },
     end: { dateTime: new Date(block.endsAt).toISOString() },
     extendedProperties: {
       private: {
-        billabledWorkspaceId: block.workspaceId,
-        billabledBlockId: block.id,
+        sowledgerWorkspaceId: block.workspaceId,
+        sowledgerBlockId: block.id,
       },
     },
   };
@@ -282,7 +282,7 @@ export async function syncGoogleCalendar(input: { workspaceId: string; userId: s
           resourceId: block.id,
           externalId: event.id,
           externalUrl: event.htmlLink ?? null,
-          metadata: { direction: "billabled_to_google" },
+          metadata: { direction: "sowledger_to_google" },
         });
         if (existing) updated += 1;
         else exported += 1;
@@ -300,7 +300,7 @@ export async function syncGoogleCalendar(input: { workspaceId: string; userId: s
       });
       const data = await googleFetch<GoogleEventsResponse>(connection, `/calendars/${selectedCalendarId}/events?${params.toString()}`);
       for (const event of data.items ?? []) {
-        if (!event.id || event.extendedProperties?.private?.billabledBlockId) continue;
+        if (!event.id || event.extendedProperties?.private?.sowledgerBlockId) continue;
         const startsAt = eventStart(event);
         const endsAt = eventEnd(event);
         if (!startsAt || !endsAt || endsAt <= startsAt) continue;
@@ -343,7 +343,7 @@ export async function syncGoogleCalendar(input: { workspaceId: string; userId: s
           resourceId: block.id,
           externalId: event.id,
           externalUrl: event.htmlLink ?? null,
-          metadata: { direction: "google_busy_to_billabled" },
+          metadata: { direction: "google_busy_to_sowledger" },
         });
         imported += 1;
       }

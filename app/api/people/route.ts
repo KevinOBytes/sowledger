@@ -190,6 +190,16 @@ export async function PATCH(req: NextRequest) {
       if (!existing.linkedUserId) {
         return NextResponse.json({ error: "Person is not linked to a workspace member" }, { status: 400 });
       }
+      const [currentMembership] = await db
+        .select()
+        .from(memberships)
+        .where(and(eq(memberships.workspaceId, session.workspaceId), eq(memberships.userId, existing.linkedUserId)));
+      if (!currentMembership) {
+        return NextResponse.json({ error: "Membership not found" }, { status: 404 });
+      }
+      if (isElevatedRole(currentMembership.role) && session.role !== "owner") {
+        return NextResponse.json({ error: "Only owners can change elevated roles" }, { status: 403 });
+      }
       await db
         .update(memberships)
         .set({ role: body.workspaceRole })

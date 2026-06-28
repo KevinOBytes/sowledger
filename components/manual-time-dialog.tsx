@@ -147,7 +147,7 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
       toast.success(editEntry ? "Time entry corrected" : "Completed work logged");
       onOpenChange(false);
       await onSaved?.();
-      window.dispatchEvent(new CustomEvent("billabled:time-saved"));
+      window.dispatchEvent(new CustomEvent("sowledger:time-saved"));
     } catch (error) {
       toast.error(editEntry ? "Could not correct time" : "Could not log time", { description: error instanceof Error ? error.message : "Unknown error" });
     } finally {

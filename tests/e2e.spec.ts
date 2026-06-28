@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { gotoApp, requestGetApp } from './helpers/navigation';
 
 async function expectWorkflowStage(page: import('@playwright/test').Page, stage: string) {
-  const workflow = page.locator('section[aria-label="Billabled workflow"]');
+  const workflow = page.locator('section[aria-label="SOWLedger workflow"]');
   await expect(workflow).toBeVisible();
   const activeStep = workflow.locator('[aria-current="step"]');
   await expect(activeStep).toHaveCount(1);
@@ -18,7 +18,7 @@ test.describe('Unauthenticated Flows', () => {
     await gotoApp(page, '/');
     await expect(page.getByRole('banner')).toHaveCount(1);
     await expect(page.getByRole('heading', { level: 1, name: 'Recover revenue. Prove every invoice.' })).toBeVisible();
-    await expect(page.getByLabel('Billabled capability navigation')).toBeVisible();
+    await expect(page.getByLabel('SOWLedger capability navigation')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Invoice Proof Packs', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Retainer Leak Radar', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Client Sign-Off Portal', exact: true })).toBeVisible();
@@ -27,16 +27,16 @@ test.describe('Unauthenticated Flows', () => {
     await expect(page.getByRole('heading', { name: 'The work path ends in proof, not a timesheet dump.' })).toBeVisible();
     await expect(page.getByText('read:proof-packs')).toBeVisible();
     await expect(page.getByText('read:revenue-intelligence')).toBeVisible();
-    await expect(page.getByRole('img', { name: /Billabled invoice proof pack screenshot/i }).first()).toBeVisible();
-    await expect(page.getByRole('img', { name: /Billabled analytics screenshot/i }).first()).toBeVisible();
-    await expect(page.getByRole('img', { name: /Billabled client sign-off portal screenshot/i }).first()).toBeVisible();
+    await expect(page.getByRole('img', { name: /SOWLedger invoice proof pack screenshot/i }).first()).toBeVisible();
+    await expect(page.getByRole('img', { name: /SOWLedger analytics screenshot/i }).first()).toBeVisible();
+    await expect(page.getByRole('img', { name: /SOWLedger client sign-off portal screenshot/i }).first()).toBeVisible();
     await expect(page.getByText('Real screens for the work customers pay for.')).toBeVisible();
-    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /billabled-og\.png/);
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /sowledger-og\.png/);
     for (const asset of [
       '/images/marketing/invoice-proof-pack.png',
       '/images/marketing/revenue-radar.png',
       '/images/marketing/client-signoff-portal.png',
-      '/images/marketing/billabled-og.png',
+      '/images/marketing/sowledger-og.png',
     ]) {
       const image = await page.request.get(asset);
       expect(image.ok()).toBeTruthy();
@@ -72,7 +72,7 @@ test.describe('Unauthenticated Flows', () => {
 
     await gotoApp(page, '/support/api');
     await expect(page).not.toHaveURL(/.*\/login/);
-    await expect(page.getByRole('heading', { name: 'Build on Billabled.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Build on SOWLedger.' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'API extends the workflow' })).toBeVisible();
     await expect(page.getByText(/oauth2-bearer/).first()).toBeVisible();
     await expect(page.getByText('/api/v1/proof-packs?invoiceId=...')).toBeVisible();
@@ -106,7 +106,7 @@ test.describe('Unauthenticated Flows', () => {
 
     await gotoApp(page, '/contact');
     await expect(page).not.toHaveURL(/.*\/login/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Contact Billabled with the right context.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Contact SOWLedger with the right context.' })).toBeVisible();
     await expect(page.getByText('Never send API keys or bearer tokens.')).toBeVisible();
   });
 
@@ -143,7 +143,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
     await expectVisibleMainText(page, 'Planning queue');
     await expectVisibleMainText(page, 'Concurrent timer stack');
     await expectWorkflowStage(page, 'Track');
-    await expect(page.getByRole('link', { name: /Billabled/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /SOWLedger/i })).toBeVisible();
   });
 
   test('Test 5b: redesigned internal workflow spine marks each app stage', async ({ page }) => {
@@ -167,7 +167,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
 
     await gotoApp(page, '/exports');
     await expect(page.getByRole('heading', { name: 'Complete and filtered data exports' })).toBeVisible();
-    await expect(page.getByText('x-billabled-export-sha256')).toBeVisible();
+    await expect(page.getByText('x-sowledger-export-sha256')).toBeVisible();
     await expectWorkflowStage(page, 'Approve / Invoice / Export');
 
     await gotoApp(page, '/settings/developers');
@@ -179,7 +179,7 @@ test.describe('Authenticated Flows (Free Plan)', () => {
     await expectWorkflowStage(page, 'Integrate');
 
     await gotoApp(page, '/integrations');
-    await expect(page.getByRole('heading', { name: 'Connect the systems around Billabled' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Connect the systems around SOWLedger' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Calendar sync controls' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Slack manual setup' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'QuickBooks invoice defaults' })).toBeVisible();
@@ -194,6 +194,8 @@ test.describe('Authenticated Flows (Free Plan)', () => {
   });
 
   test('Test 7: billing settings shows plan and usage meters', async ({ page }) => {
+    await gotoApp(page, '/app/billing');
+    await expect(page).toHaveURL(/.*\/settings\/billing/);
     await gotoApp(page, '/settings/billing');
     await expect(page.getByRole('heading', { name: 'Plans and subscription' })).toBeVisible();
     await expect(page.getByText('Workspace members')).toBeVisible();

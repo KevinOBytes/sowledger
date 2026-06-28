@@ -21,6 +21,7 @@ import {
   Plug,
   Receipt,
   Settings,
+  ShieldCheck,
   Tag,
   UserRound,
   Users,
@@ -28,7 +29,7 @@ import {
   X,
 } from "lucide-react";
 
-import { BILLABLED_WORKFLOW_STAGES } from "@/components/app-page-shell";
+import { SOWLEDGER_WORKFLOW_STAGES } from "@/components/app-page-shell";
 import { ManualTimeDialog } from "@/components/manual-time-dialog";
 
 type NavItem = {
@@ -58,7 +59,7 @@ function navItemLabel(item: NavItem, unreadCount: number) {
   return item.showBadge && unreadCount > 0 ? `${item.name}, ${unreadCount} unread` : item.name;
 }
 
-const workflowSteps = BILLABLED_WORKFLOW_STAGES.map((stage) => stage.label);
+const workflowSteps = SOWLEDGER_WORKFLOW_STAGES.map((stage) => stage.label);
 
 const navSections: NavSection[] = [
   {
@@ -99,7 +100,7 @@ const navSections: NavSection[] = [
   },
   {
     label: "Integrate",
-    summary: "Connect Billabled to external systems.",
+    summary: "Connect SOWLedger to external systems.",
     items: [
       { name: "Integrations", description: "Calendar, Slack, accounting", href: "/integrations", icon: Plug },
       { name: "Developers", description: "API keys, scopes, docs", href: "/settings/developers", icon: Code2 },
@@ -139,11 +140,32 @@ const mobileMoreItems: NavItem[] = [
   { name: "Settings", description: "Workspace defaults", href: "/settings", icon: Settings, exact: true },
 ];
 
-export function Sidebar() {
+type SidebarProps = {
+  isSiteAdmin?: boolean;
+};
+
+const siteAdminNavItem: NavItem = {
+  name: "Site admin",
+  description: "Users and workspaces",
+  href: "/admin",
+  icon: ShieldCheck,
+};
+
+export function Sidebar({ isSiteAdmin = false }: SidebarProps) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const sections = isSiteAdmin
+    ? navSections.map((section) =>
+        section.label === "Workspace"
+          ? { ...section, items: [...section.items, siteAdminNavItem] }
+          : section,
+      )
+    : navSections;
+  const moreItems = isSiteAdmin
+    ? [...mobileMoreItems, siteAdminNavItem]
+    : mobileMoreItems;
 
   useEffect(() => {
     async function fetchNotifications() {
@@ -168,9 +190,9 @@ export function Sidebar() {
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-72 flex-col border-r border-stone-200/80 bg-[#fffdf8]/95 shadow-[16px_0_50px_rgba(65,52,37,0.08)] backdrop-blur md:flex">
         <div className="border-b border-stone-200/70 px-5 py-5">
           <Link href="/dashboard" className="flex items-center transition hover:opacity-80">
-            <Image src="/logo.png" alt="Billabled" width={30} height={30} className="mr-3 rounded-lg" unoptimized />
+            <Image src="/logo.png" alt="SOWLedger" width={30} height={30} className="mr-3 rounded-lg" unoptimized />
             <div>
-              <p className="text-lg font-semibold tracking-tight text-[#17211d]">Billabled</p>
+              <p className="text-lg font-semibold tracking-tight text-[#17211d]">SOWLedger</p>
               <p className="text-xs font-medium text-stone-500">Internal billing control surface</p>
             </div>
           </Link>
@@ -187,7 +209,7 @@ export function Sidebar() {
         </div>
 
         <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Internal application navigation">
-          {navSections.map((section) => (
+          {sections.map((section) => (
             <section key={section.label} className="mb-5">
               <div className="px-2 pb-2">
                 <h2 className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-400">{section.label}</h2>
@@ -268,7 +290,7 @@ export function Sidebar() {
       >
         {mobileNav.map((item) => {
           const isMore = item.href === "#more";
-          const isActive = isMore ? mobileMoreOpen || mobileMoreItems.some((moreItem) => routeIsActive(pathname, moreItem)) : routeIsActive(pathname, item);
+          const isActive = isMore ? mobileMoreOpen || moreItems.some((moreItem) => routeIsActive(pathname, moreItem)) : routeIsActive(pathname, item);
           const Icon = item.icon;
           return isMore ? (
             <button
@@ -314,8 +336,8 @@ export function Sidebar() {
             id="mobile-more-hub"
             role="dialog"
             aria-modal="true"
-            aria-label="More Billabled navigation"
-            className="absolute inset-x-3 bottom-24 max-h-[72vh] overflow-hidden rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow-2xl shadow-stone-950/20"
+            aria-label="More SOWLedger navigation"
+            className="absolute inset-x-3 bottom-24 max-h-[72vh] overflow-hidden rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow shadow-stone-950/20"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-stone-200/80 px-5 py-4">
@@ -329,7 +351,7 @@ export function Sidebar() {
               </button>
             </div>
             <div className="grid max-h-[calc(72vh-5.5rem)] grid-cols-2 gap-2 overflow-y-auto p-3">
-              {mobileMoreItems.map((item) => {
+                {moreItems.map((item) => {
                 const isActive = routeIsActive(pathname, item);
                 const Icon = item.icon;
                 return (
@@ -354,7 +376,7 @@ export function Sidebar() {
       <button
         type="button"
         onClick={() => setManualOpen(true)}
-        className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#163c36] text-white shadow-xl shadow-teal-950/20 transition hover:bg-[#23544b] md:hidden"
+        className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#163c36] text-white shadow-sm shadow-teal-950/20 transition hover:bg-[#23544b] md:hidden"
         aria-label="Quick time entry"
       >
         <Plus className="h-6 w-6" />

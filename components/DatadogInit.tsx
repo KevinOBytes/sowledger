@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 declare global {
   interface Window {
-    __billabledDatadogInitialized?: boolean;
+    __sowledgerDatadogInitialized?: boolean;
   }
 }
 
@@ -14,19 +14,19 @@ export default function DatadogInit() {
     const clientToken = process.env.NEXT_PUBLIC_DATADOG_CLIENT_TOKEN;
     const site = process.env.NEXT_PUBLIC_DATADOG_SITE;
 
-    if (!applicationId || !clientToken || !site || window.__billabledDatadogInitialized) return;
+    if (!applicationId || !clientToken || !site || window.__sowledgerDatadogInitialized) return;
 
     let cancelled = false;
 
     void import('@datadog/browser-rum').then(({ datadogRum }) => {
-      if (cancelled || window.__billabledDatadogInitialized) return;
+      if (cancelled || window.__sowledgerDatadogInitialized) return;
 
       if (!datadogRum.getInitConfiguration()) {
         datadogRum.init({
           applicationId,
           clientToken,
           site,
-          service: 'billabled-frontend',
+          service: 'sowledger-frontend',
           env: process.env.NODE_ENV,
           version: '1.0.0',
           sessionSampleRate: 100,
@@ -39,7 +39,7 @@ export default function DatadogInit() {
         datadogRum.startSessionReplayRecording();
       }
 
-      window.__billabledDatadogInitialized = true;
+      window.__sowledgerDatadogInitialized = true;
     });
 
     return () => {

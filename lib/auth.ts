@@ -32,7 +32,7 @@ export class ForbiddenError extends Error {
   }
 }
 
-const AUTH_COOKIE_NAME = "billabled_session";
+const AUTH_COOKIE_NAME = "sowledger_session";
 
 type SessionPayload = {
   sub: string;
@@ -191,7 +191,7 @@ export async function checkMagicLinkEligibility(email: string) {
     eligible: false as const,
     email: resolved.email,
     workspaceSlug: resolved.workspaceSlug,
-    error: "This Billabled workspace is invite-only. Ask a workspace owner or manager to invite this email before requesting a sign-in link.",
+    error: "This SOWLedger workspace is invite-only. Ask a workspace owner or manager to invite this email before requesting a sign-in link.",
   };
 }
 
@@ -257,7 +257,7 @@ export async function consumeMagicLink(token: string) {
     return { user, workspace, membership: await repairSetupRole(user.email, existingMembership) };
   }
 
-  // @kevinbytes.com users always get owner role on first join.
+  // Internal site-admin domains always get owner role on first join.
   if (isAdminEmail(user.email)) {
     const adminMembership = await ensureMembership(user.id, workspace.id, "owner");
     return { user, workspace, membership: adminMembership };

@@ -133,7 +133,7 @@ export async function sendSlackMessage(connection: IntegrationConnection, text: 
 export async function testSlackConnection(workspaceId: string) {
   const connection = await getIntegrationConnection(workspaceId, SLACK_PROVIDER);
   if (!connection || connection.status === "disabled") throw new Error("Slack is not connected");
-  await sendSlackMessage(connection, "Billabled Slack alerts are connected.");
+  await sendSlackMessage(connection, "SOWLedger Slack alerts are connected.");
 }
 
 export async function notifySlack(workspaceId: string, eventType: string, payload: { title: string; body?: string; url?: string }) {
@@ -145,7 +145,7 @@ export async function notifySlack(workspaceId: string, eventType: string, payloa
         type: "section",
         text: { type: "mrkdwn", text: `*${payload.title}*${payload.body ? `\n${payload.body}` : ""}` },
       },
-      ...(payload.url ? [{ type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "Open in Billabled" }, url: payload.url }] }] : []),
+      ...(payload.url ? [{ type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "Open in SOWLedger" }, url: payload.url }] }] : []),
     ]);
   } catch (error) {
     await markIntegrationError(connection, error instanceof Error ? error.message : "Slack notification failed");

@@ -7,7 +7,7 @@ export type DraftTimer = {
   lastSeenAt: string;
 };
 
-const DB_NAME = "billabledLocal";
+const DB_NAME = "sowledgerLocal";
 const STORE_NAME = "draftTimers";
 
 async function openDb(): Promise<IDBDatabase> {

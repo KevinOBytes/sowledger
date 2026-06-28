@@ -1,12 +1,12 @@
 ---
-name: billabled-api-security
-description: Use when modifying Billabled public API v1, API keys, exports, webhooks, authentication, authorization, billing, or Stripe integration.
+name: sowledger-api-security
+description: Use when modifying SOWLedger public API v1, API keys, exports, webhooks, authentication, authorization, billing, or Stripe integration.
 ---
 
-# Billabled API Security
+# SOWLedger API Security
 
 ## Overview
-Billabled exposes operational workspace data. Security work must preserve tenant isolation, least privilege, auditability, and safe billing boundaries.
+SOWLedger exposes operational workspace data. Security work must preserve tenant isolation, least privilege, auditability, and safe billing boundaries.
 
 ## Rules
 - Scope every operational read/write by `workspaceId`.

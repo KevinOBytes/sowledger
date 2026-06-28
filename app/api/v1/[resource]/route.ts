@@ -269,7 +269,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       if (!result) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
       return NextResponse.json(
         { ok: true, proofPack: result.proofPack, digest: result.digest },
-        { headers: { "x-billabled-proof-sha256": result.digest } },
+        { headers: { "x-sowledger-proof-sha256": result.digest } },
       );
     }
     if (resource === "revenue-intelligence") {
@@ -284,7 +284,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
     const format = req.nextUrl.searchParams.get("format") === "json" ? "json" : "csv";
     const data = await loadExportData(context.workspaceId, Object.fromEntries(req.nextUrl.searchParams.entries()));
-    return createExportResponse(data, format, `billabled-${context.workspaceId}-${new Date().toISOString().slice(0, 10)}`);
+    return createExportResponse(data, format, `sowledger-${context.workspaceId}-${new Date().toISOString().slice(0, 10)}`);
   });
 }
 
@@ -312,7 +312,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       const name = typeof body.name === "string" ? body.name.trim().toLowerCase() : "";
       if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
       await assertWorkspaceProject(context.workspaceId, body.projectId);
-      const [tag] = await db.insert(workspaceTags).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, name, color: body.color || "#3b82f6", projectId: body.projectId || null, isBillableDefault: body.isBillableDefault ?? true }).returning();
+      const [tag] = await db.insert(workspaceTags).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, name, color: body.color || "#3b82f6", projectId: body.projectId || null, isBillableDefault: body.isBillableDefault ?? false }).returning();
       return NextResponse.json({ ok: true, tag }, { status: 201 });
     }
     if (resource === "tasks") {
@@ -324,6 +324,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     }
     if (resource === "schedule") {
       if (!body.userId || !body.title || !body.startsAt || !body.endsAt) return NextResponse.json({ error: "userId, title, startsAt, and endsAt are required" }, { status: 400 });
+      if (body.userId !== context.createdByUserId) requireApiScope(context, "impersonate:user");
       await assertWorkspaceMember(context.workspaceId, body.userId);
       const startsAt = new Date(body.startsAt);
       const endsAt = new Date(body.endsAt);
@@ -335,6 +336,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     }
 
     if (!body.userId || !body.startedAt || !body.stoppedAt) return NextResponse.json({ error: "userId, startedAt, and stoppedAt are required" }, { status: 400 });
+    if (body.userId !== context.createdByUserId) requireApiScope(context, "impersonate:user");
     const status = safePublicTimeStatus(body.status);
     if (!status) return NextResponse.json({ error: "Public API time entries can only be created as draft or submitted" }, { status: 400 });
     await assertWorkspaceMember(context.workspaceId, body.userId);
@@ -420,6 +422,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
         .where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, context.workspaceId)));
       if (!existingBlock) return NextResponse.json({ error: "Block not found" }, { status: 404 });
       const nextUserId = body.userId !== undefined ? body.userId : existingBlock.userId;
+      if (nextUserId !== context.createdByUserId) requireApiScope(context, "impersonate:user");
       if (body.userId !== undefined) await assertWorkspaceMember(context.workspaceId, nextUserId);
       await assertWorkspaceAction(context.workspaceId, nextUserId, body.actionId !== undefined ? body.actionId : existingBlock.actionId);
       const startsAt = body.startsAt ? new Date(body.startsAt) : existingBlock.startsAt;

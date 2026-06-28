@@ -33,8 +33,8 @@ const CONTACT_TASKS = [
 ];
 
 export const metadata = {
-  title: "Contact - Billabled",
-  description: "Contact Billabled for product support, billing, API/security questions, sales, and onboarding without sending secrets.",
+  title: "Contact - SOWLedger",
+  description: "Contact SOWLedger for product support, billing, API/security questions, sales, and onboarding without sending secrets.",
 };
 
 export default function ContactPage() {
@@ -47,7 +47,7 @@ export default function ContactPage() {
               <Mail className="h-4 w-4" />
               Contact
             </p>
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Contact Billabled with the right context.</h1>
+            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Contact SOWLedger with the right context.</h1>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700">
               Use one support address for product, account, billing, API, security, sales, and onboarding questions. Include safe context so the issue can be reproduced without exposing secrets.
             </p>
@@ -57,8 +57,8 @@ export default function ContactPage() {
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Keep API keys, bearer tokens, passwords, card numbers, and private customer data out of the initial message.
             </p>
-            <a href="mailto:support@billabled.com" className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
-              support@billabled.com
+            <a href="mailto:support@sowledger.com" className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
+              support@sowledger.com
               <ArrowRight className="h-4 w-4" />
             </a>
           </div>

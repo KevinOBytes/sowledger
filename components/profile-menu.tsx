@@ -47,7 +47,7 @@ export function ProfileMenu({ email, isAdmin }: ProfileMenuProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-52 rounded-2xl border border-stone-200 bg-white py-1 shadow-xl shadow-stone-900/10">
+        <div className="absolute right-0 z-50 mt-2 w-52 rounded-2xl border border-stone-200 bg-white py-1 shadow-sm shadow-stone-900/10">
           {/* User info */}
           <div className="border-b border-stone-200 px-4 py-3">
             <p className="truncate text-xs font-medium text-slate-950">{email}</p>

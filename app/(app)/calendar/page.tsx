@@ -1,7 +1,7 @@
 import { CalendarView } from "@/components/calendar-view";
 import { CalendarIntegrationPanel } from "@/components/calendar-integration-panel";
 
-export const metadata = { title: "Calendar - Billabled" };
+export const metadata = { title: "Calendar - SOWLedger" };
 
 export default function CalendarPage() {
   return (

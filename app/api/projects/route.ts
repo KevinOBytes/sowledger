@@ -179,18 +179,12 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    await db.delete(projects).where(and(eq(projects.id, projectId), eq(projects.workspaceId, session.workspaceId)));
-
-    // Also need to clear projectId from time entries and goals
-    // Wait, let's keep it simple by querying them
-    // Actually, in schema.ts, projectId doesn't have ON DELETE SET NULL for time entries and goals, we must do it manually or let schema handle it?
-    // In lib/store.ts: 
-    // for (const entry of ...) entry.projectId = undefined;
-    
-    // We can do this with Drizzle:
     const { timeEntries, goals } = await import("@/lib/db/schema");
-    await db.update(timeEntries).set({ projectId: null }).where(and(eq(timeEntries.workspaceId, session.workspaceId), eq(timeEntries.projectId, projectId)));
-    await db.update(goals).set({ projectId: null }).where(and(eq(goals.workspaceId, session.workspaceId), eq(goals.projectId, projectId)));
+    await db.transaction(async (tx) => {
+      await tx.update(timeEntries).set({ projectId: null }).where(and(eq(timeEntries.workspaceId, session.workspaceId), eq(timeEntries.projectId, projectId!)));
+      await tx.update(goals).set({ projectId: null }).where(and(eq(goals.workspaceId, session.workspaceId), eq(goals.projectId, projectId!)));
+      await tx.delete(projects).where(and(eq(projects.id, projectId!), eq(projects.workspaceId, session.workspaceId)));
+    });
 
     return NextResponse.json({ ok: true, deletedProjectId: projectId });
   } catch (error) {

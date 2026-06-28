@@ -8,11 +8,11 @@ const requiredFiles = [
   "AGENTS.md",
   "CLAUDE.md",
   ".github/copilot-instructions.md",
-  ".cursor/rules/billabled.mdc",
+  ".cursor/rules/sowledger.mdc",
   "docs/agentic/README.md",
-  ".codex/skills/billabled-development/SKILL.md",
-  ".codex/skills/billabled-product-ux/SKILL.md",
-  ".codex/skills/billabled-api-security/SKILL.md",
+  ".codex/skills/sowledger-development/SKILL.md",
+  ".codex/skills/sowledger-product-ux/SKILL.md",
+  ".codex/skills/sowledger-api-security/SKILL.md",
 ];
 
 const requiredAgentPhrases = [
@@ -45,7 +45,7 @@ if (existsSync(join(root, "AGENTS.md"))) {
   }
 }
 
-for (const file of ["CLAUDE.md", ".github/copilot-instructions.md", ".cursor/rules/billabled.mdc"]) {
+for (const file of ["CLAUDE.md", ".github/copilot-instructions.md", ".cursor/rules/sowledger.mdc"]) {
   if (existsSync(join(root, file)) && !read(file).includes("AGENTS.md")) {
     failures.push(`${file} must delegate to AGENTS.md`);
   }

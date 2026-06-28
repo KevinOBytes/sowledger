@@ -6,7 +6,7 @@ import { listWorkspacePeopleDirectory } from "@/lib/people-directory";
 
 import { PeopleWorkspaceClient } from "@/components/people-workspace-client";
 
-export const metadata = { title: "People - Billabled" };
+export const metadata = { title: "People - SOWLedger" };
 
 export default async function PeoplePage({
   searchParams,

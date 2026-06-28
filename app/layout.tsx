@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
+import { GoogleAnalytics } from "@next/third-parties/google";
+import { Analytics } from "@vercel/analytics/next";
 import DatadogInit from "@/components/DatadogInit";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.billabled.com";
-const metadataTitle = "Billabled Workforce Intelligence";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.sowledger.com";
+const googleAnalyticsId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+const metadataTitle = "SOWLedger Workforce Intelligence";
 const metadataDescription = "Recover revenue and prove every invoice with proof-backed time tracking, retainer leak radar, client sign-off, and agency APIs.";
 
 export const metadata: Metadata = {
@@ -16,13 +19,13 @@ export const metadata: Metadata = {
     title: metadataTitle,
     description: metadataDescription,
     url: "/",
-    siteName: "Billabled",
+    siteName: "SOWLedger",
     images: [
       {
-        url: "/images/marketing/billabled-og.png",
+        url: "/images/marketing/sowledger-og.png",
         width: 1200,
         height: 630,
-        alt: "Billabled proof-backed billing preview.",
+        alt: "SOWLedger proof-backed billing preview.",
       },
     ],
     type: "website",
@@ -31,11 +34,11 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: metadataTitle,
     description: metadataDescription,
-    images: ["/images/marketing/billabled-og.png"],
+    images: ["/images/marketing/sowledger-og.png"],
   },
   appleWebApp: {
     capable: true,
-    title: "Billabled",
+    title: "SOWLedger",
     statusBarStyle: "default",
   },
   formatDetection: {
@@ -66,6 +69,8 @@ export default function RootLayout({
         <DatadogInit />
         {children}
         <Toaster theme="light" richColors position="bottom-right" />
+        <Analytics />
+        {googleAnalyticsId ? <GoogleAnalytics gaId={googleAnalyticsId} /> : null}
       </body>
     </html>
   );

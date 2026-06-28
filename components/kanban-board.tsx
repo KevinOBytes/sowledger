@@ -292,7 +292,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                 ))}
 
                 {addingToCol === col.id && (
-                    <div className="rounded-2xl border border-teal-200 bg-teal-50 p-3 shadow-lg shadow-teal-900/5">
+                    <div className="rounded-2xl border border-teal-200 bg-teal-50 p-3 shadow-sm shadow-teal-900/5">
                         <input 
                           autoFocus
                           type="text" 
@@ -318,7 +318,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
 
       {selectedTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4 backdrop-blur-sm">
-          <div className="animate-in fade-in zoom-in flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-stone-200 bg-[#fffdf8] shadow-2xl shadow-stone-950/20 duration-200">
+          <div className="animate-in fade-in zoom-in flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-stone-200 bg-[#fffdf8] shadow shadow-stone-950/20 duration-200">
             <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50/70 p-6">
               <h2 className="text-xl font-bold text-[#17211d]">{selectedTask.title}</h2>
               <button onClick={() => setSelectedTask(null)} className="rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-800">

@@ -9,9 +9,9 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link href="/" className="flex min-w-0 items-center gap-2 transition hover:opacity-80">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow">
-              <Image src="/logo.png" alt="Billabled" width={32} height={32} unoptimized />
+              <Image src="/logo.png" alt="SOWLedger" width={32} height={32} unoptimized />
             </div>
-            <span className="text-lg font-bold tracking-tight text-slate-950">Billabled</span>
+            <span className="text-lg font-bold tracking-tight text-slate-950">SOWLedger</span>
           </Link>
           <nav className="hidden items-center gap-5 text-sm font-semibold text-stone-600 lg:flex" aria-label="Marketing navigation">
             <Link href="/#proof-packs" className="transition hover:text-cyan-700">
@@ -57,7 +57,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
           <Link href="/billing-policy" className="hover:text-slate-950">Billing policy</Link>
           <Link href="/contact" className="hover:text-slate-950">Contact</Link>
         </div>
-        <p>&copy; {new Date().getFullYear()} Billabled Inc. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} SOWLedger Inc. All rights reserved.</p>
       </footer>
     </div>
   );

@@ -37,8 +37,8 @@ export async function GET() {
 
     const workspaceWebhooks = await db.select().from(webhooks).where(eq(webhooks.workspaceId, session.workspaceId));
     return NextResponse.json({ ok: true, webhooks: workspaceWebhooks.map(toPublicWebhook) });
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
   }
 }
 
@@ -63,8 +63,8 @@ export async function POST(req: Request) {
     }).returning();
 
     return NextResponse.json({ ok: true, webhook: toPublicWebhook(hook) });
-  } catch {
-    return NextResponse.json({ error: "Failed to create webhook" }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
 }
 
@@ -84,7 +84,7 @@ export async function DELETE(req: Request) {
 
     if (!deleted) return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
     return NextResponse.json({ ok: true, deletedWebhookId: deleted.id });
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
   }
 }

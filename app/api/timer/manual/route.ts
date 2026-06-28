@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { createTimeEntry, ensurePeriodUnlocked, enforceDailyHoursLimit } from "@/lib/security";
+import {  ensurePeriodUnlocked, enforceDailyHoursLimit } from "@/lib/security";
 import { db } from "@/lib/db";
 import { projects, goals, userActions, scheduledWorkBlocks } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
+import { timeEntries } from "@/lib/db/schema";
 import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
 import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
 import { and, eq } from "drizzle-orm";
@@ -88,7 +89,8 @@ export async function POST(req: NextRequest) {
       hourlyRate = uAction.hourlyRate || undefined;
     }
 
-    const entry = await createTimeEntry({
+    const entryData = {
+      id: crypto.randomUUID(),
       workspaceId: session.workspaceId,
       userId: session.sub,
       scheduledBlockId: body.scheduledBlockId || null,
@@ -100,27 +102,35 @@ export async function POST(req: NextRequest) {
       stoppedAt,
       durationSeconds,
       description: body.description || null,
-      status: "draft",
-      source: body.source === "calendar" ? "calendar" : "manual",
+      status: "draft" as const,
+      source: body.source === "calendar" ? ("calendar" as const) : ("manual" as const),
       collaborators: body.collaborators ?? [],
       expenses: [],
       action: actionName || null,
       hourlyRate: hourlyRate || null,
+    };
+
+    const entry = await db.transaction(async (tx) => {
+      const [newEntry] = await tx.insert(timeEntries).values(entryData).returning();
+
+      if (body.scheduledBlockId) {
+        await tx.update(scheduledWorkBlocks).set({
+          status: "completed",
+          linkedTimeEntryId: newEntry.id,
+          updatedAt: new Date(),
+        }).where(and(eq(scheduledWorkBlocks.id, body.scheduledBlockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId), eq(scheduledWorkBlocks.userId, session.sub)));
+      }
+
+      return newEntry;
     });
 
-    if (body.scheduledBlockId) {
-      await db.update(scheduledWorkBlocks).set({
-        status: "completed",
-        linkedTimeEntryId: entry.id,
-        updatedAt: new Date(),
-      }).where(and(eq(scheduledWorkBlocks.id, body.scheduledBlockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId), eq(scheduledWorkBlocks.userId, session.sub)));
-    }
-
-    dispatchIntegrationNotification(session.workspaceId, "time_entry.created", {
-      title: "Completed work logged",
-      body: `${entry.description || entry.taskId} (${Math.round(durationSeconds / 60)} min, ${entry.source})`,
-      url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/activity`,
-    }).catch(() => {});
+    after(() => {
+      dispatchIntegrationNotification(session.workspaceId, "time_entry.created", {
+        title: "Completed work logged",
+        body: `${entry.description || entry.taskId} (${Math.round(durationSeconds / 60)} min, ${entry.source})`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/activity`,
+      }).catch(() => {});
+    });
 
     return NextResponse.json({ ok: true, entry });
   } catch (error) {

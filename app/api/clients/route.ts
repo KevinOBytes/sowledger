@@ -58,13 +58,16 @@ export async function POST(req: NextRequest) {
       currencyOverride: body.currencyOverride,
     };
 
-    const [client] = await db.insert(clients).values(newClient).returning();
-    await db.insert(organizations).values({
-      id: crypto.randomUUID(),
-      workspaceId: session.workspaceId,
-      clientId: client.id,
-      name: client.name,
-      type: "client",
+    const client = await db.transaction(async (tx) => {
+      const [newInserted] = await tx.insert(clients).values(newClient).returning();
+      await tx.insert(organizations).values({
+        id: crypto.randomUUID(),
+        workspaceId: session.workspaceId,
+        clientId: newInserted.id,
+        name: newInserted.name,
+        type: "client",
+      });
+      return newInserted;
     });
     return NextResponse.json({ ok: true, client });
   } catch (error) {
@@ -101,13 +104,16 @@ export async function PATCH(req: NextRequest) {
     if (body.currencyOverride !== undefined) updates.currencyOverride = body.currencyOverride;
     if (body.status !== undefined) updates.status = body.status;
 
-    const [client] = await db.update(clients).set(updates).where(and(eq(clients.id, body.clientId), eq(clients.workspaceId, session.workspaceId))).returning();
-    if (body.name !== undefined) {
-      await db
-        .update(organizations)
-        .set({ name: body.name })
-        .where(and(eq(organizations.workspaceId, session.workspaceId), eq(organizations.clientId, body.clientId)));
-    }
+    const client = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(clients).set(updates).where(and(eq(clients.id, body.clientId!), eq(clients.workspaceId, session.workspaceId))).returning();
+      if (body.name !== undefined) {
+        await tx
+          .update(organizations)
+          .set({ name: body.name })
+          .where(and(eq(organizations.workspaceId, session.workspaceId), eq(organizations.clientId, body.clientId!)));
+      }
+      return updated;
+    });
     return NextResponse.json({ ok: true, client });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
@@ -128,11 +134,13 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    await db.delete(organizations).where(and(eq(organizations.workspaceId, session.workspaceId), eq(organizations.clientId, clientId)));
-    await db.delete(clients).where(and(eq(clients.id, clientId), eq(clients.workspaceId, session.workspaceId)));
-
-    // Clear clientId from projects
-    await db.update(projects).set({ clientId: null }).where(and(eq(projects.workspaceId, session.workspaceId), eq(projects.clientId, clientId)));
+    await db.transaction(async (tx) => {
+      await tx.delete(organizations).where(and(eq(organizations.workspaceId, session.workspaceId), eq(organizations.clientId, clientId!)));
+      await tx.delete(clients).where(and(eq(clients.id, clientId!), eq(clients.workspaceId, session.workspaceId)));
+  
+      // Clear clientId from projects
+      await tx.update(projects).set({ clientId: null }).where(and(eq(projects.workspaceId, session.workspaceId), eq(projects.clientId, clientId!)));
+    });
 
     return NextResponse.json({ ok: true, deletedClientId: clientId });
   } catch (error) {

@@ -1,15 +1,15 @@
 ---
-name: billabled-development
-description: Use when modifying the Billabled Next.js application, database schema, routes, tests, or project configuration.
+name: sowledger-development
+description: Use when modifying the SOWLedger Next.js application, database schema, routes, tests, or project configuration.
 ---
 
-# Billabled Development
+# SOWLedger Development
 
 ## Overview
-Billabled is a Next.js 16.2 App Router application for planning, tracking, billing, exporting, and integrating time data. Treat framework version drift, workspace isolation, and product workflow continuity as primary risks.
+SOWLedger is a Next.js 16.2 App Router application for planning, tracking, billing, exporting, and integrating time data. Treat framework version drift, workspace isolation, and product workflow continuity as primary risks.
 
 ## Quick Start
-1. Confirm the repo root is `/Users/example/Projects/billabled`.
+1. Confirm the repo root is `/Users/example/Projects/sowledger`.
 2. Run `git status --short` and preserve unrelated changes.
 3. Read relevant local Next.js docs in `node_modules/next/dist/docs/` before editing Next-specific APIs.
 4. Locate existing patterns with `rg` before adding new ones.

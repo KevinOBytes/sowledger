@@ -2,17 +2,17 @@ import Link from "next/link";
 import { ArrowRight, FileText, Scale, ShieldCheck } from "lucide-react";
 
 const TERMS = [
-  ["Service use", "Billabled provides workspace tools for planning, timers, completed work logs, analytics, invoices, exports, and API integrations. You are responsible for the accuracy of data entered into your workspace."],
+  ["Service use", "SOWLedger provides workspace tools for planning, timers, completed work logs, analytics, invoices, exports, and API integrations. You are responsible for the accuracy of data entered into your workspace."],
   ["Accounts and access", "Use a valid email and keep workspace access limited to authorized users. Owners and managers control higher-risk actions such as billing, approvals, exports, API keys, and webhooks."],
   ["Customer data", "You retain responsibility for customer data in your workspace. Do not upload secrets or regulated data unless your agreement and configuration explicitly allow it."],
   ["Availability", "We aim to keep the service available, but access may include maintenance windows, product changes, and usage limits."],
-  ["Acceptable use", "Do not abuse public APIs, bypass rate limits, attempt workspace isolation failures, or use Billabled to process unlawful, harmful, or unauthorized data."],
+  ["Acceptable use", "Do not abuse public APIs, bypass rate limits, attempt workspace isolation failures, or use SOWLedger to process unlawful, harmful, or unauthorized data."],
   ["Changes", "Product functionality, limits, pricing, and these terms may change. Material paid-plan changes should be communicated before they affect active customers."],
 ];
 
 export const metadata = {
-  title: "Terms - Billabled",
-  description: "Billabled terms covering service use, account access, customer data, availability, acceptable use, and product changes.",
+  title: "Terms - SOWLedger",
+  description: "SOWLedger terms covering service use, account access, customer data, availability, acceptable use, and product changes.",
 };
 
 export default function TermsPage() {
@@ -29,7 +29,7 @@ export default function TermsPage() {
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Terms of service</h1>
           <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700">
-            These terms describe how customers may use Billabled for planning, time tracking, billing evidence, exports, and integrations. They do not expand public API access beyond documented scopes.
+            These terms describe how customers may use SOWLedger for planning, time tracking, billing evidence, exports, and integrations. They do not expand public API access beyond documented scopes.
           </p>
         </section>
 
@@ -38,7 +38,7 @@ export default function TermsPage() {
             <FileText className="h-6 w-6 text-cyan-700" />
             <h2 className="mt-4 text-2xl font-semibold">Summary</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Use Billabled for authorized workspace operations, keep access limited to the right people, and keep secrets or unsupported regulated data out of routine product and support flows.
+              Use SOWLedger for authorized workspace operations, keep access limited to the right people, and keep secrets or unsupported regulated data out of routine product and support flows.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">

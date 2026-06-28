@@ -1,4 +1,4 @@
-# Billabled
+# SOWLedger
 
 Security-focused workforce intelligence starter on Next.js (App Router) with role-based auth, immutable audit logs, compliance controls, user settings, and local-first timer resilience.
 
@@ -28,6 +28,7 @@ When a project/goal is deleted, linked time entries are cleaned by unsetting the
 - SQL migration for Postgres remains included at `db/migrations/0001_init.sql`.
 - Launch/deploy runbook lives at [`docs/launch-readiness.md`](docs/launch-readiness.md).
 - Product-completion schema changes are applied with `npm run db:migrate:product`, which backs up schema metadata and records migration checksums.
+- Vercel Web Analytics is wired through `@vercel/analytics`; Google Analytics is enabled when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set.
 
 ## Current persistence note
 This branch currently uses an in-memory runtime store for API state so it remains compile-safe in restricted CI environments. SQL-first schema is included and adapter wiring to Neon can be done behind current API contracts.
@@ -40,12 +41,13 @@ npm run dev
 
 ## Required environment variables
 ```bash
-NEXT_PUBLIC_APP_URL=https://billabled.tkoresearch.com
+NEXT_PUBLIC_APP_URL=https://sowledger.tkoresearch.com
 AUTH_SHARED_KEY=replace_with_internal_service_key
 AUTH_COOKIE_SECRET=replace_with_long_random_secret_min_24_chars
 AUDIT_SIGNING_SECRET=replace_with_long_random_secret
 RESEND_API_KEY=re_xxx
 RESEND_LOGIN_FROM=logins@kevinbytes.com
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 DATABASE_URL=postgres://...
 UPSTASH_REDIS_REST_URL=https://...
 UPSTASH_REDIS_REST_TOKEN=...
@@ -59,7 +61,7 @@ ALLOW_BOOTSTRAP_OWNER=true
   - `POST /api/auth/request-link`
   - `GET /api/auth/verify?token=...`
   - `GET /api/auth/me`
-  - `POST /api/auth/logout`
+  - `GET|POST /api/auth/logout`
   - `POST /api/auth/invite`
 - User settings
   - `GET /api/user/settings`

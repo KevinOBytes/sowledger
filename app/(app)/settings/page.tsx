@@ -20,7 +20,7 @@ const SETTINGS_LINKS = [
   { href: "/exports", title: "Exports", description: "Download complete or filtered workspace data.", icon: FileDown },
   { href: "/settings/tags", title: "Tags", description: "Maintain workspace tag metadata and billing defaults.", icon: Tag },
   { href: "/settings/actions", title: "Work types", description: "Configure reusable work labels and optional hourly rates.", icon: Bell },
-  { href: "/settings/webhooks", title: "Webhooks", description: "Connect Billabled events to external systems.", icon: Webhook },
+  { href: "/settings/webhooks", title: "Webhooks", description: "Connect SOWLedger events to external systems.", icon: Webhook },
 ];
 
 export default function SettingsPage() {

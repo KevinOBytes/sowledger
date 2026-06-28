@@ -72,7 +72,7 @@ async function runSchemaEnsure() {
       project_id varchar(255),
       name varchar(255) NOT NULL,
       color varchar(50) NOT NULL DEFAULT '#3b82f6',
-      is_billable_default boolean NOT NULL DEFAULT true,
+      is_billable_default boolean NOT NULL DEFAULT false,
       status varchar(20) NOT NULL DEFAULT 'active'
     )
   `);
@@ -280,7 +280,8 @@ async function runSchemaEnsure() {
 
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS project_id varchar(255)`);
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS color varchar(50) NOT NULL DEFAULT '#3b82f6'`);
-  await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS is_billable_default boolean NOT NULL DEFAULT true`);
+  await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS is_billable_default boolean NOT NULL DEFAULT false`);
+  await db.execute(sql`ALTER TABLE workspace_tags ALTER COLUMN is_billable_default SET DEFAULT false`);
   await db.execute(sql`ALTER TABLE workspace_tags ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'active'`);
 
   await db.execute(sql`ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'needs_setup'`);

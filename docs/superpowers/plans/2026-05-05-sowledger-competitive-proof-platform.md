@@ -1,8 +1,8 @@
-# Billabled Competitive Proof Platform Implementation Plan
+# SOWLedger Competitive Proof Platform Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build Billabled's competitive proof-backed billing platform: invoice proof packs, retainer leak radar, client sign-off, missing billable recovery, agency integrations, and a rebuilt marketing homepage.
+**Goal:** Build SOWLedger's competitive proof-backed billing platform: invoice proof packs, retainer leak radar, client sign-off, missing billable recovery, agency integrations, and a rebuilt marketing homepage.
 
 **Architecture:** Add focused server modules for proof-pack and revenue-intelligence derivation, expose them through authenticated app routes and scoped API-key routes, then wire the internal app, client portal, developer docs, and homepage to the new product story. Use existing audit logs for sign-off records to avoid an unnecessary schema expansion.
 

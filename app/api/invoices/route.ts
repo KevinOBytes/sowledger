@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { invoices as invoicesTable, memberships as membershipsTable, timeEntries as timeEntriesTable, projects as projectsTable, users as usersTable } from "@/lib/db/schema";
@@ -164,11 +164,13 @@ export async function POST(req: NextRequest) {
       return createdInvoice;
     });
 
-    dispatchIntegrationNotification(session.workspaceId, "invoice.created", {
-      title: `Invoice ${invoice.number} created`,
-      body: `$${invoice.amount.toFixed(2)} moved into invoice-ready output with ${timeEntryIds.length} linked entries.`,
-      url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/invoices`,
-    }).catch(() => {});
+    after(() => {
+      dispatchIntegrationNotification(session.workspaceId, "invoice.created", {
+        title: `Invoice ${invoice.number} created`,
+        body: `$${invoice.amount.toFixed(2)} moved into invoice-ready output with ${timeEntryIds.length} linked entries.`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/invoices`,
+      }).catch(() => {});
+    });
 
     return NextResponse.json({ ok: true, invoice });
   } catch (error) {

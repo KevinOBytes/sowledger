@@ -283,8 +283,9 @@ export function CalendarView() {
   const [savingHours, setSavingHours] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  const browserTimezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", []);
+  const browserTimezone = useMemo(() => mounted ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" : "UTC", [mounted]);
   const isManager = session?.role === "manager" || session?.role === "owner";
   const visibleStartMinutes = visibleStartHour * 60;
   const visibleEndMinutes = visibleEndHour * 60;
@@ -464,6 +465,7 @@ export function CalendarView() {
   }, []);
 
   useEffect(() => {
+    setMounted(true);
     const onResize = () => setIsMobile(window.innerWidth < 640);
     onResize();
     window.addEventListener("resize", onResize);
@@ -474,8 +476,8 @@ export function CalendarView() {
     const onTimeSaved = () => {
       fetchData().catch(() => null);
     };
-    window.addEventListener("billabled:time-saved", onTimeSaved);
-    return () => window.removeEventListener("billabled:time-saved", onTimeSaved);
+    window.addEventListener("sowledger:time-saved", onTimeSaved);
+    return () => window.removeEventListener("sowledger:time-saved", onTimeSaved);
   }, []);
 
   useLayoutEffect(() => {
@@ -745,7 +747,7 @@ export function CalendarView() {
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Could not log completed work");
-        window.dispatchEvent(new CustomEvent("billabled:time-saved"));
+        window.dispatchEvent(new CustomEvent("sowledger:time-saved"));
         toast.success("Completed work logged");
       }
       setComposerOpen(false);
@@ -1055,7 +1057,7 @@ export function CalendarView() {
                   })}
                   {!hasWork && <div data-testid="calendar-empty-day-hint" className="pointer-events-none absolute left-3 right-3 top-4 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-3 text-xs text-slate-400">Drag here to plan work, log time, or mark unavailable.</div>}
                   {draftForLane && (
-                    <div className={`pointer-events-none absolute left-1 right-1 z-20 rounded-2xl border-2 border-dashed p-2 text-xs shadow-lg ${draftForLane.kind === "selection" ? "border-cyan-500 bg-cyan-100/85 text-cyan-950" : "border-slate-400 bg-white/90 text-slate-800"}`} style={clampEventStyle(lane.date, draftForLane.startsAt, draftForLane.endsAt)}>
+                    <div className={`pointer-events-none absolute left-1 right-1 z-20 rounded-2xl border-2 border-dashed p-2 text-xs shadow-sm ${draftForLane.kind === "selection" ? "border-cyan-500 bg-cyan-100/85 text-cyan-950" : "border-slate-400 bg-white/90 text-slate-800"}`} style={clampEventStyle(lane.date, draftForLane.startsAt, draftForLane.endsAt)}>
                       <p className="font-bold">{draftForLane.kind === "resize" ? "Resize block" : draftForLane.kind === "move" ? "Move block here" : "New work block"}</p>
                       <p className="mt-0.5 text-[10px]">{timeLabel(draftForLane.startsAt)} - {timeLabel(draftForLane.endsAt)}</p>
                     </div>
@@ -1078,11 +1080,11 @@ export function CalendarView() {
   const draftConflicts = draft ? conflictsForRange(draft.startsAt, draft.endsAt, draft.userId ?? session?.sub, draft.block?.id) : [];
   const selectedBlockConflicts = selectedBlock ? conflictsForRange(new Date(selectedBlock.block.startsAt), new Date(selectedBlock.block.endsAt), selectedBlock.block.userId, selectedBlock.block.id) : [];
   const composerConflicts = composerMode !== "calendar" ? conflictsForRange(new Date(eventStart), new Date(eventEnd), eventUserId ?? session?.sub, editingBlock?.id) : [];
-  const popoverStyle = draft && !isMobile && typeof window !== "undefined" ? {
+  const popoverStyle = draft && !isMobile && mounted ? {
     left: Math.min(Math.max(16, draft.x + 14), Math.max(16, window.innerWidth - 384)),
     top: Math.min(Math.max(16, draft.y + 14), Math.max(16, window.innerHeight - 320)),
   } : undefined;
-  const selectedStyle = selectedBlock && !isMobile && typeof window !== "undefined" ? {
+  const selectedStyle = selectedBlock && !isMobile && mounted ? {
     left: Math.min(Math.max(16, selectedBlock.x + 14), Math.max(16, window.innerWidth - 400)),
     top: Math.min(Math.max(16, selectedBlock.y + 14), Math.max(16, window.innerHeight - 380)),
   } : undefined;
@@ -1155,7 +1157,7 @@ export function CalendarView() {
       </div>
 
       {draft && !composerOpen && (
-        <div className={`fixed z-[70] rounded-3xl border border-slate-200 bg-white p-4 text-slate-950 shadow-2xl ${isMobile ? "inset-x-3 bottom-3" : "w-[22rem]"}`} style={popoverStyle} role="dialog" aria-label={draft.kind === "selection" ? "Create calendar work block" : draft.kind === "resize" ? "Resize scheduled work" : "Move scheduled work"}>
+        <div className={`fixed z-[70] rounded-3xl border border-slate-200 bg-white p-4 text-slate-950 shadow ${isMobile ? "inset-x-3 bottom-3" : "w-[22rem]"}`} style={popoverStyle} role="dialog" aria-label={draft.kind === "selection" ? "Create calendar work block" : draft.kind === "resize" ? "Resize scheduled work" : "Move scheduled work"}>
           <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">{draft.kind === "selection" ? "Selected time" : draft.kind === "resize" ? "Resize" : "Reschedule"}</p><h3 className="mt-1 text-lg font-semibold">{draft.block?.title ?? "Fill this schedule block"}</h3><p className="mt-1 text-sm text-slate-500">{draft.startsAt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {timeLabel(draft.startsAt)} - {timeLabel(draft.endsAt)}</p></div><button onClick={() => { setDraft(null); setMovingBlockId(null); }} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Dismiss calendar selection"><X className="h-4 w-4" /></button></div>
           {draftConflicts.length > 0 && <div data-testid="calendar-conflict-warning" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4" />{draftConflicts.length} conflict(s)</div><p className="mt-1">Overlaps {draftConflicts.slice(0, 2).map((conflict) => conflict.label).join(", ")}.</p></div>}
           {draft.kind === "selection" ? <div className="mt-4 space-y-3"><input value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" placeholder="Work title" /><div className="flex flex-wrap gap-2"><button onClick={() => createQuickDraft()} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white">Save plan</button><button onClick={() => openComposerFromDraft("calendar")} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Log completed</button><button onClick={() => openComposerFromDraft("unavailable")} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Unavailable</button></div>{draftConflicts.length > 0 && <div className="flex flex-wrap gap-2 text-xs"><button onClick={() => { const next = findNextOpenSlot(draft.endsAt, minuteDuration(draft.startsAt, draft.endsAt), draft.userId ?? session?.sub); if (next) setDraft({ ...draft, ...next }); }} className="font-bold text-cyan-700 underline">Move next open</button><button onClick={() => createQuickDraft({ shorten: true })} className="font-bold text-cyan-700 underline">Shorten</button><button onClick={() => createQuickDraft({ replace: true })} className="font-bold text-cyan-700 underline">Replace planned</button></div>}<button onClick={() => openComposerFromDraft("scheduled")} className="text-xs font-bold text-slate-500 underline">Plan work</button></div> : <div className="mt-4 flex flex-wrap gap-2"><button onClick={applyDraftMove} disabled={reschedulingBlock} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{reschedulingBlock ? "Saving..." : draft.kind === "resize" ? "Resize block" : "Move block"}</button>{draft.block && <button onClick={() => { openComposer({ mode: "scheduled", block: draft.block }); setDraft(null); setMovingBlockId(null); }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Edit details</button>}</div>}
@@ -1163,7 +1165,7 @@ export function CalendarView() {
       )}
 
       {selectedBlock && !composerOpen && (
-        <div className={`fixed z-[70] rounded-3xl border border-slate-200 bg-white p-4 text-slate-950 shadow-2xl ${isMobile ? "inset-x-3 bottom-3" : "w-[23rem]"}`} style={selectedStyle} role="dialog" aria-label="Scheduled work actions">
+        <div className={`fixed z-[70] rounded-3xl border border-slate-200 bg-white p-4 text-slate-950 shadow ${isMobile ? "inset-x-3 bottom-3" : "w-[23rem]"}`} style={selectedStyle} role="dialog" aria-label="Scheduled work actions">
           <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">{statusLabel(selectedBlock.block)}</p><h3 className="mt-1 text-lg font-semibold">{selectedBlock.block.title}</h3><p className="mt-1 text-sm text-slate-500">{timeLabel(selectedBlock.block.startsAt)} - {timeLabel(selectedBlock.block.endsAt)}</p></div><button onClick={() => setSelectedBlock(null)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close scheduled work actions"><X className="h-4 w-4" /></button></div>
           {selectedBlockConflicts.length > 0 && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><AlertTriangle className="mr-1 inline h-4 w-4" />Overlaps {selectedBlockConflicts.length} item(s).</div>}
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm font-semibold">
@@ -1181,7 +1183,7 @@ export function CalendarView() {
 
       {composerOpen && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Calendar event composer">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] border border-slate-200 bg-white text-slate-950 shadow-2xl sm:rounded-[28px]">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] border border-slate-200 bg-white text-slate-950 shadow sm:rounded-[28px]">
             <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5"><div><div className="flex items-center gap-2 text-sm font-semibold text-cyan-700">{composerMode === "scheduled" ? <CalendarPlus className="h-4 w-4" /> : composerMode === "unavailable" ? <Bell className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}{editingBlock ? "Edit calendar work" : "New calendar work"}</div><h2 className="mt-1 text-2xl font-semibold tracking-tight">{composerMode === "scheduled" ? "Schedule work" : composerMode === "unavailable" ? "Mark unavailable" : "Log completed work"}</h2><p className="mt-1 text-sm text-slate-500">Use calendar-style details, recurrence, and assignment without leaving the planning surface.</p></div><button onClick={() => setComposerOpen(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close calendar composer"><X className="h-5 w-5" /></button></div>
             <div className="border-b border-slate-100 px-6 py-4"><div className="inline-flex rounded-full bg-slate-100 p-1"><button onClick={() => setComposerMode("scheduled")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "scheduled" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Scheduled work</button><button onClick={() => setComposerMode("calendar")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "calendar" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Completed time</button><button onClick={() => setComposerMode("unavailable")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "unavailable" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Unavailable</button></div></div>
             {composerConflicts.length > 0 && <div className="mx-6 mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertTriangle className="mr-2 inline h-4 w-4" />This time overlaps {composerConflicts.length} calendar item(s). Saving will allow the overlap.</div>}

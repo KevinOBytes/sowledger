@@ -160,7 +160,7 @@ export default function InvoicesPage() {
       setProofPackState({
         invoiceId,
         loading: false,
-        digest: data.digest || res.headers.get("x-billabled-proof-sha256") || undefined,
+        digest: data.digest || res.headers.get("x-sowledger-proof-sha256") || undefined,
         proofPack: data.proofPack || {},
       });
     } catch (error) {

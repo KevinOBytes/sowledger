@@ -97,8 +97,8 @@ export default function ActivityPage() {
     const onTimeSaved = () => {
       fetchEntries().catch(() => null);
     };
-    window.addEventListener("billabled:time-saved", onTimeSaved);
-    return () => window.removeEventListener("billabled:time-saved", onTimeSaved);
+    window.addEventListener("sowledger:time-saved", onTimeSaved);
+    return () => window.removeEventListener("sowledger:time-saved", onTimeSaved);
   }, []);
 
   const groupedEntries = useMemo<GroupedEntries[]>(() => {

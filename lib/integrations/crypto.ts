@@ -10,7 +10,7 @@ function encryptionSecret() {
     if (env.NODE_ENV === "production") {
       throw new Error("AUTH_COOKIE_SECRET or AUDIT_SIGNING_SECRET must be configured before storing integration credentials");
     }
-    return "dev-only-billabled-integration-secret";
+    return "dev-only-sowledger-integration-secret";
   }
   return secret;
 }

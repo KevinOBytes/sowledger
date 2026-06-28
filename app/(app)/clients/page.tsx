@@ -6,7 +6,7 @@ import { eq, desc } from "drizzle-orm";
 import { CreateClientButton } from "@/components/create-client-button";
 import { ClientsPageClient } from "@/components/clients-page-client";
 
-export const metadata = { title: "Clients - Billabled" };
+export const metadata = { title: "Clients - SOWLedger" };
 
 export default async function ClientsPage() {
   const session = await requireSession();

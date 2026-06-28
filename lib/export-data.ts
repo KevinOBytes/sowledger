@@ -192,7 +192,7 @@ export function createExportResponse(data: Awaited<ReturnType<typeof loadExportD
     headers: {
       "Content-Type": format === "json" ? "application/json; charset=utf-8" : "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename=${filenameBase}.${format}`,
-      "x-billabled-export-sha256": digest,
+      "x-sowledger-export-sha256": digest,
     },
   });
 }

@@ -98,13 +98,13 @@ export default function ExportsPage() {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || "Export failed");
       }
-      const digest = response.headers.get("x-billabled-export-sha256");
+      const digest = response.headers.get("x-sowledger-export-sha256");
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       const suffix = selectedProjectName ? selectedProjectName.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "workspace";
       a.href = url;
-      a.download = `billabled-${suffix}-${today()}.${nextFormat}`;
+      a.download = `sowledger-${suffix}-${today()}.${nextFormat}`;
       a.click();
       URL.revokeObjectURL(url);
       setLastDigest(digest);
@@ -183,7 +183,7 @@ export default function ExportsPage() {
               ))}
             </div>
             <div className="mt-5 rounded-3xl border border-cyan-100 bg-cyan-50 p-4 text-sm text-cyan-900">
-              <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">Integrity headers stay on exports.</p><p className="mt-1">The API returns <code>x-billabled-export-sha256</code> so exported payloads can be verified later.</p></div></div>
+              <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">Integrity headers stay on exports.</p><p className="mt-1">The API returns <code>x-sowledger-export-sha256</code> so exported payloads can be verified later.</p></div></div>
               <p className="mt-3 text-xs text-cyan-900">{layout === "summary" ? "Summary CSV groups hours by day, person, project, status, and source." : "Detailed CSV exports one row per time entry."}</p>
               {lastDigest && <p className="mt-3 break-all font-mono text-xs">Last digest: {lastDigest}</p>}
             </div>

@@ -1,9 +1,9 @@
 ---
-name: billabled-product-ux
-description: Use when changing Billabled planning, timer, manual time, calendar, activity, analytics, exports, or navigation UX.
+name: sowledger-product-ux
+description: Use when changing SOWLedger planning, timer, manual time, calendar, activity, analytics, exports, or navigation UX.
 ---
 
-# Billabled Product UX
+# SOWLedger Product UX
 
 ## Overview
 Every product change should reinforce the connected workflow: plan work, track live timers, log manual or calendar time, review analytics, approve or export, then integrate by API.

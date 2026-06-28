@@ -12,7 +12,7 @@ function hasUpstash() {
 export async function GET(req: NextRequest) {
   const providedKey = req.headers.get("x-auth-key");
   const detailsAllowed = process.env.NODE_ENV === "development" || Boolean(env.AUTH_SHARED_KEY && providedKey === env.AUTH_SHARED_KEY);
-  if (!detailsAllowed) return NextResponse.json({ ok: true, service: "billabled" });
+  if (!detailsAllowed) return NextResponse.json({ ok: true, service: "sowledger" });
 
   const requiredChecks = {
     appUrl: Boolean(env.NEXT_PUBLIC_APP_URL),
@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
     upstashKv: hasUpstash(),
   };
   const optionalChecks = {
+    vercelWebAnalytics: true,
+    googleAnalytics: Boolean(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID),
     sentryDsn: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
     sentryReleaseUpload: Boolean(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT),
     googleCalendarOAuth: Boolean(env.GOOGLE_CALENDAR_CLIENT_ID && env.GOOGLE_CALENDAR_CLIENT_SECRET),

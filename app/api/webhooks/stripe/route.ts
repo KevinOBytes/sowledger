@@ -4,7 +4,7 @@ import { stripe } from "@/lib/stripe";
 import { env } from "@/lib/env";
 import { db } from "@/lib/db";
 import { workspaces } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import type Stripe from "stripe";
 import { getPlanByPriceId } from "@/lib/billing-plans";
 
@@ -19,9 +19,10 @@ async function updateWorkspaceFromSubscription(subscription: Stripe.Subscription
   const priceId = subscription.items.data[0]?.price.id;
   if (!priceId) return;
   const plan = getPlanByPriceId(priceId);
+  const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   const updates = {
     stripeSubscriptionId: subscription.id,
-    stripeCustomerId: typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
+    stripeCustomerId: customerId,
     stripePriceId: priceId,
     stripeCurrentPeriodEnd: periodEnd(subscription),
     plan: plan.planId as "free" | "pro" | "smb" | "enterprise",
@@ -32,11 +33,17 @@ async function updateWorkspaceFromSubscription(subscription: Stripe.Subscription
     return;
   }
 
-  await db.update(workspaces).set(updates).where(eq(workspaces.stripeSubscriptionId, subscription.id));
+  await db.update(workspaces).set(updates).where(
+    or(
+      eq(workspaces.stripeSubscriptionId, subscription.id),
+      eq(workspaces.stripeCustomerId, customerId)
+    )
+  );
 }
 
 export async function POST(req: Request) {
-  const body = await req.text();
+  const rawBody = await req.arrayBuffer();
+  const body = Buffer.from(rawBody);
   const headersList = await headers();
   const signature = headersList.get("stripe-signature");
 
@@ -79,7 +86,7 @@ export async function POST(req: Request) {
 
   if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
     const subscription = event.data.object as Stripe.Subscription;
-    await updateWorkspaceFromSubscription(subscription);
+    await updateWorkspaceFromSubscription(subscription, subscription.metadata?.workspaceId);
   }
 
   if (event.type === "customer.subscription.deleted") {

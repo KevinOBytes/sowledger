@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const AUTH_COOKIE_NAME = "billabled_session";
-
+const AUTH_COOKIE_NAME = "sowledger_session";
 const PUBLIC_PREFIXES = [
   "/login",
   "/support",
@@ -56,10 +54,7 @@ function clientIdentifier(req: NextRequest) {
   const sessionPrefix = req.cookies.get(AUTH_COOKIE_NAME)?.value?.slice(0, 18);
   if (sessionPrefix) return `session:${sessionPrefix}`;
 
-  const vercelForwardedFor = req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
-  const realIp = req.headers.get("x-real-ip")?.trim();
-  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return vercelForwardedFor || realIp || forwardedFor || "anonymous";
+  return req.headers.get("x-forwarded-for") || "anonymous";
 }
 
 async function incrementWithUpstash(key: string, windowSeconds: number) {
@@ -95,7 +90,7 @@ async function rateLimit(req: NextRequest, pathname: string) {
   const rule = RATE_LIMIT_RULES.find((item) => item.matches(pathname));
   if (!rule) return null;
 
-  const key = `billabled:${rule.name}:${clientIdentifier(req)}`;
+  const key = `sowledger:${rule.name}:${clientIdentifier(req)}`;
   let count: number;
   try {
     count = await incrementWithUpstash(key, rule.windowSeconds) ?? incrementInMemory(key, rule.windowSeconds);

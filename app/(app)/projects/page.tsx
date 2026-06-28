@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Archive, FolderKanban, LayoutList, ArrowRight } from "lucide-react";
 import { CreateProjectButton } from "@/components/create-project-button";
 
-export const metadata = { title: "Projects - Billabled" };
+export const metadata = { title: "Projects - SOWLedger" };
 
 export default async function ProjectsPage({
   searchParams,

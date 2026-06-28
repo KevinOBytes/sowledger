@@ -11,7 +11,7 @@ export async function GET() {
     requireRole("owner", session.role);
 
     if (!isAdminEmail(session.email)) {
-      throw new ForbiddenError("Admin access requires a @kevinbytes.com email address.");
+      throw new ForbiddenError("Admin access requires a @tkoresearch.com or @sowledger.com email address.");
     }
 
     const allUsers = await db.select().from(users);

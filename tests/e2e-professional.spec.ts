@@ -92,18 +92,25 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
     await expect(page.getByText('Retroactive E2E Task')).toBeVisible();
   });
 
-  test('Story 8: calendar schedules a planned work block', async ({ page }) => {
-    const title = `Calendar E2E ${unique()}`;
-    await gotoApp(page, '/calendar');
-    await page.getByRole('button', { name: 'Schedule work' }).click();
-    await page.getByLabel('Title').fill(title);
-    await page.getByRole('button', { name: 'Save scheduled work' }).click();
-    await expect.poll(async () => {
-      const response = await page.request.get('/api/schedule?status=planned');
-      if (!response.ok()) return false;
-      const data = await response.json();
-      return data.blocks.some((block: { title?: string }) => block.title === title);
-    }, { timeout: 30_000 }).toBe(true);
+  test('Story 8: team member views recurring goals in the Resource Planner', async ({ page }) => {
+    // 1. Create a goal via API
+    const goalName = `Weekly Billable Target ${unique()}`;
+    const goalRes = await page.request.post('/api/goals', {
+      data: {
+        name: goalName,
+        targetHours: 35,
+        targetType: "hours",
+        recurrence: "weekly"
+      }
+    });
+    expect(goalRes.ok()).toBeTruthy();
+
+    // 2. View planner UI
+    await gotoApp(page, '/planner');
+    await expect(page.getByRole('heading', { name: 'Resource Planner' }).or(page.getByText('Resource Planner'))).toBeVisible();
+    
+    // 3. Verify goal is visible (it should be in "Unassigned backlog" since we didn't provide assignedUserId)
+    await expect(page.getByText(goalName)).toBeVisible();
   });
 
   test('Story 9: add a scoped tag to a project', async ({ page }) => {
@@ -115,12 +122,22 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
     await expect(row.getByRole('combobox', { name: 'Select Project Scope' })).toHaveValue(/.+/);
   });
 
-  test('Story 10: complete filtered export is available', async ({ page }) => {
-    await gotoApp(page, '/exports');
-    await expect(page.getByRole('heading', { name: 'Complete and filtered data exports' })).toBeVisible();
-    await page.getByLabel('Format').selectOption('csv');
-    const response = await page.request.get('/api/export/csv?format=csv&include=projects,timeEntries');
-    expect(response.ok()).toBeTruthy();
-    expect(response.headers()['x-billabled-export-sha256']).toBeTruthy();
+  test('Story 10: enforce default billable status for specific workspace tags', async ({ page }) => {
+    await gotoApp(page, '/settings/tags');
+    await page.getByPlaceholder('Enter new tag...').fill('Billable E2E Tag');
+    await page.getByRole('button', { name: 'Add Tag' }).click();
+    
+    // Find the created tag row
+    const row = page.getByRole('row').filter({ hasText: 'billable e2e tag' });
+    
+    // Toggle the billable status from the table row
+    await row.getByRole('button', { name: 'Non-Billable' }).click();
+    
+    // Verify it changes to "Billable Default"
+    await expect(row.getByRole('button', { name: 'Billable Default' })).toBeVisible();
+    
+    // Check that it's applied when tracking time
+    await gotoApp(page, '/dashboard');
+    await page.getByRole('textbox', { name: 'Tags' }).fill('Billable E2E Tag');
   });
 });

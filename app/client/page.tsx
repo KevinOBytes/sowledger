@@ -27,7 +27,7 @@ async function digestForInvoice(invoiceId: string) {
     const response = await fetch(`/api/invoices/${invoiceId}/proof-pack`);
     if (!response.ok) return null;
     const data = await response.json().catch(() => ({}));
-    return typeof data.digest === "string" ? data.digest : response.headers.get("x-billabled-proof-sha256");
+    return typeof data.digest === "string" ? data.digest : response.headers.get("x-sowledger-proof-sha256");
   } catch {
     return null;
   }

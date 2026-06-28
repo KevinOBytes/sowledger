@@ -54,7 +54,7 @@ type IntegrationsResponse = {
 const PROVIDER_META: Record<Provider, { title: string; subtitle: string; icon: typeof Plug; authPath: string; readinessKey: keyof NonNullable<IntegrationsResponse["readiness"]> }> = {
   google_calendar: {
     title: "Google Calendar",
-    subtitle: "Two-way planning sync: Billabled scheduled blocks out, external busy time in.",
+    subtitle: "Two-way planning sync: SOWLedger scheduled blocks out, external busy time in.",
     icon: CalendarDays,
     authPath: "/api/integrations/google-calendar/oauth/start",
     readinessKey: "googleCalendarOAuth",
@@ -68,7 +68,7 @@ const PROVIDER_META: Record<Provider, { title: string; subtitle: string; icon: t
   },
   quickbooks: {
     title: "QuickBooks Online",
-    subtitle: "Push approved Billabled invoices with proof-pack digest metadata into accounting.",
+    subtitle: "Push approved SOWLedger invoices with proof-pack digest metadata into accounting.",
     icon: Receipt,
     authPath: "/api/integrations/quickbooks/oauth/start",
     readinessKey: "quickBooksOAuth",
@@ -204,8 +204,8 @@ export function IntegrationCenterClient() {
     <AppPageShell contentClassName="space-y-5">
       <AppPageHeader
         eyebrow="Integrations"
-        title="Connect the systems around Billabled"
-        description="Calendar is the priority: sync planned Billabled blocks to Google Calendar, import external busy time as unavailable blocks, then route alerts and invoice proof into Slack and QuickBooks."
+        title="Connect the systems around SOWLedger"
+        description="Calendar is the priority: sync planned SOWLedger blocks to Google Calendar, import external busy time as unavailable blocks, then route alerts and invoice proof into Slack and QuickBooks."
         icon={Plug}
         metadata={[
           { label: "Calendar-first operations", tone: "cyan", icon: CalendarDays },
@@ -278,7 +278,7 @@ export function IntegrationCenterClient() {
             <CalendarDays className="mt-1 h-6 w-6 text-cyan-700" />
             <div>
               <h2 className="text-2xl font-semibold">Calendar sync controls</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">Use Google Calendar as the external planning mirror. Billabled remains source-of-truth for planned work; imported external events become unavailable blocks.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Use Google Calendar as the external planning mirror. SOWLedger remains source-of-truth for planned work; imported external events become unavailable blocks.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -288,7 +288,7 @@ export function IntegrationCenterClient() {
             <button onClick={() => void patchConfig("google_calendar", { calendarId: googleCalendarId, importBusy: googleImportBusy, syncScheduled: googleSyncScheduled })} disabled={!connectionByProvider.get("google_calendar") || busy !== null} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:border-cyan-200 hover:text-cyan-700 disabled:opacity-50"><Settings2 className="h-4 w-4" />Save</button>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={googleSyncScheduled} onChange={(event) => setGoogleSyncScheduled(event.target.checked)} className="mt-1 accent-cyan-700" />Push Billabled planned blocks to Google Calendar</label>
+            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={googleSyncScheduled} onChange={(event) => setGoogleSyncScheduled(event.target.checked)} className="mt-1 accent-cyan-700" />Push SOWLedger planned blocks to Google Calendar</label>
             <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={googleImportBusy} onChange={(event) => setGoogleImportBusy(event.target.checked)} className="mt-1 accent-cyan-700" />Import external busy events as unavailable blocks</label>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -323,7 +323,7 @@ export function IntegrationCenterClient() {
             <Receipt className="mt-1 h-6 w-6 text-cyan-700" />
             <div>
               <h2 className="text-2xl font-semibold">QuickBooks invoice defaults</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">QuickBooks needs a customer reference and service item reference before Billabled can push invoices safely.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">QuickBooks needs a customer reference and service item reference before SOWLedger can push invoices safely.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -353,7 +353,7 @@ export function IntegrationCenterClient() {
         <AppEmptyState
           icon={Plug}
           title="Start with calendar sync."
-          description="Connect Google Calendar first so planned Billabled work appears where users already live. Slack and QuickBooks can follow once schedule behavior is proven."
+          description="Connect Google Calendar first so planned SOWLedger work appears where users already live. Slack and QuickBooks can follow once schedule behavior is proven."
           action={<button onClick={() => connect("google_calendar")} className="rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">Connect Google Calendar</button>}
         />
       )}

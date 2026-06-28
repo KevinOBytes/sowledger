@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 
 import { requireRole, requireSession } from "@/lib/auth";
@@ -120,11 +120,13 @@ export async function POST(req: NextRequest) {
       createdByUserId: session.sub,
     }).returning();
 
-    dispatchIntegrationNotification(session.workspaceId, "scheduled_block.created", {
-      title: `Scheduled: ${block.title}`,
-      body: `${new Date(block.startsAt).toLocaleString()} - ${new Date(block.endsAt).toLocaleString()}`,
-      url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/calendar`,
-    }).catch(() => {});
+    after(() => {
+      dispatchIntegrationNotification(session.workspaceId, "scheduled_block.created", {
+        title: `Scheduled: ${block.title}`,
+        body: `${new Date(block.startsAt).toLocaleString()} - ${new Date(block.endsAt).toLocaleString()}`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/calendar`,
+      }).catch(() => {});
+    });
 
     return NextResponse.json({ ok: true, block });
   } catch (error) {

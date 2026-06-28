@@ -2,7 +2,7 @@
 
 Date: 2026-04-24
 Updated: 2026-05-04
-Scope: Billabled launch pass covering Next.js proxy boundaries, public API, Stripe billing/webhooks, API keys, exports, readiness, and production observability.
+Scope: SOWLedger launch pass covering Next.js proxy boundaries, public API, Stripe billing/webhooks, API keys, exports, readiness, and production observability.
 
 ## Executive Summary
 The highest-risk launch issues found in this pass were fixed before deployment: public API v1 and Stripe webhook routes were session-gated by the app proxy, sensitive endpoints had no app-level rate limiting, and production readiness/health checks were not suitable for operational verification. The remaining launch risks are operational: required production env values, Upstash wiring, Sentry visibility, and live Stripe event verification must be confirmed after deployment. Sentry is intentionally non-blocking: the app and readiness checks fail gracefully when Sentry auth or DSN values are missing or insufficient.
@@ -60,7 +60,7 @@ The highest-risk launch issues found in this pass were fixed before deployment: 
 
 ### R-2: Live Stripe webhook delivery
 - Severity: High until verified
-- Evidence: Code-level signature handling is present, and the live Stripe endpoint should point at `https://www.billabled.com/api/webhooks/stripe` with the matching `STRIPE_WEBHOOK_SECRET`.
+- Evidence: Code-level signature handling is present, and the live Stripe endpoint should point at `https://www.sowledger.com/api/webhooks/stripe` with the matching `STRIPE_WEBHOOK_SECRET`.
 - Required verification: Send a Stripe CLI or Dashboard test event to `/api/webhooks/stripe`, then perform real checkout and confirm workspace plan mutation.
 
 ### R-3: Public API abuse controls depend on Upstash in production

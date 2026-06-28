@@ -1,4 +1,4 @@
-import { boolean, jsonb, pgTable, real, text, timestamp, varchar, primaryKey, bigint } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, real, text, timestamp, varchar, primaryKey, bigint, index } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -21,7 +21,9 @@ export const workspaces = pgTable("workspaces", {
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
   stripeCurrentPeriodEnd: timestamp("stripe_current_period_end"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  stripeSubscriptionIdx: index("workspaces_stripe_sub_idx").on(table.stripeSubscriptionId),
+}));
 
 export const memberships = pgTable("memberships", {
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
@@ -84,12 +86,15 @@ export const projects = pgTable("projects", {
   status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
   percentComplete: real("percent_complete").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdx: index("projects_workspace_idx").on(table.workspaceId),
+  clientIdx: index("projects_client_idx").on(table.clientId),
+}));
 
 export const goals = pgTable("goals", {
   id: varchar("id", { length: 255 }).primaryKey(),
   workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
-  projectId: varchar("project_id", { length: 255 }),
+  projectId: varchar("project_id", { length: 255 }).references(() => projects.id, { onDelete: "set null" }),
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
@@ -100,7 +105,10 @@ export const goals = pgTable("goals", {
   dueDate: timestamp("due_date"),
   completed: boolean("completed").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdx: index("goals_workspace_idx").on(table.workspaceId),
+  projectIdx: index("goals_project_idx").on(table.projectId),
+}));
 
 export const invitations = pgTable("invitations", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -127,7 +135,7 @@ export const timeEntries = pgTable("time_entries", {
   userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   scheduledBlockId: varchar("scheduled_block_id", { length: 255 }),
   taskId: varchar("task_id", { length: 255 }).notNull(),
-  projectId: varchar("project_id", { length: 255 }),
+  projectId: varchar("project_id", { length: 255 }).references(() => projects.id, { onDelete: "set null" }),
   goalId: varchar("goal_id", { length: 255 }),
   tags: jsonb("tags").$type<string[]>().default([]).notNull(),
   startedAt: timestamp("started_at").notNull(),
@@ -140,7 +148,11 @@ export const timeEntries = pgTable("time_entries", {
   source: varchar("source", { enum: ["web", "calendar", "manual"] }).notNull().default("web"),
   collaborators: jsonb("collaborators").$type<string[]>().default([]).notNull(),
   expenses: jsonb("expenses").$type<{ label: string; amount: number; currency: string; r2Key: string }[]>().default([]).notNull(),
-});
+}, (table) => ({
+  workspaceIdx: index("time_entries_workspace_idx").on(table.workspaceId),
+  userIdx: index("time_entries_user_idx").on(table.userId),
+  projectIdx: index("time_entries_project_idx").on(table.projectId),
+}));
 
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -315,6 +327,6 @@ export const workspaceTags = pgTable("workspace_tags", {
   projectId: varchar("project_id", { length: 255 }),
   name: varchar("name", { length: 255 }).notNull(),
   color: varchar("color", { length: 50 }).notNull().default("#3b82f6"),
-  isBillableDefault: boolean("is_billable_default").notNull().default(true),
+  isBillableDefault: boolean("is_billable_default").notNull().default(false),
   status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
 });

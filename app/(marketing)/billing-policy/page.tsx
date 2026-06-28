@@ -2,17 +2,17 @@ import Link from "next/link";
 import { ArrowRight, CreditCard, ReceiptText, ShieldCheck } from "lucide-react";
 
 const POLICIES = [
-  ["Flat workspace pricing", "Free, Starter, Studio, and Business are billed per workspace. The plan shown at checkout should match the workspace plan selected in Billabled."],
+  ["Flat workspace pricing", "Free, Starter, Studio, and Business are billed per workspace. The plan shown at checkout should match the workspace plan selected in SOWLedger."],
   ["Plan changes", "Workspace owners can manage subscriptions through Stripe Checkout and Customer Portal when billing is enabled for the workspace."],
   ["Refunds", "If billing or checkout behaves incorrectly, contact support with the workspace, Stripe receipt, and date so the issue can be reviewed."],
   ["Cancellations", "Cancel through the billing portal. Access usually remains through the paid period unless fraud, abuse, or legal risk requires earlier restriction."],
-  ["Invoices and taxes", "Stripe handles payment receipts and tax-related checkout details when configured. Billabled product invoices are operational customer invoices created inside the app."],
-  ["Checkout boundary", "Billabled checkout uses internal plan IDs. Do not send raw Stripe price IDs or payment data through support requests."],
+  ["Invoices and taxes", "Stripe handles payment receipts and tax-related checkout details when configured. SOWLedger product invoices are operational customer invoices created inside the app."],
+  ["Checkout boundary", "SOWLedger checkout uses internal plan IDs. Do not send raw Stripe price IDs or payment data through support requests."],
 ];
 
 export const metadata = {
-  title: "Billing Policy - Billabled",
-  description: "Billabled billing and refund policy for flat workspace pricing, plan changes, cancellations, receipts, taxes, and checkout boundaries.",
+  title: "Billing Policy - SOWLedger",
+  description: "SOWLedger billing and refund policy for flat workspace pricing, plan changes, cancellations, receipts, taxes, and checkout boundaries.",
 };
 
 export default function BillingPolicyPage() {
@@ -29,7 +29,7 @@ export default function BillingPolicyPage() {
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Billing and refund policy</h1>
           <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700">
-            Billabled uses flat workspace plans for simple paid workspace access. Billing support should focus on the workspace, selected internal plan, Stripe receipt, and the date of the issue.
+            SOWLedger uses flat workspace plans for simple paid workspace access. Billing support should focus on the workspace, selected internal plan, Stripe receipt, and the date of the issue.
           </p>
         </section>
 

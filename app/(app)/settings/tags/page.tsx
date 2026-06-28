@@ -5,7 +5,7 @@ import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, desc } from "drizzle-orm";
 import { TagsDataTable } from "@/components/tags-data-table";
 
-export const metadata = { title: "Tags - Billabled" };
+export const metadata = { title: "Tags - SOWLedger" };
 
 export default async function TagsSettingsPage() {
   const session = await requireSession();

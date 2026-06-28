@@ -3,7 +3,7 @@ import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 import type { LookupFunction } from "node:net";
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { env } from "./env";
 import { UnauthorizedError } from "./auth";
 import { db } from "./db";
@@ -350,7 +350,9 @@ export async function appendAuditLog(params: {
   });
 
   // Fire Webhooks async without blocking the main thread
-  dispatchWebhook(params.workspaceId, params.eventType, params.diff).catch(() => {});
+  after(() => {
+    dispatchWebhook(params.workspaceId, params.eventType, params.diff).catch(() => {});
+  });
 }
 
 export async function createTimeEntry(input: Omit<typeof timeEntries.$inferInsert, "id" | "createdAt">) {

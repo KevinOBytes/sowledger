@@ -25,6 +25,7 @@ export const API_SCOPES = [
   "read:proof-packs",
   "read:revenue-intelligence",
   "export:data",
+  "impersonate:user",
 ] as const;
 
 export type ApiScope = (typeof API_SCOPES)[number];
@@ -33,6 +34,7 @@ export type ApiKeyContext = {
   workspaceId: string;
   scopes: string[];
   name: string;
+  createdByUserId: string;
 };
 
 type ApiKeyAuthError = UnauthorizedError & { apiKeyContext?: ApiKeyContext };
@@ -80,6 +82,7 @@ export async function authenticateApiKey(req: NextRequest): Promise<ApiKeyContex
     workspaceId: key.workspaceId,
     name: key.name,
     scopes: Array.isArray(key.scopes) ? key.scopes : [],
+    createdByUserId: key.createdByUserId,
   };
   if (key.revokedAt) {
     const error = new UnauthorizedError("API key revoked") as ApiKeyAuthError;
@@ -104,11 +107,7 @@ export function requireApiScope(context: ApiKeyContext, scope: ApiScope) {
 }
 
 function safeIpHash(req: NextRequest) {
-  const ip =
-    req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip")?.trim() ||
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "";
+  const ip = req.headers.get("x-forwarded-for") || "";
   if (!ip) return null;
   return createHash("sha256").update(ip).digest("hex");
 }

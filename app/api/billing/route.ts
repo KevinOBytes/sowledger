@@ -24,6 +24,7 @@ export async function GET() {
       plan: resolvedPlan.plan,
       storedPlan: ws.plan,
       planSource: resolvedPlan.source,
+      hasStripeCustomer: Boolean(ws.stripeCustomerId),
       isOwner: session.role === "owner",
       usage: {
         members: membersResult.count,
@@ -41,7 +42,7 @@ export async function GET() {
       })),
     });
 
-  } catch {
-    return NextResponse.json({ error: "Failed to load billing info" }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
 }

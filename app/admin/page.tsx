@@ -7,7 +7,7 @@ import { sql } from "drizzle-orm";
 import Link from "next/link";
 import Image from "next/image";
 
-export const metadata = { title: "Admin Dashboard – Billabled" };
+export const metadata = { title: "Admin Dashboard – SOWLedger" };
 
 export default async function AdminPage() {
   let session;
@@ -19,7 +19,7 @@ export default async function AdminPage() {
   }
 
   if (!isAdminEmail(session.email)) {
-    throw new ForbiddenError("Admin access requires a @kevinbytes.com email address.");
+    throw new ForbiddenError("Admin access requires a @tkoresearch.com or @sowledger.com email address.");
   }
 
   const allUsers = await db.select().from(usersTable);
@@ -66,7 +66,7 @@ export default async function AdminPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#050914] shadow-md border border-slate-800 overflow-hidden">
-              <Image src="/logo.png" alt="Billabled Logo" width={48} height={48} unoptimized />
+              <Image src="/logo.png" alt="SOWLedger Logo" width={48} height={48} unoptimized />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>

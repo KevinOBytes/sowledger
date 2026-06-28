@@ -1,12 +1,12 @@
-# Billabled Competitive Proof Platform Design
+# SOWLedger Competitive Proof Platform Design
 
 ## Goal
 
-Turn Billabled from a credible time tracker into a proof-backed billing platform for service teams that need to recover missed billables, defend invoices, prevent retainer leakage, get client sign-off, and integrate trusted billing data into agency systems.
+Turn SOWLedger from a credible time tracker into a proof-backed billing platform for service teams that need to recover missed billables, defend invoices, prevent retainer leakage, get client sign-off, and integrate trusted billing data into agency systems.
 
 ## Positioning
 
-Billabled should sell as "proof-backed billing operations" rather than "time tracking." The first buyer is a small agency, consultancy, or technical services shop that already tracks time somewhere but loses revenue through missed work, scope drift, client disputes, weak approval trails, and disconnected operational systems.
+SOWLedger should sell as "proof-backed billing operations" rather than "time tracking." The first buyer is a small agency, consultancy, or technical services shop that already tracks time somewhere but loses revenue through missed work, scope drift, client disputes, weak approval trails, and disconnected operational systems.
 
 ## Scope
 
@@ -76,7 +76,7 @@ Missing invoices return 404. Missing scopes return 403. Unsupported sign-off pay
 
 Add focused coverage for:
 
-- Proof-pack route returns linked invoice evidence and `x-billabled-proof-sha256`.
+- Proof-pack route returns linked invoice evidence and `x-sowledger-proof-sha256`.
 - Revenue-intelligence route returns risk/recovery structures without leaking other workspaces.
 - API v1 resources require scoped keys and expose proof/revenue endpoints.
 - Client portal renders sign-off controls.

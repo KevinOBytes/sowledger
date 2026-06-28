@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     if (!result) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     return NextResponse.json(
       { ok: true, proofPack: result.proofPack, digest: result.digest },
-      { headers: { "x-billabled-proof-sha256": result.digest } },
+      { headers: { "x-sowledger-proof-sha256": result.digest } },
     );
   } catch (error) {
     const status = (error as { status?: number; statusCode?: number }).status ?? (error as { statusCode?: number }).statusCode ?? 403;

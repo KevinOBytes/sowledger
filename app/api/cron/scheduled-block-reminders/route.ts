@@ -19,8 +19,8 @@ function isUnavailableReminderBlock(block: typeof scheduledWorkBlocks.$inferSele
 export async function GET(req: NextRequest) {
   try {
     await enforceAuthKey(req);
-  } catch {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 401 });
   }
 
   const now = new Date();
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   for (const block of dueSoon) {
     await dispatchIntegrationNotification(block.workspaceId, "scheduled_block.reminder", {
       title: `Starting soon: ${block.title}`,
-      body: `${new Date(block.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${new Date(block.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Open Billabled to start the timer, log it manually, reschedule, or skip.`,
+      body: `${new Date(block.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${new Date(block.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Open SOWLedger to start the timer, log it manually, reschedule, or skip.`,
       url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/calendar`,
     });
     await db

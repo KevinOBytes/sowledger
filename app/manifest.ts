@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Billabled Workforce Intelligence",
-    short_name: "Billabled",
+    name: "SOWLedger Workforce Intelligence",
+    short_name: "SOWLedger",
     description: "Schedule work, track live timers, log completed work, and export billable proof.",
     start_url: "/dashboard",
     scope: "/",
