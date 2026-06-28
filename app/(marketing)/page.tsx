@@ -35,7 +35,7 @@ const MARKETING_PLANS = [
   {
     planId: "pro",
     name: "Starter",
-    description: "Solo operators who need invoices, exports, analytics, and planned work.",
+    description: "Solo consultants who need invoices, exports, analytics, and planned work.",
     price: 9,
     outcome: "Turn approved time into proof-backed invoices.",
     features: ["Invoice proof packs", "Scheduling", "Analytics", "Exports"],
@@ -91,7 +91,7 @@ const CAPABILITIES: Capability[] = [
   {
     title: "Client Sign-Off Portal",
     shortTitle: "Sign-off",
-    description: "Clients approve focused proof packets without entering workspace admin or internal timer views.",
+    description: "Clients approve focused proof packets without seeing team planning, timers, or workspace settings.",
     metric: "Approve",
     icon: ShieldCheck,
     href: "#signoff",
@@ -107,8 +107,8 @@ const CAPABILITIES: Capability[] = [
   {
     title: "Developer/Agency Integration Layer",
     shortTitle: "Integrations",
-    description: "Scoped keys, exports, proof-pack endpoints, revenue intelligence, and webhooks sync billing evidence.",
-    metric: "API v1",
+    description: "Scoped keys, exports, proof endpoints, revenue intelligence, and webhooks sync billing evidence.",
+    metric: "API",
     icon: Webhook,
     href: "#integrations",
   },
@@ -176,7 +176,7 @@ export default function MarketingPage() {
             >
               <p className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-surface/90 px-4 py-1.5 text-sm font-bold text-cyan-800 shadow-sm">
                 <Workflow className="h-4 w-4" />
-                Proof-backed billing for agencies and operators
+                Proof-backed billing for agencies and service teams
               </p>
               <h1 className="mt-6 max-w-4xl text-5xl font-semibold tracking-tight text-slate-950 sm:text-6xl lg:text-7xl">
                 Recover revenue. Prove every invoice.
@@ -250,7 +250,7 @@ export default function MarketingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-5 lg:grid-cols-[0.75fr_1fr] lg:items-end">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Operating system</p>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Workflow</p>
               <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">
                 The work path ends in proof, not a timesheet dump.
               </h2>
@@ -331,7 +331,7 @@ export default function MarketingPage() {
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Revenue intelligence</p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Find leakage before the retainer meeting.</h2>
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              SOWLedger turns analytics into operator queues for work that should be protected, corrected, invoiced, or explained with evidence.
+              SOWLedger turns analytics into review queues for work that should be protected, corrected, invoiced, or explained with evidence.
             </p>
             <div className="mt-8 divide-y divide-border border-y border-border">
               {[
@@ -346,7 +346,7 @@ export default function MarketingPage() {
                   title: "Missing Billable Recovery",
                   metric: "Gap queue",
                   label: "time capture",
-                  description: "Scheduled work without completed entries, stale drafts, and manual gaps become an operator queue instead of lost revenue.",
+                  description: "Scheduled work without completed entries, stale drafts, and manual gaps become a review queue instead of lost revenue.",
                   icon: Clock3,
                 },
               ].map((queue) => {
@@ -376,7 +376,7 @@ export default function MarketingPage() {
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Client approval</p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Client Sign-Off Portal</h2>
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              Clients can review proof packets, approve the work, and see billing context without gaining access to internal planning, timers, API keys, or workspace controls.
+              Clients can review proof packets, approve the work, and see billing context without gaining access to team planning, timers, API keys, or workspace controls.
             </p>
             <div className="mt-8 divide-y divide-border border-y border-border">
               {["Approval-ready packets", "Client-safe access", "Faster resolution"].map((item) => (
@@ -413,7 +413,7 @@ export default function MarketingPage() {
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-300">API layer</p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Developer/Agency Integration Layer</h2>
             <p className="mt-5 text-lg leading-8 text-slate-300">
-              Agency systems can fetch invoice proof, revenue intelligence, exports, and event updates through scoped keys while billing changes, invites, subscription management, and destructive admin actions stay out of public API v1.
+              Agency systems can fetch invoice proof, revenue intelligence, exports, and event updates through scoped keys while billing changes, invites, subscription management, and workspace administration stay inside SOWLedger.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/support/api" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-50">

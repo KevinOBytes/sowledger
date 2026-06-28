@@ -115,7 +115,7 @@ export default function ClientDashboard() {
       <header className="rounded-[32px] border border-stone-200 bg-white p-6 shadow-sm">
         <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Client portal</p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">Progress and approval-ready proof</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-500">Review project progress and approve invoice proof packets without needing the full internal workspace.</p>
+        <p className="mt-2 max-w-2xl text-sm text-slate-500">Review project progress and approve invoice proof packets without needing full team workspace access.</p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-5">

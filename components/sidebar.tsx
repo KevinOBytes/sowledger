@@ -21,7 +21,6 @@ import {
   Plug,
   Receipt,
   Settings,
-  ShieldCheck,
   Tag,
   UserRound,
   Users,
@@ -140,32 +139,11 @@ const mobileMoreItems: NavItem[] = [
   { name: "Settings", description: "Workspace defaults", href: "/settings", icon: Settings, exact: true },
 ];
 
-type SidebarProps = {
-  isSiteAdmin?: boolean;
-};
-
-const siteAdminNavItem: NavItem = {
-  name: "Site admin",
-  description: "Users and workspaces",
-  href: "/admin",
-  icon: ShieldCheck,
-};
-
-export function Sidebar({ isSiteAdmin = false }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
-  const sections = isSiteAdmin
-    ? navSections.map((section) =>
-        section.label === "Workspace"
-          ? { ...section, items: [...section.items, siteAdminNavItem] }
-          : section,
-      )
-    : navSections;
-  const moreItems = isSiteAdmin
-    ? [...mobileMoreItems, siteAdminNavItem]
-    : mobileMoreItems;
 
   useEffect(() => {
     async function fetchNotifications() {
@@ -193,7 +171,7 @@ export function Sidebar({ isSiteAdmin = false }: SidebarProps) {
             <Image src="/logo.png" alt="SOWLedger" width={30} height={30} className="mr-3 rounded-lg" unoptimized />
             <div>
               <p className="text-lg font-semibold tracking-tight text-[#17211d]">SOWLedger</p>
-              <p className="text-xs font-medium text-stone-500">Internal billing control surface</p>
+              <p className="text-xs font-medium text-stone-500">Proof-backed billing workspace</p>
             </div>
           </Link>
           <div className="mt-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-3">
@@ -208,8 +186,8 @@ export function Sidebar({ isSiteAdmin = false }: SidebarProps) {
           </div>
         </div>
 
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Internal application navigation">
-          {sections.map((section) => (
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Application navigation">
+          {navSections.map((section) => (
             <section key={section.label} className="mb-5">
               <div className="px-2 pb-2">
                 <h2 className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-400">{section.label}</h2>
@@ -290,7 +268,7 @@ export function Sidebar({ isSiteAdmin = false }: SidebarProps) {
       >
         {mobileNav.map((item) => {
           const isMore = item.href === "#more";
-          const isActive = isMore ? mobileMoreOpen || moreItems.some((moreItem) => routeIsActive(pathname, moreItem)) : routeIsActive(pathname, item);
+          const isActive = isMore ? mobileMoreOpen || mobileMoreItems.some((moreItem) => routeIsActive(pathname, moreItem)) : routeIsActive(pathname, item);
           const Icon = item.icon;
           return isMore ? (
             <button
@@ -337,7 +315,7 @@ export function Sidebar({ isSiteAdmin = false }: SidebarProps) {
             role="dialog"
             aria-modal="true"
             aria-label="More SOWLedger navigation"
-            className="absolute inset-x-3 bottom-24 max-h-[72vh] overflow-hidden rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow shadow-stone-950/20"
+            className="absolute inset-x-3 bottom-24 max-h-[72vh] overflow-hidden rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow-2xl shadow-stone-950/20"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-stone-200/80 px-5 py-4">
@@ -351,7 +329,7 @@ export function Sidebar({ isSiteAdmin = false }: SidebarProps) {
               </button>
             </div>
             <div className="grid max-h-[calc(72vh-5.5rem)] grid-cols-2 gap-2 overflow-y-auto p-3">
-                {moreItems.map((item) => {
+              {mobileMoreItems.map((item) => {
                 const isActive = routeIsActive(pathname, item);
                 const Icon = item.icon;
                 return (
@@ -376,7 +354,7 @@ export function Sidebar({ isSiteAdmin = false }: SidebarProps) {
       <button
         type="button"
         onClick={() => setManualOpen(true)}
-        className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#163c36] text-white shadow-sm shadow-teal-950/20 transition hover:bg-[#23544b] md:hidden"
+        className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#163c36] text-white shadow-xl shadow-teal-950/20 transition hover:bg-[#23544b] md:hidden"
         aria-label="Quick time entry"
       >
         <Plus className="h-6 w-6" />

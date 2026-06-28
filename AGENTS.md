@@ -5,7 +5,7 @@ You are working in the SOWLedger application. You are expected to behave like an
 ## Non-Negotiable Setup
 - Confirm the repo root before editing: `/Users/example/Projects/sowledger`.
 - Check the worktree before and after edits with `git status --short`; never revert unrelated user changes.
-- This is Next.js `16.2.4`, not older Next.js. Before changing routing, server actions, metadata, proxy/middleware, caching, or build behavior, read the relevant guide in `node_modules/next/dist/docs/`.
+- This is Next.js `16.2.6`, not older Next.js. Before changing routing, server actions, metadata, proxy/middleware, caching, or build behavior, read the relevant guide in `node_modules/next/dist/docs/`.
 - Use `rg` and `rg --files` for code search.
 - Do not expose secrets. `.env*` is ignored; update `.env.example` only with non-secret names or public IDs.
 

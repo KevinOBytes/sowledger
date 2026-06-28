@@ -7,7 +7,7 @@ const POLICIES = [
   ["Refunds", "If billing or checkout behaves incorrectly, contact support with the workspace, Stripe receipt, and date so the issue can be reviewed."],
   ["Cancellations", "Cancel through the billing portal. Access usually remains through the paid period unless fraud, abuse, or legal risk requires earlier restriction."],
   ["Invoices and taxes", "Stripe handles payment receipts and tax-related checkout details when configured. SOWLedger product invoices are operational customer invoices created inside the app."],
-  ["Checkout boundary", "SOWLedger checkout uses internal plan IDs. Do not send raw Stripe price IDs or payment data through support requests."],
+  ["Checkout boundary", "SOWLedger checkout uses workspace plan selections. Do not send Stripe price IDs or payment data through support requests."],
 ];
 
 export const metadata = {
@@ -29,7 +29,7 @@ export default function BillingPolicyPage() {
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Billing and refund policy</h1>
           <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700">
-            SOWLedger uses flat workspace plans for simple paid workspace access. Billing support should focus on the workspace, selected internal plan, Stripe receipt, and the date of the issue.
+            SOWLedger uses flat workspace plans for simple paid workspace access. Billing support should focus on the workspace, selected plan, Stripe receipt, and the date of the issue.
           </p>
         </section>
 

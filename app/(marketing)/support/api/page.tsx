@@ -14,7 +14,7 @@ const ENDPOINTS = [
   ["POST", "/api/v1/time-entries", "Create completed work with write:time"],
   ["GET", "/api/v1/analytics", "Read analytics summaries"],
   ["GET", "/api/v1/invoices", "Read invoices"],
-  ["GET", "/api/v1/proof-packs?invoiceId=...", "Read digest-backed invoice proof packs with read:proof-packs"],
+  ["GET", "/api/v1/proof-packs?invoiceId=...", "Read invoice proof packs with read:proof-packs"],
   ["GET", "/api/v1/revenue-intelligence", "Read retainer risk and recovery summaries with read:revenue-intelligence"],
   ["GET", "/api/v1/export", "Download CSV or JSON exports with export:data"],
 ];
@@ -35,7 +35,7 @@ const EXTENSIONS = [
 
 export const metadata = {
   title: "API Usage - SOWLedger Support",
-  description: "Build on SOWLedger with scoped API keys for proof packs, revenue intelligence, exports, webhooks, and workspace operations.",
+  description: "Build on SOWLedger with scoped API keys for proof packs, revenue intelligence, exports, webhooks, and workspace data.",
 };
 
 export default function ApiSupportPage() {
@@ -48,7 +48,7 @@ export default function ApiSupportPage() {
             <div className="min-w-0">
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">API usage</p>
               <h1 className="mt-4 text-5xl font-semibold tracking-tight sm:text-7xl">Build on SOWLedger.</h1>
-              <p className="mt-5 text-lg text-slate-600">Use scoped workspace API keys to read and write operational data, pull invoice proof, and monitor revenue risk without exposing billing, invites, or destructive admin actions.</p>
+              <p className="mt-5 text-lg text-slate-600">Use scoped workspace API keys to read and write work records, pull invoice proof, and monitor revenue risk without exposing billing, invites, or workspace administration.</p>
             </div>
             <div className="min-w-0 rounded-2xl border border-border bg-surface p-6 shadow-xl shadow-stone-900/10">
               <div className="flex items-start gap-4">
@@ -67,7 +67,7 @@ export default function ApiSupportPage() {
       <section className="px-4 py-10 sm:px-6">
         <div className="mx-auto grid max-w-6xl gap-5 md:grid-cols-3">
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5"><ShieldCheck className="h-6 w-6 text-cyan-700" /><h2 className="mt-4 text-xl font-semibold">Scoped access</h2><p className="mt-2 text-sm text-slate-600">Each endpoint checks a specific read or write scope. Missing scopes return 403.</p></div>
-          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5"><LockKeyhole className="h-6 w-6 text-cyan-700" /><h2 className="mt-4 text-xl font-semibold">Hashed secrets</h2><p className="mt-2 text-sm text-slate-600">SOWLedger stores a hash, prefix, creator, expiry, revoke status, and last-used timestamp, never raw keys.</p></div>
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5"><LockKeyhole className="h-6 w-6 text-cyan-700" /><h2 className="mt-4 text-xl font-semibold">Protected keys</h2><p className="mt-2 text-sm text-slate-600">SOWLedger stores a hash, prefix, creator, expiry, revoke status, and last-used timestamp, never the full secret value.</p></div>
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5"><Server className="h-6 w-6 text-cyan-700" /><h2 className="mt-4 text-xl font-semibold">Usage tracking</h2><p className="mt-2 text-sm text-slate-600">Requests record endpoint, method, status, timestamp, key ID, user agent, and a safe IP hash.</p></div>
         </div>
       </section>
@@ -75,7 +75,7 @@ export default function ApiSupportPage() {
       <section className="px-4 py-8 sm:px-6">
         <div className="mx-auto max-w-6xl rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">
           <div className="flex items-center gap-3"><Webhook className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">API extends the workflow</h2></div>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Use API v1 after the work record is corrected: send proof packs to client systems, pull revenue intelligence into reviews, export operational data, and listen for workflow events.</p>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Use the SOWLedger API after the work record is corrected: send proof packs to client systems, pull revenue intelligence into reviews, export work data, and listen for workflow events.</p>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {EXTENSIONS.map(([title, body]) => (
               <div key={title} className="rounded-xl border border-border bg-background/60 p-4">
@@ -95,10 +95,10 @@ export default function ApiSupportPage() {
         <div className="mx-auto max-w-6xl rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">
           <div className="flex items-center gap-3"><Code2 className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">Example requests</h2></div>
           <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow_example_replace_me"
+            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="blb_example_replace_me"
 curl https://your-domain.com/api/v1/projects \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow_example_replace_me"
+            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="blb_example_replace_me"
 curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
           </div>
@@ -110,10 +110,10 @@ curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
           <div className="flex items-center gap-3"><FileDown className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">Proof and revenue intelligence</h2></div>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Agency integrations can fetch invoice proof packs for client-facing evidence and revenue intelligence for retainer leak, missing billable, and recovery workflows. Proof-pack responses are designed for digest-backed invoice support; exports continue to include the <code className="break-all rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">x-sowledger-export-sha256</code> integrity header.</p>
           <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow_example_replace_me"
+            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="blb_example_replace_me"
 curl "https://your-domain.com/api/v1/proof-packs?invoiceId=inv_123" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow_example_replace_me"
+            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="blb_example_replace_me"
 curl "https://your-domain.com/api/v1/revenue-intelligence" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
           </div>
@@ -146,8 +146,8 @@ curl "https://your-domain.com/api/v1/revenue-intelligence" \
       <section className="px-4 pb-20 pt-8 sm:px-6">
         <div className="mx-auto flex max-w-6xl flex-col gap-5 rounded-2xl bg-slate-950 p-8 text-white shadow-sm md:flex-row md:items-center md:justify-between">
           <div>
-          <h2 className="text-3xl font-semibold">What v1 intentionally excludes</h2>
-          <p className="mt-3 text-slate-300">Public API v1 excludes billing changes, user invites, subscription management, and destructive workspace administration. Those actions remain inside authenticated app UI workflows.</p>
+          <h2 className="text-3xl font-semibold">What the API leaves in the app</h2>
+          <p className="mt-3 text-slate-300">Billing changes, user invites, subscription management, and workspace administration stay inside authenticated SOWLedger workflows.</p>
           </div>
           <Link href="/security" className="inline-flex items-center justify-center gap-2 rounded-full bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-200">
             Review trust center
