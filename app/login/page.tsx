@@ -8,6 +8,7 @@ export default function LoginPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -15,6 +16,10 @@ export default function LoginPage() {
     if (!linkError) return;
     setError(linkError === "missing_link" ? "Sign-in link is missing. Enter your email to request a fresh secure link." : `Sign-in link could not be used: ${linkError}. Request a fresh link below.`);
     window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -151,7 +156,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-stone-500 lg:col-span-2">
-          Secure passwordless authentication · SOWLedger &copy; {new Date().getFullYear()}
+          Secure passwordless authentication · SOWLedger &copy; {mounted ? new Date().getFullYear() : ""}
         </p>
       </div>
     </div>

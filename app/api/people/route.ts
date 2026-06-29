@@ -200,6 +200,16 @@ export async function PATCH(req: NextRequest) {
       if (isElevatedRole(currentMembership.role) && session.role !== "owner") {
         return NextResponse.json({ error: "Only owners can change elevated roles" }, { status: 403 });
       }
+      
+      if (currentMembership.role === "owner" && body.workspaceRole !== "owner") {
+        const owners = await db
+          .select({ userId: memberships.userId })
+          .from(memberships)
+          .where(and(eq(memberships.workspaceId, session.workspaceId), eq(memberships.role, "owner")));
+        if (owners.length <= 1) {
+          return NextResponse.json({ error: "Cannot demote the last owner of the workspace" }, { status: 400 });
+        }
+      }
       await db
         .update(memberships)
         .set({ role: body.workspaceRole })

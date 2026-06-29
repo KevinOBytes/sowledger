@@ -1020,6 +1020,16 @@ export function CalendarView() {
   }
 
   function renderGrid() {
+    if (loading || !mounted) {
+      return (
+        <div className="flex h-[calc(100vh-64px)] items-center justify-center p-8">
+          <div className="flex flex-col items-center gap-4 text-slate-500">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-cyan-600"></div>
+            <p className="text-sm font-medium">Loading calendar...</p>
+          </div>
+        </div>
+      );
+    }
     const gridTemplateColumns = viewMode === "team"
       ? `72px repeat(${Math.max(1, lanes.length)}, minmax(170px, 1fr))`
       : "72px repeat(7, minmax(130px, 1fr))";
@@ -1119,7 +1129,7 @@ export function CalendarView() {
       <div className="flex min-h-0 flex-1 flex-col overflow-visible rounded-[28px] border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-slate-950">{viewMode === "week" ? weekRangeLabel : viewMode === "team" ? `${currentDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} team lanes` : `${currentDate.toLocaleString("default", { month: "long" })} ${currentDate.getFullYear()}`}</h2>
+            <h2 className="text-xl font-semibold text-slate-950">{mounted ? (viewMode === "week" ? weekRangeLabel : viewMode === "team" ? `${currentDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} team lanes` : `${currentDate.toLocaleString("default", { month: "long" })} ${currentDate.getFullYear()}`) : "Loading..."}</h2>
             <p className="text-sm text-slate-500">{viewMode === "team" ? "Assign work across members without leaving the calendar." : viewMode === "week" ? `${visibleStartHour}:00 to ${visibleEndHour === 24 ? "midnight" : `${visibleEndHour}:00`} with 15-minute drag scheduling.` : "Month overview for spotting planned and logged work."}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1137,7 +1147,7 @@ export function CalendarView() {
           </div>
         </div>
 
-        {loading ? <div className="p-10 text-center text-slate-500">Loading calendar...</div> : viewMode === "month" ? (
+        {loading || !mounted ? <div className="p-10 text-center text-slate-500">Loading calendar...</div> : viewMode === "month" ? (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="grid grid-cols-7 bg-slate-50 text-center text-xs font-bold uppercase tracking-wider text-slate-500">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div key={day} className="border-b border-slate-200 py-3">{day}</div>)}</div>
             <div className="grid min-h-full grid-cols-7 auto-rows-[minmax(155px,1fr)]">
