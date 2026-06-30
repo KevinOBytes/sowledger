@@ -11,6 +11,8 @@ import {
   LockKeyhole,
   TrendingUp,
   Clock3,
+  Check,
+  Workflow,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -50,6 +52,46 @@ const PRODUCT_SCREENSHOTS = [
     alt: "SOWLedger client sign-off portal screenshot showing active projects and approval-ready proof packets.",
     width: 1440,
     height: 936,
+  },
+];
+
+const MARKETING_PLANS = [
+  {
+    planId: "free",
+    name: "Free",
+    description: "Try the connected workflow on one small workspace.",
+    price: 0,
+    outcome: "Start tracking and correcting the work record.",
+    features: ["Live timers", "Manual logging", "Basic planning"],
+    limits: { members: 1, projects: 2, storageMB: 100 },
+  },
+  {
+    planId: "pro",
+    name: "Starter",
+    description: "Solo consultants who need invoices, exports, analytics, and planned work.",
+    price: 9,
+    outcome: "Turn approved time into proof-backed invoices.",
+    features: ["Invoice proof packs", "Scheduling", "Analytics", "Exports"],
+    limits: { members: 2, projects: 10, storageMB: 1000 },
+  },
+  {
+    planId: "smb",
+    name: "Studio",
+    description: "Small teams that need approvals, API keys, webhooks, and recovery queues.",
+    price: 29,
+    outcome: "Run sign-off, recovery, and agency integrations together.",
+    features: ["Client sign-off", "API keys", "Webhooks", "Revenue intelligence"],
+    limits: { members: 5, projects: 50, storageMB: 5000 },
+    recommended: true,
+  },
+  {
+    planId: "enterprise",
+    name: "Business",
+    description: "Growing firms that need more capacity, audit depth, and priority support.",
+    price: 79,
+    outcome: "Scale proof-backed billing across larger operating teams.",
+    features: ["20 members", "Advanced reports", "Audit posture", "Priority support"],
+    limits: { members: 20, projects: 500, storageMB: 50000 },
   },
 ];
 
@@ -286,6 +328,62 @@ export function MarketingContent() {
               </motion.figure>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="border-y border-border bg-surface px-4 py-20 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-10 max-w-3xl">
+            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Pricing</p>
+            <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">Flat workspace pricing for proof-backed billing.</h2>
+            <p className="mt-4 max-w-2xl text-lg text-slate-600">Start free, then move to fixed monthly workspace plans as recovery, sign-off, analytics, and integration needs grow.</p>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-border bg-border">
+            {MARKETING_PLANS.map((plan) => (
+              <div key={plan.planId} className={`grid gap-5 border-b border-border p-5 last:border-b-0 lg:grid-cols-[13rem_1fr_11rem_9rem] lg:items-center ${plan.recommended ? "bg-cyan-50/70" : "bg-surface"}`}>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-2xl font-semibold">{plan.name}</h3>
+                    {plan.recommended && <span className="rounded-full bg-cyan-700 px-3 py-1 text-xs font-bold text-white">Studio</span>}
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">{plan.planId}</p>
+                </div>
+                <div>
+                  <p className="text-sm leading-6 text-slate-600">{plan.description}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-800">{plan.outcome}</p>
+                  <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-700" />{feature}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <span className="text-4xl font-semibold tracking-tight">${plan.price}</span>
+                  <span className="text-sm font-semibold text-slate-500">/workspace/mo</span>
+                  <p className="mt-1 text-xs text-slate-500">{plan.limits.members} member{plan.limits.members === 1 ? "" : "s"} · {plan.limits.projects} projects</p>
+                </div>
+                <Link href="/login" className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
+                  Get started
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 py-20 sm:px-6 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-6 py-10 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">
+              <Workflow className="h-4 w-4" />
+              Ready to charge for proof
+            </p>
+            <h2 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight sm:text-5xl">Replace fragile timesheets with evidence clients can sign.</h2>
+            <p className="mt-3 max-w-2xl text-slate-600">Create a workspace, capture planned and completed work, recover missed billables, and turn approved time into proof-backed invoices.</p>
+          </div>
+          <Link href="/login" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-cyan-700 px-6 py-4 text-sm font-bold text-white transition hover:bg-cyan-600">
+            Start free <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
     </>
