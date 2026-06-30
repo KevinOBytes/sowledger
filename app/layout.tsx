@@ -3,6 +3,8 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/next";
 import DatadogInit from "@/components/DatadogInit";
 import { Toaster } from "sonner";
+import { CookieConsent } from "@/components/cookie-consent";
+import { AnalyticsWrapper } from "@/components/analytics-wrapper";
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.sowledger.com";
@@ -70,7 +72,8 @@ export default function RootLayout({
         {children}
         <Toaster theme="light" richColors position="bottom-right" />
         <Analytics />
-        {googleAnalyticsId ? <GoogleAnalytics gaId={googleAnalyticsId} /> : null}
+        {googleAnalyticsId ? <AnalyticsWrapper gaId={googleAnalyticsId} /> : null}
+        <CookieConsent />
       </body>
     </html>
   );
