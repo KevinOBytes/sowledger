@@ -31,6 +31,7 @@ const EXTENSIONS = [
   ["Revenue intelligence", "Read retainer risk, missing billable, and recovery summaries for operating reviews."],
   ["Exports", "Pull CSV or JSON exports with integrity headers where supported."],
   ["Webhooks", "Connect project, time, invoice, and approval events to agency systems."],
+  ["MCP Server", "Connect Claude Desktop or Cursor to SOWLedger natively using the Model Context Protocol (MCP)."],
 ];
 
 export const metadata = {
@@ -83,6 +84,19 @@ export default function ApiSupportPage() {
                 <p className="mt-1 text-sm leading-6 text-slate-600">{body}</p>
               </div>
             ))}
+            <div className="rounded-xl border border-border bg-background/60 p-4">
+              <h3 className="font-semibold">MCP Server</h3>
+              <p className="mt-1 text-sm leading-6 text-slate-600">Start an authenticated MCP server to connect AI agents natively.</p>
+              <pre className="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-3 text-[10px] text-cyan-100">{`{
+  "mcpServers": {
+    "sowledger": {
+      "command": "npx",
+      "args": ["-y", "@sowledger/mcp"],
+      "env": { "SOWLEDGER_API_KEY": "..." }
+    }
+  }
+}`}</pre>
+            </div>
           </div>
           <div className="mt-5 rounded-2xl border border-cyan-100 bg-cyan-50 p-4 text-sm leading-6 text-cyan-950">
             <p className="font-bold">Native app integrations</p>

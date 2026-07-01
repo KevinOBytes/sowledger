@@ -456,6 +456,27 @@ export default function DevelopersPage() {
               </div>
             </div>
           </section>
+
+          <section className="rounded-[32px] border border-stone-200 bg-stone-50 p-5 text-stone-900 shadow-sm" aria-labelledby="developer-mcp-server">
+            <div className="flex items-start gap-3">
+              <Code2 className="mt-0.5 h-5 w-5 shrink-0 text-cyan-700" />
+              <div className="min-w-0 flex-1">
+                <h2 id="developer-mcp-server" className="text-base font-semibold">AI Agents via MCP</h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">Connect Claude Desktop, Cursor, or other AI agents natively using our Model Context Protocol (MCP) server. Provide the key above to authenticate.</p>
+                <pre className="mt-3 min-w-0 max-w-full overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs text-cyan-100 font-mono"><code>{`{
+  "mcpServers": {
+    "sowledger": {
+      "command": "npx",
+      "args": ["-y", "@sowledger/mcp"],
+      "env": {
+        "SOWLEDGER_API_KEY": "YOUR_API_KEY"
+      }
+    }
+  }
+}`}</code></pre>
+              </div>
+            </div>
+          </section>
         </div>
 
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="workspace-keys-heading">
