@@ -139,7 +139,7 @@ const mobileMoreItems: NavItem[] = [
   { name: "Settings", description: "Workspace defaults", href: "/settings", icon: Settings, exact: true },
 ];
 
-export function Sidebar({ isSiteAdmin }: { isSiteAdmin?: boolean }) {
+export function Sidebar() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);

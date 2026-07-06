@@ -180,6 +180,9 @@ export async function PATCH(req: NextRequest) {
       if (isElevatedRole(body.inviteRole) && session.role !== "owner") {
         return NextResponse.json({ error: "Only owners can assign elevated invites" }, { status: 403 });
       }
+      if (isElevatedRole(existing.inviteRole) && session.role !== "owner") {
+        return NextResponse.json({ error: "Only owners can change elevated invites" }, { status: 403 });
+      }
       updates.inviteRole = body.inviteRole;
     }
 

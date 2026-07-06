@@ -8,7 +8,8 @@ const professionalWorkspace = `professional-${unique()}`;
 test.describe('Professional Feature Suite (10 User Stories)', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'sowledger-cookie-consent', value: 'true', domain: 'localhost', path: '/' }, { name: 'sowledger-cookie-consent', value: 'true', domain: '127.0.0.1', path: '/' }]);
     const cleanParam = !didClean ? '&clean=true' : '';
     didClean = true;
     const res = await requestGetApp(page, `/api/test/login?plan=pro&workspace=${professionalWorkspace}${cleanParam}`);

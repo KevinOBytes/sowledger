@@ -54,9 +54,8 @@ function clientIdentifier(req: NextRequest) {
   const sessionPrefix = req.cookies.get(AUTH_COOKIE_NAME)?.value?.slice(0, 18);
   if (sessionPrefix) return `session:${sessionPrefix}`;
 
-  const forwarded = req.headers.get("x-forwarded-for");
-  const ip = req.headers.get("x-real-ip") ?? (forwarded ? forwarded.split(",")[0].trim() : "anonymous");
-  return ip;
+  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "anonymous";
+  return ip.split(",")[0].trim();
 }
 
 async function incrementWithUpstash(key: string, windowSeconds: number) {

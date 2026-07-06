@@ -57,12 +57,12 @@ export default function LoginPage() {
       <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         {/* Logo / branding */}
         <div className="text-center lg:text-left">
-          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg shadow-stone-900/10">
+          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm shadow-stone-900/10">
             <Image src="/logo.png" alt="SOWLedger Logo" width={56} height={56} unoptimized />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[#17211d]">SOWLedger</h1>
           <p className="mt-1 text-sm text-stone-500">Schedule work. Track cleanly. Invoice with proof.</p>
-          <div className="mt-8 rounded-[28px] border border-stone-200 bg-[#fffdf8]/85 p-5 text-left shadow-xl shadow-stone-900/10">
+          <div className="mt-8 rounded-[28px] border border-stone-200 bg-[#fffdf8]/85 p-5 text-left shadow-sm shadow-stone-900/10">
             <p className="text-sm font-bold uppercase tracking-[0.22em] text-teal-700">What happens next</p>
             <div className="mt-4 space-y-4 text-sm text-stone-600">
               <p><span className="font-semibold text-[#17211d]">New workspace:</span> if signup is open, your email can create a workspace.</p>
@@ -72,7 +72,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-stone-200 bg-[#fffdf8] p-6 shadow-xl shadow-stone-900/10">
+        <div className="rounded-[28px] border border-stone-200 bg-[#fffdf8] p-6 shadow-sm shadow-stone-900/10">
           <h2 className="mb-1 text-lg font-semibold text-[#17211d]">Continue to your workspace</h2>
           <p className="mb-6 text-sm text-stone-500">
             Enter your email to receive a secure link. New users can create a workspace when signup is available; invited users should use the email their owner or manager invited.

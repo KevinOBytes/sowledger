@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { GoogleAnalytics } from "@next/third-parties/google";
+import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import DatadogInit from "@/components/DatadogInit";
 import { Toaster } from "sonner";

@@ -1,5 +1,5 @@
-import { CalendarView } from "@/components/calendar-view";
 import { CalendarIntegrationPanel } from "@/components/calendar-integration-panel";
+import { CalendarViewClient } from "@/components/calendar-view-client";
 
 export const metadata = { title: "Calendar - SOWLedger" };
 
@@ -16,7 +16,7 @@ export default function CalendarPage() {
         </header>
         <CalendarIntegrationPanel />
         <div className="min-h-[780px] flex-1">
-          <CalendarView />
+          <CalendarViewClient />
         </div>
       </div>
     </main>

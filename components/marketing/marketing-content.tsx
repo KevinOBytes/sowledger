@@ -3,7 +3,6 @@
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  BarChart3,
   Code2,
   DatabaseZap,
   FileCheck2,

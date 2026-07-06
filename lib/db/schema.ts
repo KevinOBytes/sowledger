@@ -42,7 +42,9 @@ export const clients = pgTable("clients", {
   currencyOverride: varchar("currency_override", { length: 10 }),
   status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdx: index("clients_workspace_idx").on(table.workspaceId),
+}));
 
 export const organizations = pgTable("organizations", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -51,7 +53,10 @@ export const organizations = pgTable("organizations", {
   name: varchar("name", { length: 255 }).notNull(),
   type: varchar("type", { enum: ["internal", "client", "vendor", "partner", "other"] }).notNull().default("other"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdx: index("organizations_workspace_idx").on(table.workspaceId),
+  clientIdx: index("organizations_client_idx").on(table.clientId),
+}));
 
 export const workspacePeople = pgTable("workspace_people", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -66,7 +71,11 @@ export const workspacePeople = pgTable("workspace_people", {
   inviteRole: varchar("invite_role", { enum: ["client", "member", "manager", "owner"] }),
   status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdx: index("workspace_people_workspace_idx").on(table.workspaceId),
+  organizationIdx: index("workspace_people_org_idx").on(table.organizationId),
+  linkedUserIdx: index("workspace_people_user_idx").on(table.linkedUserId),
+}));
 
 export const projects = pgTable("projects", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -180,7 +189,10 @@ export const userActions = pgTable("user_actions", {
   userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   hourlyRate: real("hourly_rate"),
-});
+}, (table) => ({
+  workspaceIdx: index("user_actions_workspace_idx").on(table.workspaceId),
+  userIdx: index("user_actions_user_idx").on(table.userId),
+}));
 
 export const projectTasks = pgTable("project_tasks", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -197,7 +209,11 @@ export const projectTasks = pgTable("project_tasks", {
   blockedByTaskIds: jsonb("blocked_by_task_ids").$type<string[]>().default([]),
   attachments: jsonb("attachments").$type<{ name: string; url: string; size?: number }[]>().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdx: index("project_tasks_workspace_idx").on(table.workspaceId),
+  projectIdx: index("project_tasks_project_idx").on(table.projectId),
+  assigneeIdx: index("project_tasks_assignee_idx").on(table.assigneeId),
+}));
 
 export const notifications = pgTable("notifications", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -219,7 +235,10 @@ export const invoices = pgTable("invoices", {
   dueDate: timestamp("due_date"),
   timeEntryIds: jsonb("time_entry_ids").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdx: index("invoices_workspace_idx").on(table.workspaceId),
+  projectIdx: index("invoices_project_idx").on(table.projectId),
+}));
 
 export const webhooks = pgTable("webhooks", {
   id: varchar("id", { length: 255 }).primaryKey(),
