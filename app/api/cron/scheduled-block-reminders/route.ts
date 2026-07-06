@@ -38,15 +38,19 @@ export async function GET(req: NextRequest) {
   const dueSoon = candidateBlocks.filter((block) => !isUnavailableReminderBlock(block)).slice(0, 100);
 
   for (const block of dueSoon) {
-    await dispatchIntegrationNotification(block.workspaceId, "scheduled_block.reminder", {
-      title: `Starting soon: ${block.title}`,
-      body: `${new Date(block.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${new Date(block.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Open SOWLedger to start the timer, log it manually, reschedule, or skip.`,
-      url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/calendar`,
-    });
-    await db
-      .update(scheduledWorkBlocks)
-      .set({ reminderSentAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(scheduledWorkBlocks.id, block.id), eq(scheduledWorkBlocks.workspaceId, block.workspaceId)));
+    try {
+      await dispatchIntegrationNotification(block.workspaceId, "scheduled_block.reminder", {
+        title: `Starting soon: ${block.title}`,
+        body: `${new Date(block.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${new Date(block.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Open SOWLedger to start the timer, log it manually, reschedule, or skip.`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/calendar`,
+      });
+      await db
+        .update(scheduledWorkBlocks)
+        .set({ reminderSentAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(scheduledWorkBlocks.id, block.id), eq(scheduledWorkBlocks.workspaceId, block.workspaceId)));
+    } catch (error) {
+      console.error(`Failed to process reminder for block ${block.id}:`, error);
+    }
   }
 
   return NextResponse.json({ ok: true, reminded: dueSoon.length });

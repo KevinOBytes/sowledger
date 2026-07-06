@@ -7,7 +7,10 @@ import { isNull, lt, and } from "drizzle-orm";
 export async function GET(req: NextRequest) {
   try {
     await enforceAuthKey(req);
-  } catch {
+  } catch (error) {
+    if (error && (error as { name?: string }).name !== "UnauthorizedError") {
+      console.error("unfinished-timers error:", error);
+    }
     return NextResponse.json(
       { ok: false, error: "Unauthorized" },
       { status: 401 }

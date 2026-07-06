@@ -27,7 +27,7 @@ const server = new Server(
 );
 
 // Helper for making API requests
-async function fetchApi(endpoint: string, method: string = "GET", body?: any) {
+async function fetchApi(endpoint: string, method: string = "GET", body?: unknown) {
   const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
     method,
@@ -94,7 +94,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       
       case "start_timer": {
-        const { projectId, taskId, description } = request.params.arguments as any;
+        const { projectId, taskId, description } = request.params.arguments as Record<string, unknown>;
         const data = await fetchApi("/time-entries", "POST", {
           projectId,
           taskId,
@@ -118,9 +118,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       default:
         throw new Error(`Unknown tool: ${request.params.name}`);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
-      content: [{ type: "text", text: `Error: ${error.message}` }],
+      content: [{ type: "text", text: `Error: ${(error as Error).message}` }],
       isError: true,
     };
   }
