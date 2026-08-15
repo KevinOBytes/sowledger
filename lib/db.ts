@@ -5,13 +5,13 @@ import * as schema from "./db/schema";
 type DbClient = NodePgDatabase<typeof schema>;
 
 declare global {
-  var __timelyDbPool: Pool | undefined;
-  var __timelyDbClient: DbClient | undefined;
+  var __sowledgerDbPool: Pool | undefined;
+  var __sowledgerDbClient: DbClient | undefined;
 }
 
 export function getDb(): DbClient {
-  if (globalThis.__timelyDbClient) {
-    return globalThis.__timelyDbClient;
+  if (globalThis.__sowledgerDbClient) {
+    return globalThis.__sowledgerDbClient;
   }
 
   const databaseUrl = process.env.DATABASE_URL;
@@ -19,11 +19,11 @@ export function getDb(): DbClient {
     throw new Error("DATABASE_URL is required to use the database");
   }
 
-  const pool = globalThis.__timelyDbPool ?? new Pool({ connectionString: databaseUrl });
+  const pool = globalThis.__sowledgerDbPool ?? new Pool({ connectionString: databaseUrl });
   const client = drizzle(pool, { schema });
 
-  globalThis.__timelyDbPool = pool;
-  globalThis.__timelyDbClient = client;
+  globalThis.__sowledgerDbPool = pool;
+  globalThis.__sowledgerDbClient = client;
   return client;
 }
 
