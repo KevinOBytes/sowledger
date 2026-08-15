@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       projectName: projects.name,
       goalName: goals.name,
       action: timeEntries.action,
+      rejectionReason: timeEntries.rejectionReason,
     })
     .from(timeEntries)
     .leftJoin(projects, eq(timeEntries.projectId, projects.id))

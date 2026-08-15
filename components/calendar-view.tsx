@@ -284,11 +284,26 @@ export function CalendarView() {
   const [isMobile, setIsMobile] = useState(false);
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   const browserTimezone = useMemo(() => mounted ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" : "UTC", [mounted]);
   const isManager = session?.role === "manager" || session?.role === "owner";
   const visibleStartMinutes = visibleStartHour * 60;
   const visibleEndMinutes = visibleEndHour * 60;
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    onResize();
+    window.addEventListener("resize", onResize);
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      clearInterval(interval);
+    };
+  }, []);
+
   const hours = useMemo(() => Array.from({ length: visibleEndHour - visibleStartHour }, (_, index) => index + visibleStartHour), [visibleStartHour, visibleEndHour]);
 
   const weekDays = useMemo(() => {
@@ -465,6 +480,7 @@ export function CalendarView() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     const onResize = () => setIsMobile(window.innerWidth < 640);
     onResize();
@@ -490,6 +506,7 @@ export function CalendarView() {
     } else {
       element.scrollIntoView({ block: "center", inline: "nearest" });
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFocusBlockId(null);
   }, [blocks, focusBlockId]);
 
@@ -935,9 +952,9 @@ export function CalendarView() {
   }
 
   const weekRangeLabel = `${weekDays[0].toLocaleDateString(undefined, { month: "short", day: "numeric" })} - ${weekDays[6].toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
-  const missedBlocks = blocks.filter((block) => block.status === "planned" && !isUnavailableBlock(block) && new Date(block.endsAt).getTime() < Date.now()).slice(0, 5);
+  const missedBlocks = blocks.filter((block) => block.status === "planned" && !isUnavailableBlock(block) && new Date(block.endsAt).getTime() < now).slice(0, 5);
   const upcomingBlocks = blocks.filter((block) => {
-    const untilStart = new Date(block.startsAt).getTime() - Date.now();
+    const untilStart = new Date(block.startsAt).getTime() - now;
     return block.status === "planned" && !isUnavailableBlock(block) && untilStart >= 0 && untilStart <= 10 * 60 * 1000;
   }).slice(0, 3);
 

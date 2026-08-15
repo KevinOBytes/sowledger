@@ -59,6 +59,7 @@ type IntelligenceItem = {
   actualHours?: number;
   missingHours?: number;
   hours?: number;
+  url?: string;
 };
 
 type RevenueIntelligenceData = {
@@ -146,6 +147,7 @@ export function ReportsPageClient() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, startDate, endDate]);
@@ -172,6 +174,7 @@ export function ReportsPageClient() {
       return;
     }
     const query = new URLSearchParams({ format: "csv", scope, start: startDate, end: endDate, include: "projects,timeEntries,users,schedule" });
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = `/api/export/csv?${query.toString()}`;
   }
 
@@ -464,7 +467,15 @@ function IntelligencePanel({
               <article key={item.id || `${label}-${index}`} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <h3 className="font-bold text-slate-950">{label}</h3>
+                    <h3 className="font-bold text-slate-950">
+                      {item.url ? (
+                        <a href={item.url} className="hover:text-cyan-600 hover:underline">
+                          {label}
+                        </a>
+                      ) : (
+                        label
+                      )}
+                    </h3>
                     <p className="mt-1 text-sm text-slate-500">{detail}</p>
                     {flaggedHours != null && (
                       <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">

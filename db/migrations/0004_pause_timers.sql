@@ -1,0 +1,1 @@
+ALTER TABLE "time_entries" ADD COLUMN IF NOT EXISTS "is_paused" boolean DEFAULT false NOT NULL; ALTER TABLE "time_entries" ADD COLUMN IF NOT EXISTS "paused_at" timestamp; ALTER TABLE "time_entries" ADD COLUMN IF NOT EXISTS "accumulated_seconds" real DEFAULT 0 NOT NULL;

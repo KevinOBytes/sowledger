@@ -202,15 +202,16 @@ export type WorkflowRailItem = {
   label: string;
   description: string;
   icon: LucideIcon;
+  href: string;
 };
 
 export const SOWLEDGER_WORKFLOW_STAGES: WorkflowRailItem[] = [
-  { id: "plan", label: "Plan", description: "Shape scheduled work", icon: CalendarDays },
-  { id: "track", label: "Track", description: "Run live timers", icon: Clock3 },
-  { id: "log", label: "Log", description: "Add manual or calendar time", icon: CheckCircle2 },
-  { id: "review", label: "Review", description: "Correct activity and analytics", icon: BarChart3 },
-  { id: "approve", label: "Approve / Invoice / Export", description: "Move proof into billing output", icon: FileCheck2 },
-  { id: "integrate", label: "Integrate", description: "Connect API and webhooks", icon: Plug },
+  { id: "plan", label: "Plan", description: "Shape scheduled work", icon: CalendarDays, href: "/calendar" },
+  { id: "track", label: "Track", description: "Run live timers", icon: Clock3, href: "/" },
+  { id: "log", label: "Log", description: "Add manual or calendar time", icon: CheckCircle2, href: "/activity" },
+  { id: "review", label: "Review", description: "Correct activity and analytics", icon: BarChart3, href: "/analytics" },
+  { id: "approve", label: "Approve / Invoice / Export", description: "Move proof into billing output", href: "/invoices", icon: FileCheck2 },
+  { id: "integrate", label: "Integrate", description: "Connect API and webhooks", icon: Plug, href: "/settings/integrations" },
 ];
 
 export type AppWorkflowRailProps = {
@@ -229,9 +230,10 @@ export function AppWorkflowRail({ current, items = SOWLEDGER_WORKFLOW_STAGES, cl
           return (
             <li key={item.id} className="relative min-w-0" aria-current={active ? "step" : undefined}>
               {index > 0 && <span className="absolute -left-2 top-6 hidden h-px w-2 bg-slate-200 xl:block" aria-hidden="true" />}
-              <div
+              <a
+                href={item.href}
                 className={cx(
-                  "h-full rounded-2xl border px-3 py-3",
+                  "block h-full rounded-2xl border px-3 py-3 transition hover:border-cyan-200 hover:bg-cyan-50/50",
                   active ? toneClasses.cyan.rail : toneClasses.slate.rail,
                 )}
               >
@@ -240,7 +242,7 @@ export function AppWorkflowRail({ current, items = SOWLEDGER_WORKFLOW_STAGES, cl
                   <span className="min-w-0 break-words text-sm font-bold leading-5">{item.label}</span>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>
-              </div>
+              </a>
             </li>
           );
         })}
