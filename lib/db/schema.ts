@@ -346,6 +346,6 @@ export const workspaceTags = pgTable("workspace_tags", {
   projectId: varchar("project_id", { length: 255 }),
   name: varchar("name", { length: 255 }).notNull(),
   color: varchar("color", { length: 50 }).notNull().default("#3b82f6"),
-  isBillableDefault: boolean("is_billable_default").notNull().default(false),
+  isSOWLedgerDefault: boolean("is_billable_default").notNull().default(false),
   status: varchar("status", { enum: ["active", "archived"] }).notNull().default("active"),
 });

@@ -110,7 +110,7 @@ export function TagsDataTable({ initialTags, projects }: { initialTags: Workspac
       <div className="flex flex-col gap-4 border-b border-slate-100 p-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="relative w-full xl:max-w-md">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search or filter tags..." className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search or filter tags..." aria-label="Search or filter tags" className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" />
         </div>
         <form onSubmit={createTag} className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input value={newTagName} onChange={(e) => setNewTagName(e.target.value)} placeholder="Enter new tag..." aria-label="New Tag Name" className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white sm:w-56" />
@@ -141,7 +141,7 @@ export function TagsDataTable({ initialTags, projects }: { initialTags: Workspac
                     <td className="px-5 py-4">
                       {isEditing ? (
                         <div className="flex items-center gap-2">
-                          <input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-cyan-500" autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(tag.id); if (e.key === "Escape") setEditingId(null); }} />
+                          <input value={editName} onChange={(e) => setEditName(e.target.value)} aria-label="Edit tag name" placeholder="Tag name" title="Edit tag name" className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-cyan-500" autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(tag.id); if (e.key === "Escape") setEditingId(null); }} />
                           <div className="flex gap-1">
                             {COLORS.slice(0, 4).map((color) => <button key={color.value} type="button" onClick={() => setEditColor(color.value)} className={`h-4 w-4 rounded-full ${editColor === color.value ? "ring-2 ring-slate-950" : ""}`} style={{ backgroundColor: color.value }} aria-label={`Use ${color.name}`} />)}
                           </div>

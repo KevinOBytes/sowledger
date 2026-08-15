@@ -127,9 +127,9 @@ export default function BillingPage() {
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Billing</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Plans and subscription</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Flat workspace pricing keeps the first paid step easy to approve. Stripe checkout follows the selected Billabled plan, so customers never handle Stripe price IDs.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Flat workspace pricing keeps the first paid step easy to approve. Stripe checkout follows the selected SOWLedger plan, so customers never handle Stripe price IDs.</p>
             </div>
-          <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
               {data.planSource === "internal" && (
                 <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">Business access</span>
               )}

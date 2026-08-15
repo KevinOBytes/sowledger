@@ -24,7 +24,7 @@ if (!existsSync(migrationFile)) {
 
 const sql = readFileSync(migrationFile, "utf8");
 const checksum = createHash("sha256").update(sql).digest("hex");
-const backupPath = resolve(process.env.MIGRATION_BACKUP_PATH || `/tmp/billabled-schema-${new Date().toISOString().replace(/[:.]/g, "-")}.sql`);
+const backupPath = resolve(process.env.MIGRATION_BACKUP_PATH || `/tmp/sowledger-schema-${new Date().toISOString().replace(/[:.]/g, "-")}.sql`);
 mkdirSync(dirname(backupPath), { recursive: true });
 
 function pgDumpEnv(connectionString) {
@@ -74,14 +74,14 @@ try {
   }
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS billabled_migrations (
+    CREATE TABLE IF NOT EXISTS sowledger_migrations (
       id text PRIMARY KEY,
       checksum text NOT NULL,
       applied_at timestamp NOT NULL DEFAULT now()
     )
   `);
 
-  const existing = await client.query("SELECT checksum FROM billabled_migrations WHERE id = $1", [migrationId]);
+  const existing = await client.query("SELECT checksum FROM sowledger_migrations WHERE id = $1", [migrationId]);
   if (existing.rowCount && existing.rows[0].checksum === checksum) {
     console.log(`Migration ${migrationId} already applied; checksum matches.`);
     process.exit(0);
@@ -92,7 +92,7 @@ try {
 
   await client.query("BEGIN");
   await client.query(sql);
-  await client.query("INSERT INTO billabled_migrations (id, checksum) VALUES ($1, $2)", [migrationId, checksum]);
+  await client.query("INSERT INTO sowledger_migrations (id, checksum) VALUES ($1, $2)", [migrationId, checksum]);
   await client.query("COMMIT");
   console.log(`Migration ${migrationId} applied successfully.`);
 } catch (error) {

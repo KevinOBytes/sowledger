@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { Download } from "lucide-react";
+import { RoiCalculator } from "@/components/marketing/roi-calculator";
 
 const PROOF_ROWS = [
   { label: "Invoice record", value: "Issued invoices, totals, client, project, and status" },
@@ -113,6 +115,16 @@ export function MarketingContent() {
                 </div>
               ))}
             </div>
+            <div className="mt-6 flex">
+              <a
+                href="/sample-proof-pack.pdf"
+                download="sowledger-sample-proof-pack.pdf"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition hover:border-cyan-300 hover:text-cyan-800"
+              >
+                <Download className="h-4 w-4" />
+                Download sample proof pack
+              </a>
+            </div>
           </div>
 
           <motion.figure
@@ -193,6 +205,12 @@ export function MarketingContent() {
               })}
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-white px-4 py-20 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-5xl">
+          <RoiCalculator />
         </div>
       </section>
 
