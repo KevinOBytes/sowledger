@@ -38,11 +38,11 @@ export async function POST(req: NextRequest) {
       isBillableDefault?: boolean;
     };
     if (!body.name || typeof body.name !== "string") return NextResponse.json({ error: "Invalid name" }, { status: 400 });
-    
+
     // Check if tag exists (globally or for this project)
     const existing = await db.select().from(workspaceTags)
       .where(and(eq(workspaceTags.workspaceId, session.workspaceId), eq(workspaceTags.name, body.name.trim().toLowerCase())));
-    
+
     if (existing.length > 0) {
       return NextResponse.json({ error: "Tag with this name already exists" }, { status: 400 });
     }
@@ -108,7 +108,7 @@ export async function DELETE(req: NextRequest) {
 
     const [existing] = await db.select().from(workspaceTags).where(and(eq(workspaceTags.id, id), eq(workspaceTags.workspaceId, session.workspaceId)));
     if (!existing) {
-       return NextResponse.json({ error: "Tag metadata not found" }, { status: 404 });
+      return NextResponse.json({ error: "Tag metadata not found" }, { status: 404 });
     }
 
     await db.delete(workspaceTags).where(and(eq(workspaceTags.id, id), eq(workspaceTags.workspaceId, session.workspaceId)));

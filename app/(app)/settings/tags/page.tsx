@@ -9,14 +9,14 @@ export const metadata = { title: "Tags - SOWLedger" };
 
 export default async function TagsSettingsPage() {
   const session = await requireSession();
-  let tags: Array<{ id: string; name: string; color: string; projectId: string | null; isBillableDefault: boolean; status: "active" | "archived" }> = [];
+  let tags: Array<{ id: string; name: string; color: string; projectId: string | null; isSOWLedgerDefault: boolean; status: "active" | "archived" }> = [];
   let projects: Array<{ id: string; name: string }> = [];
   let loadError: string | null = null;
 
   try {
     await ensureWorkspaceSchema();
     const rawTags = await db.select().from(workspaceTags).where(eq(workspaceTags.workspaceId, session.workspaceId)).orderBy(desc(workspaceTags.status), workspaceTags.name);
-    tags = rawTags.map((tag) => ({ id: tag.id, name: tag.name, color: tag.color, projectId: tag.projectId, isBillableDefault: tag.isBillableDefault, status: tag.status }));
+    tags = rawTags.map((tag) => ({ id: tag.id, name: tag.name, color: tag.color, projectId: tag.projectId, isSOWLedgerDefault: tag.isSOWLedgerDefault, status: tag.status }));
     const rawProjects = await db.select().from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId));
     projects = rawProjects.map((project) => ({ id: project.id, name: project.name }));
   } catch (error) {

@@ -312,7 +312,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       const name = typeof body.name === "string" ? body.name.trim().toLowerCase() : "";
       if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
       await assertWorkspaceProject(context.workspaceId, body.projectId);
-      const [tag] = await db.insert(workspaceTags).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, name, color: body.color || "#3b82f6", projectId: body.projectId || null, isBillableDefault: body.isBillableDefault ?? false }).returning();
+      const [tag] = await db.insert(workspaceTags).values({ id: crypto.randomUUID(), workspaceId: context.workspaceId, name, color: body.color || "#3b82f6", projectId: body.projectId || null, isSOWLedgerDefault: body.isSOWLedgerDefault ?? false }).returning();
       return NextResponse.json({ ok: true, tag }, { status: 201 });
     }
     if (resource === "tasks") {
@@ -398,7 +398,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (resource === "tags") {
       if (!body.tagId) return NextResponse.json({ error: "tagId is required" }, { status: 400 });
       await assertWorkspaceProject(context.workspaceId, body.projectId);
-      const [tag] = await db.update(workspaceTags).set({ name: body.name, color: body.color, projectId: body.projectId, isBillableDefault: body.isBillableDefault, status: body.status }).where(and(eq(workspaceTags.id, body.tagId), eq(workspaceTags.workspaceId, context.workspaceId))).returning();
+      const [tag] = await db.update(workspaceTags).set({ name: body.name, color: body.color, projectId: body.projectId, isSOWLedgerDefault: body.isSOWLedgerDefault, status: body.status }).where(and(eq(workspaceTags.id, body.tagId), eq(workspaceTags.workspaceId, context.workspaceId))).returning();
       return NextResponse.json({ ok: true, tag });
     }
     if (resource === "tasks") {
