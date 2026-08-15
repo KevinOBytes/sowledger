@@ -109,10 +109,10 @@ export default function ApiSupportPage() {
         <div className="mx-auto max-w-6xl rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">
           <div className="flex items-center gap-3"><Code2 className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">Example requests</h2></div>
           <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="blb_example_replace_me"
+            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
 curl https://your-domain.com/api/v1/projects \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="blb_example_replace_me"
+            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
 curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
           </div>
@@ -124,10 +124,10 @@ curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
           <div className="flex items-center gap-3"><FileDown className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">Proof and revenue intelligence</h2></div>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Agency integrations can fetch invoice proof packs for client-facing evidence and revenue intelligence for retainer leak, missing billable, and recovery workflows. Proof-pack responses are designed for digest-backed invoice support; exports continue to include the <code className="break-all rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">x-sowledger-export-sha256</code> integrity header.</p>
           <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="blb_example_replace_me"
+            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
 curl "https://your-domain.com/api/v1/proof-packs?invoiceId=inv_123" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="blb_example_replace_me"
+            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
 curl "https://your-domain.com/api/v1/revenue-intelligence" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
           </div>

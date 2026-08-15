@@ -32,6 +32,7 @@ export type IntelligenceItem = {
   actualHours?: number;
   missingHours?: number;
   hours?: number;
+  url?: string;
 };
 
 function parseDate(value?: string | null) {
@@ -161,6 +162,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
         projectId: project.id,
         projectName: project.name,
         title: `${project.name} has approved time not invoiced`,
+        url: `/projects/${project.id}`,
         reason: "Approved billable work is ready to convert into invoice proof.",
         notes: "Generate an invoice proof pack before the next client update.",
         amountAtRisk: money(unbilledApproved),
@@ -177,6 +179,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
         projectId: project.id,
         projectName: project.name,
         title: `${project.name} has billing leakage indicators`,
+        url: `/projects/${project.id}`,
         reason: `${missingRateCount} entries need rates and ${missedBlocks.length} scheduled blocks have not been reconciled.`,
         notes: "Resolve missing rates and reconcile scheduled work before approving the next invoice.",
         missingHours: hours(missedBlocks.reduce((sum, block) => sum + Math.max(0, (new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000), 0)),
@@ -198,6 +201,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
       projectId: block.projectId,
       projectName: block.projectId ? projectsById.get(block.projectId)?.name ?? "Unknown project" : "General Workspace",
       title: `Scheduled work was not logged: ${block.title}`,
+      url: `/`,
       reason: "This planned block ended without a linked completed time entry.",
       notes: "Confirm whether this work happened and log or skip it.",
       missingHours: hours(plannedSeconds),
@@ -216,6 +220,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
         projectId: entry.projectId,
         projectName: entry.projectId ? projectsById.get(entry.projectId)?.name ?? "Unknown project" : "General Workspace",
         title: "Approved billable time is ready to invoice",
+        url: `/invoices`,
         reason: entry.description || "Approved entry has not been included in an invoice yet.",
         notes: "Select this entry in Invoices to generate a proof pack.",
         recoverableAmount: amount,
@@ -231,6 +236,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
         projectId: entry.projectId,
         projectName: entry.projectId ? projectsById.get(entry.projectId)?.name ?? "Unknown project" : "General Workspace",
         title: "Logged work is missing a billable rate",
+        url: `/activity`,
         reason: entry.description || "A completed entry cannot become billable value until it has a rate.",
         notes: "Add or correct the rate before approval and invoicing.",
         hours: hours(durationSeconds),

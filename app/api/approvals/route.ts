@@ -13,8 +13,10 @@ export async function GET(req: NextRequest) {
     const statusFilter = req.nextUrl.searchParams.get("status");
 
     let condition = eq(timeEntries.workspaceId, session.workspaceId);
-    if (statusFilter !== "all") {
-      condition = and(condition, notInArray(timeEntries.status, ["approved", "invoiced"]))!;
+    if (statusFilter === "pending") {
+      condition = and(condition, eq(timeEntries.status, "submitted"))!;
+    } else {
+      condition = and(condition, inArray(timeEntries.status, ["submitted", "approved", "invoiced"]))!;
     }
 
     const pendingEntriesData = await db.select().from(timeEntries)

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     requireRole("manager", session.role);
 
-    const body = await req.json() as { entryId?: string };
+    const body = await req.json() as { entryId?: string; reason?: string };
     if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
 
     const [entry] = await db.select().from(timeEntries).where(and(eq(timeEntries.id, body.entryId), eq(timeEntries.workspaceId, session.workspaceId)));
@@ -20,14 +20,14 @@ export async function POST(req: NextRequest) {
     const before = entry.status;
     
     // Setting back to draft so user can edit and resubmit
-    await db.update(timeEntries).set({ status: "draft" }).where(and(eq(timeEntries.id, entry.id), eq(timeEntries.workspaceId, session.workspaceId)));
+    await db.update(timeEntries).set({ status: "draft", rejectionReason: body.reason || null }).where(and(eq(timeEntries.id, entry.id), eq(timeEntries.workspaceId, session.workspaceId)));
 
     await appendAuditLog({
       workspaceId: session.workspaceId,
       timeEntryId: entry.id,
       actorUserId: session.sub,
       eventType: "entry_rejected",
-      diff: { status: { before, after: "draft" } },
+      diff: { status: { before, after: "draft" }, rejectionReason: { before: entry.rejectionReason, after: body.reason || null } },
     });
 
     return NextResponse.json({ ok: true, entryId: entry.id, status: "draft" });

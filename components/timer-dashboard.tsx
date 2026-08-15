@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, CheckCircle2, Clock, FastForward, ListChecks, Play, Plus, Square, TimerReset } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, Clock, FastForward, ListChecks, Play, Pause, Plus, Square, TimerReset } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppEmptyState, AppMetricCard, AppPageHeader, AppPageShell, AppWorkflowRail } from "@/components/app-page-shell";
@@ -20,6 +20,9 @@ type ActiveTimer = {
   action?: string | null;
   tags?: string[];
   startedAt: string;
+  isPaused: boolean;
+  pausedAt: string | null;
+  accumulatedSeconds: number;
 };
 type ScheduledBlock = {
   id: string;
@@ -310,6 +313,34 @@ export function TimerDashboard() {
     await refresh();
   }
 
+  async function pauseTimer(entryId: string) {
+    const response = await fetch("/api/timer/pause", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId }),
+    });
+    if (!response.ok) {
+      const data = await response.json() as { error?: string };
+      toast.error("Could not pause timer", { description: data.error });
+      return;
+    }
+    await refresh();
+  }
+
+  async function resumeTimer(entryId: string) {
+    const response = await fetch("/api/timer/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId }),
+    });
+    if (!response.ok) {
+      const data = await response.json() as { error?: string };
+      toast.error("Could not resume timer", { description: data.error });
+      return;
+    }
+    await refresh();
+  }
+
   async function updateBlock(block: ScheduledBlock, updates: Partial<ScheduledBlock>) {
     const response = await fetch("/api/schedule", {
       method: "PATCH",
@@ -383,7 +414,13 @@ export function TimerDashboard() {
     await refresh();
   }
 
-  const focusedElapsed = focusedTimer ? Math.max(0, Math.floor((now - new Date(focusedTimer.startedAt).getTime()) / 1000)) : 0;
+  let focusedElapsed = 0;
+  if (focusedTimer && focusedTimer.startedAt) {
+    const startTs = new Date(focusedTimer.startedAt).getTime();
+    const totalElapsed = Math.floor((now - startTs) / 1000);
+    const pausedSince = focusedTimer.isPaused && focusedTimer.pausedAt ? Math.floor((now - new Date(focusedTimer.pausedAt).getTime()) / 1000) : 0;
+    focusedElapsed = Math.max(0, totalElapsed - (focusedTimer.accumulatedSeconds || 0) - pausedSince);
+  }
   const setupPercent = setupComplete || allSetupStepsDone ? 100 : Math.round((setupDoneCount / setupSteps.length) * 100);
 
   return (
@@ -569,8 +606,12 @@ export function TimerDashboard() {
           <div className="mt-5 rounded-[24px] border border-cyan-100 bg-cyan-50/70 p-4 sm:p-5">
             <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(180px,220px)] md:items-end">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-cyan-800">Elapsed</p>
-                <div className="mt-2 max-w-full overflow-hidden font-mono text-5xl font-semibold tabular-nums text-slate-950">{fmt(focusedElapsed)}</div>
+                <p className="text-sm font-semibold text-cyan-800">
+                  {focusedTimer?.isPaused ? "Elapsed (Paused)" : "Elapsed"}
+                </p>
+                <div className={`mt-2 max-w-full overflow-hidden font-mono text-5xl font-semibold tabular-nums ${focusedTimer?.isPaused ? "text-slate-400" : "text-slate-950"}`}>
+                  {fmt(focusedElapsed)}
+                </div>
                 <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                   <div className="min-w-0 rounded-2xl border border-cyan-100 bg-white/80 px-3 py-2">
                     <dt className="font-semibold text-slate-500">Project</dt>
@@ -584,6 +625,23 @@ export function TimerDashboard() {
               </div>
               {focusedTimer ? (
                 <div className="grid gap-2">
+                  {focusedTimer.isPaused ? (
+                    <button
+                      onClick={() => resumeTimer(focusedTimer.id)}
+                      className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-teal-600 px-5 text-sm font-bold text-white transition hover:bg-teal-500"
+                    >
+                      <Play className="mr-2 h-4 w-4 fill-white" />
+                      Resume timer
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => pauseTimer(focusedTimer.id)}
+                      className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-amber-500 px-5 text-sm font-bold text-white transition hover:bg-amber-400"
+                    >
+                      <Pause className="mr-2 h-4 w-4 fill-white" />
+                      Pause timer
+                    </button>
+                  )}
                   <button
                     onClick={() => stopTimer(focusedTimer.id)}
                     className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-rose-500 px-5 text-sm font-bold text-white transition hover:bg-rose-400"
@@ -664,13 +722,19 @@ export function TimerDashboard() {
         </div>
 
         <aside className="min-w-0 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
               <p className="text-sm font-semibold text-slate-500">Planning queue</p>
               <h2 className="mt-1 text-xl font-semibold text-slate-950">Up next</h2>
               <p className="mt-1 text-sm text-slate-500">Scheduled work that can become a timer or completed log.</p>
             </div>
-            <CalendarClock className="h-5 w-5 shrink-0 text-cyan-700" />
+            <button
+              onClick={() => setPlanningOpen(true)}
+              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Schedule work
+            </button>
           </div>
           <div className="mt-5 space-y-3">
             {blocks.length === 0 ? (
@@ -734,17 +798,38 @@ export function TimerDashboard() {
               className="rounded-[24px] p-6 lg:col-span-2"
             />
           ) : activeTimers.map((timer, index) => {
-            const elapsed = Math.max(0, Math.floor((now - new Date(timer.startedAt).getTime()) / 1000));
+            let elapsed = 0;
+            if (timer.startedAt) {
+              const startTimestamp = new Date(timer.startedAt).getTime();
+              const totalElapsed = Math.floor((now - startTimestamp) / 1000);
+              const pausedSince = timer.isPaused && timer.pausedAt ? Math.floor((now - new Date(timer.pausedAt).getTime()) / 1000) : 0;
+              elapsed = Math.max(0, totalElapsed - (timer.accumulatedSeconds || 0) - pausedSince);
+            }
             const timerProjectLabel = timer.projectName || "No project";
             return (
               <article key={timer.id} className={`flex min-w-0 flex-col gap-4 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${index === 0 ? "border-cyan-200 bg-cyan-50" : "border-slate-200 bg-slate-50"}`}>
                 <div className="min-w-0">
-                  <div className="font-mono text-2xl font-semibold tabular-nums text-slate-950">{fmt(elapsed)}</div>
+                  <div className={`font-mono text-2xl font-semibold tabular-nums ${timer.isPaused ? "text-slate-400" : "text-slate-950"}`}>{fmt(elapsed)}</div>
                   <p className="mt-1 break-words text-sm font-semibold text-slate-800">{timer.taskId}</p>
-                  <p className="text-xs text-slate-500">{timerProjectLabel}{timer.action ? ` · ${timer.action}` : ""}</p>
+                  <p className="text-xs text-slate-500">{timerProjectLabel}{timer.action ? ` · ${timer.action}` : ""} {timer.isPaused && "· Paused"}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {index !== 0 && <FastForward className="h-4 w-4 text-slate-400" />}
+                  {timer.isPaused ? (
+                    <button
+                      onClick={() => resumeTimer(timer.id)}
+                      className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-teal-600 px-4 text-sm font-bold text-white transition hover:bg-teal-500"
+                    >
+                      Resume
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => pauseTimer(timer.id)}
+                      className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-amber-500 px-4 text-sm font-bold text-white transition hover:bg-amber-400"
+                    >
+                      Pause
+                    </button>
+                  )}
                   <button
                     onClick={() => stopTimer(timer.id)}
                     aria-label={`Stop timer for ${timer.taskId} in ${timerProjectLabel}`}

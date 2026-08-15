@@ -14,11 +14,13 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const linkError = params.get("error");
     if (!linkError) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(linkError === "missing_link" ? "Sign-in link is missing. Enter your email to request a fresh secure link." : `Sign-in link could not be used: ${linkError}. Request a fresh link below.`);
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
