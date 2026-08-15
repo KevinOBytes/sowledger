@@ -186,7 +186,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Application navigation">
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Internal application navigation">
           {navSections.map((section) => (
             <section key={section.label} className="mb-5">
               <div className="px-2 pb-2">

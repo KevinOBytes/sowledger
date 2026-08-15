@@ -241,6 +241,8 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                 </div>
                 <button 
                   onClick={() => setAddingToCol(col.id)}
+                  title={`Add task to ${col.title}`}
+                  aria-label={`Add task to ${col.title}`}
                   className="rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-teal-700"
                 >
                     <Plus className="h-4 w-4" />
@@ -262,7 +264,12 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                                 {isBlocked(t) && (
                                    <Lock className="h-3 w-3 text-rose-500" />
                                 )}
-                                <button onClick={() => deleteBtn(t.id)} className="text-stone-400 opacity-0 hover:text-red-500 group-hover:opacity-100">
+                                <button 
+                                  onClick={() => deleteBtn(t.id)} 
+                                  title="Delete task"
+                                  aria-label="Delete task"
+                                  className="text-stone-400 opacity-0 hover:text-red-500 group-hover:opacity-100"
+                                >
                                     <HelpCircle className="h-4 w-4 hidden" />
                                     <span className="text-xs">✕</span>
                                 </button>
@@ -297,6 +304,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                           autoFocus
                           type="text" 
                           placeholder="What needs to be done?"
+                          aria-label="New task title"
                           className="w-full bg-transparent text-sm text-[#17211d] placeholder-stone-500 focus:outline-none"
                           value={newTaskTitle}
                           onChange={e => setNewTaskTitle(e.target.value)}
@@ -321,7 +329,12 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
           <div className="animate-in fade-in zoom-in flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-stone-200 bg-[#fffdf8] shadow shadow-stone-950/20 duration-200">
             <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50/70 p-6">
               <h2 className="text-xl font-bold text-[#17211d]">{selectedTask.title}</h2>
-              <button onClick={() => setSelectedTask(null)} className="rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-800">
+              <button 
+                onClick={() => setSelectedTask(null)} 
+                title="Close"
+                aria-label="Close modal"
+                className="rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-800"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -330,8 +343,9 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
               {/* Info Section */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-stone-200 bg-white p-4">
-                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Status</p>
+                   <label htmlFor="task-status-select" className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">Status</label>
                    <select
+                     id="task-status-select"
                      value={selectedTask.status}
                      onChange={(event) => patchSelectedTask({ status: event.target.value })}
                      className="mt-1 h-10 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm font-semibold uppercase tracking-wider text-[#17211d] outline-none focus:border-teal-500"
@@ -344,11 +358,13 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                    </select>
                 </div>
                 <div className="rounded-2xl border border-stone-200 bg-white p-4">
-                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Estimated hours</p>
+                   <label htmlFor="task-est-hours-input" className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">Estimated hours</label>
                    <input
+                     id="task-est-hours-input"
                      type="number"
                      min="0"
                      step="0.25"
+                     placeholder="0.00"
                      value={selectedTask.estimatedHours || ""}
                      onChange={(event) => setSelectedTask({ ...selectedTask, estimatedHours: event.target.value ? Number.parseFloat(event.target.value) : null })}
                      onBlur={() => patchSelectedTask({ estimatedHours: selectedTask.estimatedHours })}
@@ -356,8 +372,9 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                    />
                 </div>
                 <div className="rounded-2xl border border-stone-200 bg-white p-4">
-                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Assigned person</p>
+                   <label htmlFor="task-assignee-select" className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">Assigned person</label>
                    <select
+                     id="task-assignee-select"
                      value={selectedTask.assigneeId || ""}
                      onChange={(event) => patchSelectedTask({ assigneeId: event.target.value || null })}
                      className="mt-1 h-10 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm text-[#17211d] outline-none focus:border-teal-500"
@@ -371,8 +388,9 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                    </select>
                 </div>
                 <div className="rounded-2xl border border-stone-200 bg-white p-4">
-                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-stone-500">Due date</p>
+                   <label htmlFor="task-due-date-input" className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">Due date</label>
                    <input
+                     id="task-due-date-input"
                      type="date"
                      value={selectedTask.dueDate ? String(selectedTask.dueDate).slice(0, 10) : ""}
                      onChange={(event) => patchSelectedTask({ dueDate: event.target.value || null })}
@@ -382,9 +400,11 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
               </div>
 
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-stone-700">Description</h3>
+                <label htmlFor="task-description-textarea" className="mb-2 block text-sm font-semibold text-stone-700">Description</label>
                 <textarea
+                  id="task-description-textarea"
                   rows={4}
+                  placeholder="Add a detailed description..."
                   value={selectedTask.description || ""}
                   onChange={(event) => setSelectedTask({ ...selectedTask, description: event.target.value })}
                   onBlur={() => patchSelectedTask({ description: selectedTask.description || null })}
@@ -421,6 +441,8 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                         <button 
                           onClick={() => handleRemoveAttachment(idx)}
                           disabled={isPatching}
+                          title="Remove attachment"
+                          aria-label="Remove attachment"
                           className="shrink-0 p-2 text-stone-400 hover:text-rose-500 disabled:opacity-50"
                         >
                           <X className="h-4 w-4" />
@@ -433,8 +455,9 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                 {/* Add new attachment form */}
                 <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:flex-row sm:items-end">
                   <div className="flex-1 space-y-1">
-                    <label className="text-[10px] font-medium uppercase tracking-wider text-stone-500">Asset name</label>
+                    <label htmlFor="task-asset-name-input" className="block text-[10px] font-medium uppercase tracking-wider text-stone-500">Asset name</label>
                     <input 
+                      id="task-asset-name-input"
                       type="text" 
                       placeholder="e.g. Figma UI Mockup"
                       value={newAttachmentName}
@@ -443,8 +466,9 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
                     />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <label className="text-[10px] font-medium uppercase tracking-wider text-stone-500">Public URL</label>
+                    <label htmlFor="task-asset-url-input" className="block text-[10px] font-medium uppercase tracking-wider text-stone-500">Public URL</label>
                     <input 
+                      id="task-asset-url-input"
                       type="url" 
                       placeholder="https://"
                       value={newAttachmentUrl}

@@ -9,7 +9,7 @@ type WorkspaceTag = {
   name: string;
   color: string;
   projectId: string | null;
-  isBillableDefault: boolean;
+  isSOWLedgerDefault: boolean;
   status: "active" | "archived";
 };
 
@@ -158,7 +158,7 @@ export function TagsDataTable({ initialTags, projects }: { initialTags: Workspac
                         {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
                       </select>
                     </td>
-                    <td className="px-5 py-4"><button onClick={() => updateTag(tag.id, { isBillableDefault: !tag.isBillableDefault })} disabled={updating === tag.id} className={`rounded-full px-3 py-1.5 text-xs font-bold ${tag.isBillableDefault ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{tag.isBillableDefault ? "Billable Default" : "Non-Billable"}</button></td>
+                    <td className="px-5 py-4"><button onClick={() => updateTag(tag.id, { isSOWLedgerDefault: !tag.isSOWLedgerDefault })} disabled={updating === tag.id} className={`rounded-full px-3 py-1.5 text-xs font-bold ${tag.isSOWLedgerDefault ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{tag.isSOWLedgerDefault ? "Billable Default" : "Non-Billable"}</button></td>
                     <td className="px-5 py-4"><button onClick={() => updateTag(tag.id, { status: tag.status === "active" ? "archived" : "active" })} disabled={updating === tag.id} className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize ${tag.status === "active" ? "bg-cyan-50 text-cyan-700" : "bg-rose-50 text-rose-700"}`}>{tag.status}</button></td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
