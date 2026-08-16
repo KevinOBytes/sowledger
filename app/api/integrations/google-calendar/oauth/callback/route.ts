@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireRole, requireSession } from "@/lib/auth";
+import { requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
 import { getIntegrationConnection } from "@/lib/integrations/connections";
 import { decryptSecret } from "@/lib/integrations/crypto";
 import { exchangeGoogleAuthorizationCode, storeGoogleCalendarConnection } from "@/lib/integrations/google-calendar";
@@ -10,6 +10,12 @@ function redirectTo(req: NextRequest, status: "connected" | "error", message?: s
   const url = new URL("/integrations", req.url);
   url.searchParams.set(status, "google_calendar");
   if (message) url.searchParams.set("message", message.slice(0, 180));
+  return NextResponse.redirect(url);
+}
+
+function redirectToLogin(req: NextRequest, message?: string) {
+  const url = new URL("/login", req.url);
+  if (message) url.searchParams.set("error", message.slice(0, 180));
   return NextResponse.redirect(url);
 }
 
@@ -32,6 +38,9 @@ export async function GET(req: NextRequest) {
     await storeGoogleCalendarConnection({ workspaceId: session.workspaceId, userId: session.sub, token, existingRefreshToken });
     return redirectTo(req, "connected");
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return redirectToLogin(req, "Your session expired during the Google Calendar setup. Please log in and try again.");
+    }
     return redirectTo(req, "error", error instanceof Error ? error.message : "Google Calendar connection failed");
   }
 }

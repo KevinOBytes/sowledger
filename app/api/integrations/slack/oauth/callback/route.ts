@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireRole, requireSession } from "@/lib/auth";
+import { requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
 import { verifyIntegrationOAuthState } from "@/lib/integrations/oauth-state";
 import { exchangeSlackAuthorizationCode, storeSlackOAuthConnection } from "@/lib/integrations/slack";
 
@@ -8,6 +8,12 @@ function redirectTo(req: NextRequest, status: "connected" | "error", message?: s
   const url = new URL("/integrations", req.url);
   url.searchParams.set(status, "slack");
   if (message) url.searchParams.set("message", message.slice(0, 180));
+  return NextResponse.redirect(url);
+}
+
+function redirectToLogin(req: NextRequest, message?: string) {
+  const url = new URL("/login", req.url);
+  if (message) url.searchParams.set("error", message.slice(0, 180));
   return NextResponse.redirect(url);
 }
 
@@ -28,6 +34,9 @@ export async function GET(req: NextRequest) {
     await storeSlackOAuthConnection({ workspaceId: session.workspaceId, userId: session.sub, oauth });
     return redirectTo(req, "connected");
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return redirectToLogin(req, "Your session expired during Slack setup. Please log in and try again.");
+    }
     return redirectTo(req, "error", error instanceof Error ? error.message : "Slack connection failed");
   }
 }
