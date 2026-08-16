@@ -152,6 +152,25 @@ export function IntegrationCenterClient() {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const connected = params.get("connected");
+      const error = params.get("error");
+      const message = params.get("message");
+
+      if (connected) {
+        toast.success(`${connected === "google_calendar" ? "Google Calendar" : connected === "quickbooks" ? "QuickBooks" : connected} connected successfully!`);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (error) {
+        toast.error(`Could not connect ${error === "google_calendar" ? "Google Calendar" : error === "quickbooks" ? "QuickBooks" : error}`, {
+          description: message || "Unknown error occurred"
+        });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, []);
+
   async function postAction(path: string, success: string, body?: unknown) {
     setBusy(path);
     try {
