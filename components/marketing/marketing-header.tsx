@@ -50,7 +50,7 @@ export function MarketingHeader() {
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-controls="marketing-mobile-navigation"
-            aria-label="Open marketing menu"
+            aria-label={menuOpen ? "Close marketing menu" : "Open marketing menu"}
             className="rounded-lg p-2 text-stone-600 transition hover:bg-stone-100 hover:text-slate-950 lg:hidden"
           >
             {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}

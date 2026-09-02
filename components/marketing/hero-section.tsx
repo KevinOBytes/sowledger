@@ -16,12 +16,14 @@ interface HeroSectionProps {
   label?: string;
   headline: string;
   subhead: string;
+  primaryCtaLabel?: string;
 }
 
 export function HeroSection({
   label = "Proof-backed billing for agencies and service teams",
   headline,
   subhead,
+  primaryCtaLabel = "Start recovering time",
 }: HeroSectionProps) {
   return (
     <div className="grid gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
@@ -43,7 +45,7 @@ export function HeroSection({
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Link href="/login" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-7 py-4 text-base font-bold text-white shadow-sm transition hover:bg-slate-800">
-            Start recovering time
+            {primaryCtaLabel}
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link href="#proof-packs" className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface px-7 py-4 text-base font-bold text-slate-800 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">

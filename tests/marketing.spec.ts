@@ -30,6 +30,8 @@ test.describe("Built-for marketing routes", () => {
       await gotoApp(page, `/for/${industry.slug}`);
       await expect(page).toHaveURL(new RegExp(`/for/${industry.slug}$`));
       await expect(page.getByRole("heading", { level: 1 })).toContainText(industry.name);
+      await expect(page.getByRole("link", { name: "Start free", exact: true }).first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Integrate", exact: true })).toBeVisible();
     }
   });
 
@@ -43,6 +45,7 @@ test.describe("Built-for marketing routes", () => {
 
     if (testInfo.project.name === "mobile-safari") {
       await page.getByRole("button", { name: "Open marketing menu" }).click();
+      await expect(page.getByRole("button", { name: "Close marketing menu" })).toHaveAttribute("aria-expanded", "true");
       const mobileNavigation = page.getByRole("navigation", { name: "Mobile marketing navigation" });
       await expect(mobileNavigation.getByRole("link", { name: "Built for", exact: true })).toBeVisible();
       await mobileNavigation.getByRole("link", { name: "Built for", exact: true }).click();
