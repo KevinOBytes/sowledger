@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 const AUTH_COOKIE_NAME = "sowledger_session";
 const PUBLIC_PREFIXES = [
   "/login",
+  "/for",
   "/support",
   "/security",
   "/privacy",
