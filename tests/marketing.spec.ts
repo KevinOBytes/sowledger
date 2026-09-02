@@ -37,6 +37,9 @@ test.describe("Built-for marketing routes", () => {
     await gotoApp(page, "/for");
     const audienceLinks = page.locator("main a[href^='/for/']");
     await expect(audienceLinks).toHaveCount(industryRoutes.length);
+    expect(await audienceLinks.evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual(
+      industryRoutes.map((industry) => `/for/${industry.slug}`),
+    );
 
     if (testInfo.project.name === "mobile-safari") {
       await page.getByRole("button", { name: "Open marketing menu" }).click();
