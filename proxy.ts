@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 const AUTH_COOKIE_NAME = "sowledger_session";
 const PUBLIC_PREFIXES = [
   "/login",
-  "/for",
   "/support",
   "/security",
   "/privacy",
@@ -119,8 +118,10 @@ export async function proxy(req: NextRequest) {
   const limited = await rateLimit(req, pathname);
   if (limited) return limited;
 
+  const isPublicAudienceRoute = pathname === "/for" || pathname.startsWith("/for/");
+
   // Allow public paths without a session.
-  if (pathname === "/" || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (pathname === "/" || pathname === "/sitemap.xml" || isPublicAudienceRoute || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return addSecurityHeaders(NextResponse.next());
   }
 
