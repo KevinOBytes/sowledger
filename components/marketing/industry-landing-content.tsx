@@ -19,7 +19,12 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
             <ChevronRight className="mx-1 inline h-4 w-4" aria-hidden="true" />
             <span aria-current="page" className="text-slate-950">{industry.name}</span>
           </nav>
-          <HeroSection label={industry.heroLabel} headline={industry.heroHeadline} subhead={industry.heroSubhead} />
+          <HeroSection
+            label={industry.heroLabel}
+            headline={industry.heroHeadline}
+            subhead={industry.heroSubhead}
+            primaryCtaLabel="Start free"
+          />
         </div>
       </section>
 
@@ -101,7 +106,7 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
       </section>
 
       <section className="bg-slate-950 px-4 py-16 text-white sm:px-6 sm:py-20">
-        <div className="mx-auto max-w-4xl text-center"><p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-300">Ready for a clearer work record?</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Make the work easier to review, approve, and bill.</h2><Link href="/login" className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 font-bold text-slate-950 transition hover:bg-cyan-50">Start with SOWLedger <ArrowRight className="h-4 w-4" /></Link></div>
+        <div className="mx-auto max-w-4xl text-center"><p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-300">Ready for a clearer work record?</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Make the work easier to review, approve, and bill.</h2><Link href="/login" className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 font-bold text-slate-950 transition hover:bg-cyan-50">Start free <ArrowRight className="h-4 w-4" /></Link></div>
       </section>
     </div>
   );
