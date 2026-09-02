@@ -26,7 +26,7 @@ const workflowStages = ["Plan", "Track", "Log", "Review", "Approve", "Export"] a
 const industrySeeds: IndustrySeed[] = [
   {
     slug: "freelance-developers", name: "Freelance Developers", category: "Independent technical delivery",
-    heroLabel: "Proof-backed billing for freelance developers", heroHeadline: "Recover unbilled engineering time.",
+    heroLabel: "Proof-backed billing for freelance developers", heroHeadline: "Freelance Developers: recover unbilled engineering time.",
     heroSubhead: "Keep discovery, implementation, debugging, and handoff time in one client-ready work record—without promising automatic code-repository sync.",
     workflowHeadline: "A technical engagement ends with a clear billing story.", workflowSubhead: "Plan the scope, capture live work and manual follow-up, then send a reviewable record with the invoice.",
     challenges: ["Discovery, debugging, and deployment follow-up often disappear between tickets.", "Small support requests can interrupt a focused build without becoming billable work.", "Clients need context for a technical invoice without access to your internal workspace."],
@@ -36,7 +36,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "marketing-agencies", name: "Marketing Agencies", category: "Multi-client campaign delivery",
-    heroLabel: "Proof-backed billing for marketing agencies", heroHeadline: "Keep retainers connected to real campaign work.",
+    heroLabel: "Proof-backed billing for marketing agencies", heroHeadline: "Marketing Agencies: keep retainers connected to real campaign work.",
     heroSubhead: "Give account leads a complete record of planning, production, meetings, and client approvals before the monthly billing conversation.",
     workflowHeadline: "Campaign delivery has a work record your client can follow.", workflowSubhead: "Bring planned effort, active work, corrections, sign-off, and exports into a single agency operating rhythm.",
     challenges: ["Strategy, coordination, and reporting time get spread across many client touchpoints.", "Concurrent campaigns make it difficult to spot work drifting beyond the retainer.", "Account teams need an approval path that does not expose internal planning."],
@@ -46,7 +46,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "seo-consultants", name: "SEO Consultants", category: "Search strategy and technical analysis",
-    heroLabel: "Proof-backed billing for SEO consultants", heroHeadline: "Make research and recommendations billable work.",
+    heroLabel: "Proof-backed billing for SEO consultants", heroHeadline: "SEO Consultants: make research and recommendations billable work.",
     heroSubhead: "Capture audit time, stakeholder calls, analysis, and implementation guidance in a record that explains the work behind each engagement.",
     workflowHeadline: "SEO work stays visible from audit to client handoff.", workflowSubhead: "Plan research cycles, log the work that sits between meetings, and hand off a reviewable billing record.",
     challenges: ["Deep technical analysis is easy to undercount when it happens between deliverables.", "Recurring calls, research, and reporting can blur together across retainers.", "A client may see recommendations but not the investigation that produced them."],
@@ -56,7 +56,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "graphic-designers", name: "Graphic Designers", category: "Creative production",
-    heroLabel: "Proof-backed billing for graphic designers", heroHeadline: "Keep revisions from becoming invisible work.",
+    heroLabel: "Proof-backed billing for graphic designers", heroHeadline: "Graphic Designers: keep revisions from becoming invisible work.",
     heroSubhead: "Track concepting, production, feedback rounds, and handoff time so your client sees the work behind the finished design.",
     workflowHeadline: "Creative work gets a clean path from brief to proof.", workflowSubhead: "Make production blocks and out-of-band revisions visible before the next approval or invoice.",
     challenges: ["Concept exploration and revision rounds can exceed the original estimate quietly.", "Small stakeholder changes interrupt production without landing in a timesheet.", "Design clients need clarity on effort without access to your internal creative process."],
@@ -66,7 +66,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "legal-consultants", name: "Legal Consultants", category: "Advisory and matter-based work",
-    heroLabel: "Proof-backed billing for legal consultants", heroHeadline: "Keep matter work ready for invoice review.",
+    heroLabel: "Proof-backed billing for legal consultants", heroHeadline: "Legal Consultants: keep matter work ready for invoice review.",
     heroSubhead: "Capture consultation, research, drafting, and client coordination with a clear record for approved engagement billing.",
     workflowHeadline: "Matter work is easier to review before it becomes an invoice.", workflowSubhead: "Use planning, live capture, corrections, and client-safe proof to keep the work record clear.",
     challenges: ["Research, drafting, and calls can be fragmented across a matter timeline.", "Short client requests often need to be added after the fact.", "Engagement billing needs a careful, reviewable explanation of time."],
@@ -76,7 +76,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "accounting-firms", name: "Accounting Firms", category: "Firm operations and advisory",
-    heroLabel: "Proof-backed billing for accounting firms", heroHeadline: "Protect busy-season capacity and engagement margins.",
+    heroLabel: "Proof-backed billing for accounting firms", heroHeadline: "Accounting Firms: protect busy-season capacity and engagement margins.",
     heroSubhead: "Keep tax, audit, bookkeeping, and advisory effort visible across clients before the engagement reaches the billing desk.",
     workflowHeadline: "Firm teams can review engagement effort before it leaks.", workflowSubhead: "Bring planned capacity, active client work, approval, and export evidence into one operating record.",
     challenges: ["Busy-season work shifts quickly between tax, audit, and advisory clients.", "Partner review needs a clear view of effort before fixed-fee work drifts.", "Staff follow-up and client coordination can fall outside formal task tracking."],
@@ -86,7 +86,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "video-editors", name: "Video Editors", category: "Post-production delivery",
-    heroLabel: "Proof-backed billing for video editors", heroHeadline: "Keep edit rounds and delivery work visible.",
+    heroLabel: "Proof-backed billing for video editors", heroHeadline: "Video Editors: keep edit rounds and delivery work visible.",
     heroSubhead: "Capture editing sessions, review feedback, revisions, and delivery coordination in a billing record built for post-production work.",
     workflowHeadline: "Each cut has a clear work record behind it.", workflowSubhead: "Plan the edit, capture active sessions and revision work, then hand off proof with the final billing record.",
     challenges: ["Revision rounds can multiply after the initial edit is delivered.", "Review notes and delivery coordination are easy to lose beside hands-on editing.", "A project can include long periods of focused post-production across several cuts."],
@@ -96,7 +96,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "copywriters", name: "Copywriters", category: "Editorial and conversion work",
-    heroLabel: "Proof-backed billing for copywriters", heroHeadline: "Make research, drafting, and revisions count.",
+    heroLabel: "Proof-backed billing for copywriters", heroHeadline: "Copywriters: make research, drafting, and revisions count.",
     heroSubhead: "Keep the work before and after the draft—interviews, research, editing, and stakeholder feedback—in a clear billing record.",
     workflowHeadline: "The work behind the words stays easy to explain.", workflowSubhead: "Plan editorial milestones, capture the writing process, then give clients proof that follows the agreed scope.",
     challenges: ["Discovery and research are often substantial but invisible beside the final copy.", "Feedback cycles can expand beyond the original writing assignment.", "Short edits and client questions interrupt deep writing time."],
@@ -106,7 +106,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "pr-agencies", name: "PR Agencies", category: "Communications and media relations",
-    heroLabel: "Proof-backed billing for PR agencies", heroHeadline: "Keep retainer work visible beyond the placement.",
+    heroLabel: "Proof-backed billing for PR agencies", heroHeadline: "PR Agencies: keep retainer work visible beyond the placement.",
     heroSubhead: "Capture media strategy, pitching, monitoring, client coordination, and reporting effort in a work record that supports the account relationship.",
     workflowHeadline: "PR account work is visible from strategy to reporting.", workflowSubhead: "Plan campaign cadence, capture the active effort, and use clear proof before the retainer invoice goes out.",
     challenges: ["Pitching, monitoring, and follow-up happen across many short work blocks.", "Account coordination and reporting can compete with time reserved for proactive outreach.", "Clients may only see outcomes, not the ongoing work behind media relations."],
@@ -116,7 +116,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "it-consultants", name: "IT Consultants", category: "Technology operations and advisory",
-    heroLabel: "Proof-backed billing for IT consultants", heroHeadline: "Turn support work into a defensible record.",
+    heroLabel: "Proof-backed billing for IT consultants", heroHeadline: "IT Consultants: turn support work into a defensible record.",
     heroSubhead: "Keep planned maintenance, incident response, infrastructure changes, and client support visible before they become unbilled interruptions.",
     workflowHeadline: "Operational work gets captured before it disappears.", workflowSubhead: "Use calendar-aware planning, live timers, manual logging, and proof-backed approval for technical service work.",
     challenges: ["Urgent support interrupts planned infrastructure work throughout the day.", "Maintenance follow-up can be forgotten after the immediate issue is resolved.", "Clients need a clear billing record without access to internal operational detail."],
@@ -126,7 +126,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "management-consultants", name: "Management Consultants", category: "Strategy and transformation advisory",
-    heroLabel: "Proof-backed billing for management consultants", heroHeadline: "Keep advisory effort connected to the engagement.",
+    heroLabel: "Proof-backed billing for management consultants", heroHeadline: "Management Consultants: keep advisory effort connected to the engagement.",
     heroSubhead: "Track discovery, workshops, analysis, executive preparation, and client follow-up in a work record that holds up at billing time.",
     workflowHeadline: "Advisory work stays clear across the engagement lifecycle.", workflowSubhead: "Plan each phase, capture what happens between meetings, and use approval-ready proof to support the invoice.",
     challenges: ["Preparation and synthesis often take more time than the visible workshop.", "Executive follow-up and stakeholder coordination happen in short, scattered intervals.", "Fixed-fee work needs an internal view of planned versus actual effort."],
@@ -136,7 +136,7 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "web-design-studios", name: "Web Design Studios", category: "Digital product and site delivery",
-    heroLabel: "Proof-backed billing for web design studios", heroHeadline: "Keep every build phase connected to the bill.",
+    heroLabel: "Proof-backed billing for web design studios", heroHeadline: "Web Design Studios: keep every build phase connected to the bill.",
     heroSubhead: "Capture discovery, UX, visual design, implementation coordination, QA, and launch support in a shared client work record.",
     workflowHeadline: "Studio delivery stays visible from kickoff through launch.", workflowSubhead: "Plan the sprint, capture work across disciplines, review the record, then approve, invoice, export, or integrate it.",
     challenges: ["Discovery, design, QA, and launch support can cross project boundaries quickly.", "Client feedback adds small bursts of work across design and implementation teams.", "Studios need a shared view of sprint effort before billing a milestone or retainer."],
