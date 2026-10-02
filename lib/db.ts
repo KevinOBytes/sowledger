@@ -14,11 +14,13 @@ export function getDb(): DbClient {
     return globalThis.__sowledgerDbClient;
   }
 
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required to use the database");
+    throw new Error("NEON_DATABASE_URL or DATABASE_URL is required to use the database");
   }
 
+  // Remote Neon pooled connections do not reliably honor startup search_path
+  // options. Tables are explicitly qualified through the Drizzle namespace.
   const pool = globalThis.__sowledgerDbPool ?? new Pool({ connectionString: databaseUrl });
   const client = drizzle(pool, { schema });
 

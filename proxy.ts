@@ -121,8 +121,10 @@ export async function proxy(req: NextRequest) {
   const limited = await rateLimit(req, pathname);
   if (limited) return limited;
 
+  const isPublicAudienceRoute = pathname === "/for" || pathname.startsWith("/for/");
+
   // Allow public paths without a session.
-  if (pathname === "/" || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (pathname === "/" || pathname === "/sitemap.xml" || isPublicAudienceRoute || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return addSecurityHeaders(NextResponse.next());
   }
 

@@ -15,14 +15,22 @@ npx playwright test --project=chromium
 Use the tracked safe runner for product-completion schema changes:
 
 ```bash
+# Supply DATABASE_MIGRATION_URL only in the maintenance shell; never deploy it.
+npm run db:migrate:runtime
 npm run db:migrate:product
 ```
 
+`db:migrate:runtime` applies the tracked runtime-table migration (including
+`clients`) to the dedicated `sowledger` schema in the shared
+`neon-violet-school` database. Run it with the direct maintenance connection,
+not the pooled application URL. The application role should have data access
+to `sowledger` but no DDL privileges.
+
 The runner:
-- loads `DATABASE_URL` from the environment;
-- writes a schema backup with `pg_dump` when the local client supports the server version;
+- loads `DATABASE_MIGRATION_URL` from the environment;
+- writes a `sowledger` schema backup with `pg_dump` when the local client supports the server version;
 - falls back to a catalog snapshot when `pg_dump` is unavailable or version-mismatched;
-- records applied migrations in `sowledger_migrations` with a SHA-256 checksum;
+- records applied migrations in `sowledger_migrations.schema_migrations` with a SHA-256 checksum;
 - refuses to run if the same migration ID was applied with different contents.
 
 ## Required Production Env
@@ -32,7 +40,7 @@ The runner:
 - `AUTH_COOKIE_SECRET`
 - `AUDIT_SIGNING_SECRET`
 - `RESEND_API_KEY`
-- `DATABASE_URL`
+- `DATABASE_URL` or `NEON_DATABASE_URL` (the restricted SOWLedger runtime role on `neon-violet-school`)
 - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`, or Vercel KV aliases `KV_REST_API_URL` and `KV_REST_API_TOKEN`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
@@ -58,6 +66,10 @@ SOWLedger runs without Sentry and without native provider integrations. When the
 - `QUICKBOOKS_CLIENT_SECRET`
 - `QUICKBOOKS_REDIRECT_URI`
 - `QUICKBOOKS_ENVIRONMENT` (`sandbox` or `production`)
+
+`DATABASE_MIGRATION_URL` is maintenance-only. It must be a direct, unpooled
+owner/migration connection and must never be added to Vercel Production or
+Preview runtime variables.
 
 ## Post-Deploy Checks
 - `GET /api/health` returns `{ ok: true }` and is safe for uptime checks.
