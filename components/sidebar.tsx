@@ -186,7 +186,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Application navigation">
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Internal application navigation">
           {navSections.map((section) => (
             <section key={section.label} className="mb-5">
               <div className="px-2 pb-2">
@@ -252,13 +252,13 @@ export function Sidebar() {
             <Code2 className="h-4 w-4" />
             API guide
           </Link>
-          <Link
+          <a
             href="/api/auth/logout"
             className="group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold text-stone-500 transition hover:bg-rose-50 hover:text-rose-600"
           >
             <LogOut className="h-4 w-4 text-stone-400 group-hover:text-rose-500" />
             Sign out
-          </Link>
+          </a>
         </div>
       </aside>
 

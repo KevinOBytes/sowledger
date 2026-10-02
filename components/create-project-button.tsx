@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BuildingIcon, ClockIcon, DollarSignIcon, PlusIcon, XIcon } from "lucide-react";
+import { BuildingIcon, ClockIcon, DollarSignIcon, PlusIcon, XIcon, Sparkles } from "lucide-react";
 
 type ClientOption = { id: string; name: string };
 
@@ -99,6 +99,26 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
             <form onSubmit={submit} className="space-y-6 p-6">
               {step === 1 ? (
                 <>
+                  <div className="mb-6 rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="h-4 w-4 text-cyan-600" />
+                      <p className="text-sm font-bold text-cyan-900">Quick-start templates</p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <button type="button" onClick={() => { setName(name || "Monthly Retainer"); setBillingModel("fixed_fee"); setBudgetType("none"); setBudgetAmount(""); }} className="rounded-xl border border-cyan-200 bg-white p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50">
+                        <p className="text-sm font-bold text-slate-800">Retainer</p>
+                        <p className="text-xs text-slate-500">Fixed monthly</p>
+                      </button>
+                      <button type="button" onClick={() => { setName(name || "Website Launch"); setBillingModel("fixed_fee"); setBudgetType("fees"); setBudgetAmount("10000"); }} className="rounded-xl border border-cyan-200 bg-white p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50">
+                        <p className="text-sm font-bold text-slate-800">Milestone</p>
+                        <p className="text-xs text-slate-500">Fixed project total</p>
+                      </button>
+                      <button type="button" onClick={() => { setName(name || "Consulting (NTE)"); setBillingModel("hourly"); setBudgetType("hours"); setBudgetAmount("100"); }} className="rounded-xl border border-cyan-200 bg-white p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50">
+                        <p className="text-sm font-bold text-slate-800">T&M (NTE)</p>
+                        <p className="text-xs text-slate-500">Hourly with cap</p>
+                      </button>
+                    </div>
+                  </div>
                   <label htmlFor="projectName" className="block text-sm font-bold text-slate-700">Project Name<input id="projectName" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Website Redesign" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
                   <label className="block text-sm font-bold text-slate-700">Client <span className="font-normal text-slate-400">(Optional)</span><span className="relative mt-1 block"><BuildingIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select aria-label="Select Client" value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No client - team work</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></span></label>
                 </>

@@ -35,14 +35,14 @@ export async function POST(req: NextRequest) {
       name?: string;
       color?: string;
       projectId?: string;
-      isBillableDefault?: boolean;
+      isSOWLedgerDefault?: boolean;
     };
     if (!body.name || typeof body.name !== "string") return NextResponse.json({ error: "Invalid name" }, { status: 400 });
-    
+
     // Check if tag exists (globally or for this project)
     const existing = await db.select().from(workspaceTags)
       .where(and(eq(workspaceTags.workspaceId, session.workspaceId), eq(workspaceTags.name, body.name.trim().toLowerCase())));
-    
+
     if (existing.length > 0) {
       return NextResponse.json({ error: "Tag with this name already exists" }, { status: 400 });
     }
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       name: body.name.trim().toLowerCase(),
       color: body.color || "#3b82f6",
       projectId: body.projectId || null,
-      isBillableDefault: body.isBillableDefault ?? false,
+      isSOWLedgerDefault: body.isSOWLedgerDefault ?? false,
     }).returning();
 
     return NextResponse.json({ ok: true, tag });
@@ -73,7 +73,7 @@ export async function PATCH(req: NextRequest) {
       name?: string;
       color?: string;
       projectId?: string | null;
-      isBillableDefault?: boolean;
+      isSOWLedgerDefault?: boolean;
       status?: "active" | "archived";
     };
 
@@ -88,7 +88,7 @@ export async function PATCH(req: NextRequest) {
     if (body.name !== undefined) updates.name = body.name.trim().toLowerCase();
     if (body.color !== undefined) updates.color = body.color;
     if (body.projectId !== undefined) updates.projectId = body.projectId;
-    if (body.isBillableDefault !== undefined) updates.isBillableDefault = body.isBillableDefault;
+    if (body.isSOWLedgerDefault !== undefined) updates.isSOWLedgerDefault = body.isSOWLedgerDefault;
     if (body.status !== undefined) updates.status = body.status;
 
     const [tag] = await db.update(workspaceTags).set(updates).where(and(eq(workspaceTags.id, body.tagId), eq(workspaceTags.workspaceId, session.workspaceId))).returning();
@@ -108,7 +108,7 @@ export async function DELETE(req: NextRequest) {
 
     const [existing] = await db.select().from(workspaceTags).where(and(eq(workspaceTags.id, id), eq(workspaceTags.workspaceId, session.workspaceId)));
     if (!existing) {
-       return NextResponse.json({ error: "Tag metadata not found" }, { status: 404 });
+      return NextResponse.json({ error: "Tag metadata not found" }, { status: 404 });
     }
 
     await db.delete(workspaceTags).where(and(eq(workspaceTags.id, id), eq(workspaceTags.workspaceId, session.workspaceId)));

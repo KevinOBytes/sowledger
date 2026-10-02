@@ -88,6 +88,7 @@ export function ManualTimeDialog({ open, onOpenChange, onSaved, scheduledBlock, 
     const startParts = parts(start);
     const endParts = parts(end);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTaskId(editEntry?.taskId || scheduledBlock?.taskId || defaultTaskId || "General work");
     setProjectId(editEntry?.projectId || scheduledBlock?.projectId || defaultProjectId || "");
     setActionId(editEntry?.action ? PRESERVE_ACTION_VALUE : scheduledBlock?.actionId || "");

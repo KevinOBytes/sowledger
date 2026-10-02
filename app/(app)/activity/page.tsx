@@ -26,6 +26,7 @@ type Entry = {
   stoppedAt: string | null;
   durationSeconds: number | null;
   status: "draft" | "submitted" | "approved" | "invoiced";
+  rejectionReason?: string | null;
   source: "web" | "calendar" | "manual";
 };
 
@@ -86,6 +87,7 @@ export default function ActivityPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEntries();
     fetch("/api/projects")
       .then((res) => res.json())
@@ -288,6 +290,11 @@ export default function ActivityPage() {
                               {entry.goalName ? <span className="max-w-full truncate rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-600">{entry.goalName}</span> : null}
                               {entry.tags.slice(0, 2).map((tag) => <span key={`${entry.id}-${tag}`} className="max-w-full truncate rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-cyan-700">#{tag}</span>)}
                             </div>
+                            {entry.rejectionReason && (
+                              <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                <span className="font-bold">Sent back:</span> {entry.rejectionReason}
+                              </p>
+                            )}
                           </div>
                           <div className="font-mono text-sm text-slate-500">{timeRange}</div>
                           <div className="font-mono text-sm font-bold text-slate-950">{formatDurationClock(entry.durationSeconds)}</div>
