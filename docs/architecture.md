@@ -51,6 +51,11 @@ These are validated against workspace scope on write endpoints.
   - Upstash KV
   - auth/audit secrets
 
+SOWLedger uses the dedicated `sowledger` PostgreSQL schema in the existing
+`neon-violet-school` database. ORM tables are explicitly qualified for that
+schema; runtime requests do not create or alter tables. Schema changes require
+the reviewed migration runner and a direct `DATABASE_MIGRATION_URL`.
+
 ## Environment
 ```bash
 NEXT_PUBLIC_APP_URL=https://sowledger.tkoresearch.com
@@ -60,6 +65,7 @@ AUDIT_SIGNING_SECRET=replace_with_long_random_secret
 RESEND_API_KEY=re_xxx
 RESEND_LOGIN_FROM=logins@kevinbytes.com
 DATABASE_URL=postgres://...
+NEON_DATABASE_URL=postgres://...
 UPSTASH_REDIS_REST_URL=https://...
 UPSTASH_REDIS_REST_TOKEN=...
 EXCHANGE_RATE_API_URL=https://api.exchangerate.host/latest

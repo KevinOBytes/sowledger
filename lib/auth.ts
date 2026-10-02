@@ -12,7 +12,6 @@ import {
   type WorkspaceRole,
 } from "./store";
 import { db } from "./db";
-import { ensureWorkspaceSchema } from "./db/ensure-workspace-schema";
 import { users, memberships, workspaces, magicLinks, invitations } from "./db/schema";
 import { desc, eq, and, gt, isNull } from "drizzle-orm";
 
@@ -126,7 +125,6 @@ async function memberCount(workspaceId: string) {
 
 async function resolveMagicLinkWorkspace(email: string) {
   const normEmail = email.trim().toLowerCase();
-  await ensureWorkspaceSchema();
 
   // Find their existing workspace if they have one
   const [userResult] = await db.select().from(users).where(eq(users.email, normEmail));

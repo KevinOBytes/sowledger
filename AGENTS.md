@@ -58,6 +58,12 @@ Preserve these first-class surfaces:
 - Reminder jobs must skip unavailable, OOO, busy, and external-calendar blocks.
 - Run product-completion DB changes with `npm run db:migrate:product`; do not hand-run production DDL without a backup/snapshot.
 
+## Shared Neon database
+- SOWLedger uses the existing `neon-violet-school` database (`neondb`) under the dedicated `sowledger` schema. Never create SOWLedger tables in the shared `public` schema or alter another application's schema.
+- ORM tables must remain explicitly schema-qualified through `lib/db/namespace.ts`; do not rely on a pooled connection's `search_path`.
+- Runtime `DATABASE_URL`/`NEON_DATABASE_URL` uses the restricted `sowledger_app` role with no DDL privileges. Use the direct, maintenance-only `DATABASE_MIGRATION_URL` with the reviewed runner for schema changes and preserve its backup/checksum journal.
+- The one-time source-to-`sowledger` data transfer is an operator-run migration with a rollback backup; it is not performed from a request or authentication path. See `docs/database-consolidation.md`.
+
 ## Validation
 Before claiming a change is ready, run the narrowest meaningful check and usually the full gate:
 

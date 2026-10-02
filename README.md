@@ -25,9 +25,9 @@ When a project/goal is deleted, linked time entries are cleaned by unsetting the
 
 ## Vercel + Neon + Upstash readiness
 - `GET /api/deployment/readiness` checks env wiring for Vercel deployment with Neon + Upstash.
-- SQL migration for Postgres remains included at `db/migrations/0001_init.sql`.
+- SOWLedger is namespaced in the shared `neon-violet-school` Neon database under the dedicated `sowledger` schema; it must not use the shared `public` schema.
 - Launch/deploy runbook lives at [`docs/launch-readiness.md`](docs/launch-readiness.md).
-- Product-completion schema changes are applied with `npm run db:migrate:product`, which backs up schema metadata and records migration checksums.
+- Reviewed schema changes are applied with an explicit direct `DATABASE_MIGRATION_URL`; `npm run db:migrate:runtime` and `npm run db:migrate:product` back up the SOWLedger namespace and record migration checksums.
 - Vercel Web Analytics is wired through `@vercel/analytics`; Google Analytics is enabled when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set.
 
 ## Current persistence note
@@ -49,6 +49,7 @@ RESEND_API_KEY=re_xxx
 RESEND_LOGIN_FROM=logins@kevinbytes.com
 NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 DATABASE_URL=postgres://...
+NEON_DATABASE_URL=postgres://...
 UPSTASH_REDIS_REST_URL=https://...
 UPSTASH_REDIS_REST_TOKEN=...
 EXCHANGE_RATE_API_URL=https://api.exchangerate.host/latest
@@ -97,3 +98,4 @@ ALLOW_BOOTSTRAP_OWNER=true
 ## Docs
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
 - Launch readiness: [`docs/launch-readiness.md`](docs/launch-readiness.md)
+- Shared database consolidation: [`docs/database-consolidation.md`](docs/database-consolidation.md)
