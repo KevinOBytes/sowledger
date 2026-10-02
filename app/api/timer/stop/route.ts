@@ -34,7 +34,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "endedAt cannot be in the future" }, { status: 400 });
     }
 
-    const originalSegments = splitTimeWindowByUtcDay(startedAt, endedAt);
+    const totalPausedSeconds = entry.accumulatedSeconds + (entry.isPaused && entry.pausedAt ? Math.max(0, Math.floor((endedAt.getTime() - entry.pausedAt.getTime()) / 1000)) : 0);
+
+    const rawSegments = splitTimeWindowByUtcDay(startedAt, endedAt);
+    let remainingPaused = totalPausedSeconds;
+    for (let i = rawSegments.length - 1; i >= 0; i--) {
+      const deduct = Math.min(rawSegments[i].durationSeconds, remainingPaused);
+      rawSegments[i].durationSeconds -= deduct;
+      remainingPaused -= deduct;
+    }
+    const originalSegments = rawSegments.filter(s => s.durationSeconds > 0);
+    if (originalSegments.length === 0 && rawSegments.length > 0) {
+      // If it was fully paused, keep at least one segment of 0 duration
+      originalSegments.push(rawSegments[0]);
+    }
     const originalDurationSeconds = originalSegments.reduce((sum, segment) => sum + segment.durationSeconds, 0);
 
     await ensurePeriodUnlocked(session.workspaceId, startedAt, endedAt);

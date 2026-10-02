@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireRole, requireSession } from "@/lib/auth";
+import { requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
 import { getIntegrationConnection } from "@/lib/integrations/connections";
 import { decryptSecret } from "@/lib/integrations/crypto";
 import { exchangeGoogleAuthorizationCode, storeGoogleCalendarConnection } from "@/lib/integrations/google-calendar";
 import { verifyIntegrationOAuthState } from "@/lib/integrations/oauth-state";
 
 function redirectTo(req: NextRequest, status: "connected" | "error", message?: string) {
-  const url = new URL("/integrations", req.url);
+  const base = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+  const url = new URL("/integrations", base);
   url.searchParams.set(status, "google_calendar");
   if (message) url.searchParams.set("message", message.slice(0, 180));
+  return NextResponse.redirect(url);
+}
+
+function redirectToLogin(req: NextRequest, message?: string) {
+  const base = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+  const url = new URL("/login", base);
+  if (message) url.searchParams.set("error", message.slice(0, 180));
   return NextResponse.redirect(url);
 }
 
@@ -28,10 +36,17 @@ export async function GET(req: NextRequest) {
     }
     const existing = await getIntegrationConnection(session.workspaceId, "google_calendar");
     const token = await exchangeGoogleAuthorizationCode(code);
+    if (!token.access_token) {
+      return redirectTo(req, "error", "Google did not return an access token");
+    }
     const existingRefreshToken = existing ? decryptSecret(existing.credentials.refreshToken) : null;
     await storeGoogleCalendarConnection({ workspaceId: session.workspaceId, userId: session.sub, token, existingRefreshToken });
     return redirectTo(req, "connected");
   } catch (error) {
+    console.error("[google-calendar-callback]", error);
+    if (error instanceof UnauthorizedError) {
+      return redirectToLogin(req, "Your session expired during the Google Calendar setup. Please log in and try again.");
+    }
     return redirectTo(req, "error", error instanceof Error ? error.message : "Google Calendar connection failed");
   }
 }

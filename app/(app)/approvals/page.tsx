@@ -91,12 +91,15 @@ export default function ApprovalsPage() {
 
   async function handleReject(entryId: string) {
     if (pendingEntryIdsRef.current.has(entryId)) return;
+    const reason = window.prompt("Reason for sending this back to the user?");
+    if (reason === null) return;
+    
     setEntryPending(entryId, true);
     try {
       const res = await fetch("/api/timer/reject", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entryId }),
+        body: JSON.stringify({ entryId, reason }),
       });
       if (res.ok) {
         if (statusFilter === "pending") setEntries((prev) => prev.filter((entry) => entry.id !== entryId));

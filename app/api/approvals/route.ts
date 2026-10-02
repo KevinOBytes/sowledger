@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { memberships, timeEntries, users, projects } from "@/lib/db/schema";
-import { eq, and, notInArray, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,8 +13,10 @@ export async function GET(req: NextRequest) {
     const statusFilter = req.nextUrl.searchParams.get("status");
 
     let condition = eq(timeEntries.workspaceId, session.workspaceId);
-    if (statusFilter !== "all") {
-      condition = and(condition, notInArray(timeEntries.status, ["approved", "invoiced"]))!;
+    if (statusFilter === "pending") {
+      condition = and(condition, eq(timeEntries.status, "submitted"))!;
+    } else {
+      condition = and(condition, inArray(timeEntries.status, ["submitted", "approved", "invoiced"]))!;
     }
 
     const pendingEntriesData = await db.select().from(timeEntries)

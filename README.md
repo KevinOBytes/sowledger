@@ -1,6 +1,6 @@
 # SOWLedger
 
-Security-focused workforce intelligence starter on Next.js (App Router) with role-based auth, immutable audit logs, compliance controls, user settings, and local-first timer resilience.
+Security-focused professional-services revenue assurance and invoice-evidence system on Next.js (App Router) with role-based auth, immutable audit logs, compliance controls, user settings, and local-first timer resilience.
 
 ## Registration safety
 - `ALLOW_SELF_REGISTRATION=false` (default) = invite-only access.
@@ -31,7 +31,7 @@ When a project/goal is deleted, linked time entries are cleaned by unsetting the
 - Vercel Web Analytics is wired through `@vercel/analytics`; Google Analytics is enabled when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set.
 
 ## Current persistence note
-This branch currently uses an in-memory runtime store for API state so it remains compile-safe in restricted CI environments. SQL-first schema is included and adapter wiring to Neon can be done behind current API contracts.
+This branch uses a functional Drizzle/Postgres client and database-backed invoice-proof and revenue-intelligence logic. SQL-first schema is included and adapter wiring to Neon is implemented behind the API contracts.
 
 ## Quick start
 ```bash

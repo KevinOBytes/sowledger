@@ -148,8 +148,28 @@ export function IntegrationCenterClient() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const connected = params.get("connected");
+      const error = params.get("error");
+      const message = params.get("message");
+
+      if (connected) {
+        toast.success(`${connected === "google_calendar" ? "Google Calendar" : connected === "quickbooks" ? "QuickBooks" : connected} connected successfully!`);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (error) {
+        toast.error(`Could not connect ${error === "google_calendar" ? "Google Calendar" : error === "quickbooks" ? "QuickBooks" : error}`, {
+          description: message || "Unknown error occurred"
+        });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, []);
 
   async function postAction(path: string, success: string, body?: unknown) {
     setBusy(path);
@@ -197,7 +217,7 @@ export function IntegrationCenterClient() {
       toast.error(`${meta.title} OAuth is not configured`, { description: "Add the provider client ID/secret and redirect URI in production env first." });
       return;
     }
-    window.location.href = meta.authPath;
+    window.location.assign(meta.authPath);
   }
 
   return (
@@ -252,7 +272,7 @@ export function IntegrationCenterClient() {
                 <div><dt className="font-bold text-slate-700">Connected account</dt><dd>{connection?.displayName || connection?.externalAccountId || "Not connected"}</dd></div>
                 <div><dt className="font-bold text-slate-700">Last sync</dt><dd>{formatDateTime(connection?.lastSyncedAt)}</dd></div>
                 {connection?.lastError && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-rose-700"><dt className="font-bold">Last error</dt><dd className="mt-1 break-words text-xs">{connection.lastError}</dd></div>}
-                {!configured && provider !== "slack" && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800"><dt className="font-bold">Environment needed</dt><dd className="mt-1 text-xs">Add OAuth client ID, secret, and redirect URI before connecting.</dd></div>}
+                {!configured && provider !== "slack" && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800"><dt className="font-bold">Environment needed</dt><dd className="mt-1 text-xs">Configure the provider&apos;s OAuth client ID and secret in your server environment variables (.env) before connecting.</dd></div>}
               </dl>
 
               <div className="mt-5 flex flex-wrap gap-2">

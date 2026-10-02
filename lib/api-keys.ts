@@ -56,7 +56,7 @@ function getBearerToken(req: NextRequest) {
 
 export function generateApiKeyMaterial() {
   const secret = randomBytes(32).toString("base64url");
-  const rawKey = `blb_${secret}`;
+  const rawKey = `sow-${secret}`;
   return {
     rawKey,
     keyHash: hashInput(rawKey),

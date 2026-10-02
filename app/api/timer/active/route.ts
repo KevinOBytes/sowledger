@@ -22,6 +22,9 @@ export async function GET() {
       action: timeEntries.action,
       tags: timeEntries.tags,
       startedAt: timeEntries.startedAt,
+      isPaused: timeEntries.isPaused,
+      pausedAt: timeEntries.pausedAt,
+      accumulatedSeconds: timeEntries.accumulatedSeconds,
     })
     .from(timeEntries)
     .leftJoin(projects, eq(timeEntries.projectId, projects.id))

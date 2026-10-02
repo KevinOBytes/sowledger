@@ -24,7 +24,7 @@ const TRUST_CONTROLS = [
   },
   {
     title: "Billing boundary",
-    body: "Stripe checkout accepts Billabled workspace plans only. The API does not expose billing changes or subscription management.",
+    body: "Stripe checkout accepts SOWLedger workspace plans only. The API does not expose billing changes or subscription management.",
     icon: CreditCard,
   },
   {
@@ -96,7 +96,7 @@ export default function SecurityPage() {
         <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.75fr_1.25fr]">
           <div className="rounded-2xl bg-slate-950 p-7 text-white shadow-sm">
             <Siren className="h-6 w-6 text-cyan-300" />
-            <h2 className="mt-4 text-3xl font-semibold">Boundaries that stay inside Billabled</h2>
+            <h2 className="mt-4 text-3xl font-semibold">Boundaries that stay inside SOWLedger</h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
               The API is for scoped operational integrations. Billing changes, invites, subscription management, and workspace administration remain inside authenticated app workflows.
             </p>
