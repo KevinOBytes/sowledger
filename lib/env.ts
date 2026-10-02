@@ -16,7 +16,7 @@ export const env = {
   STRIPE_SMB_PRICE_ID: process.env.STRIPE_SMB_PRICE_ID,
   STRIPE_ENTERPRISE_PRICE_ID: process.env.STRIPE_ENTERPRISE_PRICE_ID,
 
-  DATABASE_URL: process.env.DATABASE_URL,
+  DATABASE_URL: process.env.NEON_DATABASE_URL || process.env.DATABASE_URL,
   UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL,
   UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN,
   EXCHANGE_RATE_API_URL: process.env.EXCHANGE_RATE_API_URL ?? "https://api.exchangerate.host/latest",
