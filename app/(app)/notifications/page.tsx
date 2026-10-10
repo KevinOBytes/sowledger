@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, CheckCheck, CheckSquare, Clock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { DataLoadNotice } from "@/components/data-load-notice";
 
 type AppNotification = {
   id: string;
@@ -14,15 +15,17 @@ type AppNotification = {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     async function fetchNotifications() {
       try {
         const res = await fetch("/api/notifications");
-        if (res.ok) {
-          const data = await res.json();
-          setNotifications(data.notifications || []);
-        }
+        if (!res.ok) throw new Error("Notifications unavailable");
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+      } catch {
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -31,26 +34,32 @@ export default function NotificationsPage() {
   }, []);
 
   async function markAllAsRead() {
-    const res = await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markAllRead: true }),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAllRead: true }),
+      });
+      if (!res.ok) throw new Error("Request failed");
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       toast.success("All notifications marked as read");
+    } catch {
+      toast.error("Could not update notifications. Please try again.");
     }
   }
 
   async function markAsRead(id: string) {
-    const res = await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notificationId: id }),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId: id }),
+      });
+      if (!res.ok) throw new Error("Request failed");
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
       toast.success("Notification marked as read");
+    } catch {
+      toast.error("Could not mark this notification as read. Please try again.");
     }
   }
 
@@ -65,10 +74,11 @@ export default function NotificationsPage() {
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Review</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Notifications</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Keep an eye on unread workflow changes, approvals, and assignment updates without dropping back into the old dashboard styling.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Review reminders and updates from your workspace.</p>
             </div>
             <button
               onClick={markAllAsRead}
+              disabled={loading || loadError || unread.length === 0}
               className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
             >
               <CheckSquare className="h-4 w-4" />
@@ -96,7 +106,7 @@ export default function NotificationsPage() {
                 <Sparkles className="h-4 w-4" />
                 <span className="text-xs font-bold uppercase tracking-[0.2em]">Focus</span>
               </div>
-              <p className="mt-2 text-sm font-semibold text-slate-950">Unread items stay visually separate so the review flow is obvious.</p>
+              <p className="mt-2 text-sm font-semibold text-slate-950">Mark an update as read when you have reviewed it. Unread updates appear first.</p>
             </div>
           </div>
         </header>
@@ -104,11 +114,13 @@ export default function NotificationsPage() {
         <section className="rounded-[32px] border border-slate-200 bg-white shadow-sm">
           {loading ? (
             <div className="flex h-40 items-center justify-center text-slate-500 animate-pulse">Loading notifications...</div>
+          ) : loadError ? (
+            <DataLoadNotice message="We couldn't load your notifications." />
           ) : notifications.length === 0 ? (
             <div className="flex h-56 flex-col items-center justify-center text-slate-500">
               <Bell className="mb-4 h-10 w-10 text-slate-300" />
               <p className="text-lg font-semibold text-slate-950">No notifications yet</p>
-              <p className="mt-2 max-w-md text-center text-sm text-slate-500">Updates from approvals, assignment changes, and delivery work will show up here once the workspace gets moving.</p>
+              <p className="mt-2 max-w-md text-center text-sm text-slate-500">New workspace reminders and updates will appear here. There is nothing to review right now.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">

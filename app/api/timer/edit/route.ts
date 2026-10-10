@@ -1,129 +1,88 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { appendAuditLog, enforceDailyHoursLimit, ensurePeriodUnlocked } from "@/lib/security";
+import { appendAuditLog, dispatchWebhook, enforceDailyHoursLimit, ensurePeriodUnlocked } from "@/lib/security";
 import { db } from "@/lib/db";
 import { timeEntries, projects, goals, userActions } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { and, eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
+import { editedTimeDuration, WorkflowError, workflowErrorResponse } from "@/lib/workflow-validation";
 
 export async function PATCH(req: NextRequest) {
   try {
-    await ensureWorkspaceSchema();
     const session = await requireSession();
-    const body = await req.json() as {
-      entryId?: string;
-      taskId?: string;
-      startedAt?: string;
-      stoppedAt?: string;
-      description?: string;
-      projectId?: string;
-      goalId?: string;
-      tags?: string[];
-      actionId?: string;
-    };
-
-    if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
-
-    const [entry] = await db.select().from(timeEntries).where(and(eq(timeEntries.id, body.entryId), eq(timeEntries.workspaceId, session.workspaceId)));
-    if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
-
-    const canManageOthers = session.role === "manager" || session.role === "owner";
-    if (!canManageOthers && entry.userId !== session.sub) {
-      return NextResponse.json({ error: "Cannot edit other users entries" }, { status: 403 });
-    }
     requireRole("member", session.role);
-
-    if (entry.status === "approved" || entry.status === "invoiced") {
-      return NextResponse.json({ error: "Approved or invoiced entries are locked" }, { status: 409 });
+    await ensureWorkspaceSchema();
+    const body = await req.json() as {
+      entryId?: string; taskId?: string; startedAt?: string; stoppedAt?: string;
+      description?: string; projectId?: string | null; goalId?: string | null;
+      tags?: string[]; actionId?: string;
+    };
+    if (typeof body?.entryId !== "string" || !body.entryId || body.entryId.length > 255) throw new WorkflowError("Choose a time entry to edit.", 400);
+    for (const key of ["projectId", "goalId"] as const) {
+      if (body[key] !== undefined && body[key] !== null && (typeof body[key] !== "string" || !body[key] || body[key]!.length > 255)) throw new WorkflowError("Choose a valid project or goal.", 400);
     }
-
-    if (!entry.stoppedAt) {
-      return NextResponse.json({ error: "Running entries cannot be corrected with this endpoint. Stop the timer first." }, { status: 409 });
+    for (const key of ["taskId", "actionId", "startedAt", "stoppedAt", "description"] as const) {
+      if (body[key] !== undefined && typeof body[key] !== "string") throw new WorkflowError("Entry details must be text.", 400);
     }
+    if (body.description && body.description.length > 10000) throw new WorkflowError("Keep notes under 10,000 characters.", 400);
+    if (body.taskId !== undefined && (!body.taskId.trim() || body.taskId.length > 255)) throw new WorkflowError("Enter a work label under 255 characters.", 400);
+    if (body.tags !== undefined && (!Array.isArray(body.tags) || body.tags.length > 50 || body.tags.some((tag) => typeof tag !== "string" || tag.length > 255))) throw new WorkflowError("Choose valid tags.", 400);
 
-    if (body.projectId) {
-      const [project] = await db.select().from(projects).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
-      if (!project) {
-        return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
+    const result = await db.transaction(async (tx) => {
+      const [entry] = await tx.select().from(timeEntries).where(and(eq(timeEntries.id, body.entryId!), eq(timeEntries.workspaceId, session.workspaceId))).for("update");
+      if (!entry) throw new WorkflowError("Time entry not found.", 404);
+      const canManageOthers = session.role === "manager" || session.role === "owner";
+      if (!canManageOthers && entry.userId !== session.sub) throw new WorkflowError("You can only edit your own time.", 403);
+      if (entry.status === "approved" || entry.status === "invoiced") throw new WorkflowError("Approved or invoiced entries are locked.", 409);
+      if (!entry.stoppedAt) throw new WorkflowError("Stop the timer before editing its time.", 409);
+      if (body.projectId) {
+        const [project] = await tx.select({ id: projects.id }).from(projects).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
+        if (!project) throw new WorkflowError("Project not found.", 400);
       }
-    }
-
-    if (body.goalId) {
-      const [goal] = await db.select().from(goals).where(and(eq(goals.id, body.goalId), eq(goals.workspaceId, session.workspaceId)));
-      if (!goal) {
-        return NextResponse.json({ error: "Invalid goalId" }, { status: 400 });
+      if (body.goalId) {
+        const [goal] = await tx.select({ id: goals.id }).from(goals).where(and(eq(goals.id, body.goalId), eq(goals.workspaceId, session.workspaceId)));
+        if (!goal) throw new WorkflowError("Goal not found.", 400);
       }
-    }
-
-    let nextActionName = entry.action;
-    let nextHourlyRate = entry.hourlyRate;
-
-    if (body.actionId !== undefined) {
-      if (body.actionId === "") {
-        nextActionName = null;
-        nextHourlyRate = null;
-      } else {
-        const [uAction] = await db.select().from(userActions).where(and(eq(userActions.id, body.actionId), eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, entry.userId)));
-        if (!uAction) {
-          return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
+      let action = entry.action;
+      let hourlyRate = entry.hourlyRate;
+      if (body.actionId !== undefined) {
+        if (body.actionId === "") { action = null; hourlyRate = null; }
+        else {
+          const [rate] = await tx.select().from(userActions).where(and(eq(userActions.id, body.actionId), eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, entry.userId)));
+          if (!rate) throw new WorkflowError("Rate not found for this person.", 400);
+          action = rate.name;
+          hourlyRate = rate.hourlyRate;
         }
-        nextActionName = uAction.name;
-        nextHourlyRate = uAction.hourlyRate;
       }
-    }
-
-    const rawStartedAt = body.startedAt ?? entry.startedAt;
-    const rawStoppedAt = body.stoppedAt ?? entry.stoppedAt;
-
-    const nextStartedAt = new Date(rawStartedAt!);
-    const nextStoppedAt = new Date(rawStoppedAt);
-    if (isNaN(nextStartedAt.getTime())) return NextResponse.json({ error: "Invalid startedAt date" }, { status: 400 });
-    if (isNaN(nextStoppedAt.getTime())) return NextResponse.json({ error: "Invalid stoppedAt date" }, { status: 400 });
-    if (nextStoppedAt <= nextStartedAt) return NextResponse.json({ error: "stoppedAt must be after startedAt" }, { status: 400 });
-
-    await ensurePeriodUnlocked(session.workspaceId, nextStartedAt, nextStoppedAt);
-    const nextDurationSeconds = Math.max(1, Math.floor((nextStoppedAt.getTime() - nextStartedAt.getTime()) / 1000));
-    await enforceDailyHoursLimit(entry.workspaceId, entry.userId, nextStartedAt, nextDurationSeconds, entry.id);
-
-    const updates: Partial<typeof timeEntries.$inferInsert> = {};
-    if (body.taskId !== undefined) {
-      const nextTaskId = body.taskId.trim();
-      if (!nextTaskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
-      updates.taskId = nextTaskId;
-    }
-    updates.startedAt = nextStartedAt;
-    updates.stoppedAt = nextStoppedAt;
-    updates.durationSeconds = nextDurationSeconds;
-    updates.description = body.description ?? entry.description;
-    updates.projectId = body.projectId ?? entry.projectId;
-    updates.goalId = body.goalId ?? entry.goalId;
-    updates.tags = body.tags ? normalizeTags(body.tags) : entry.tags;
-    updates.action = nextActionName;
-    updates.hourlyRate = nextHourlyRate;
-
-    await db.update(timeEntries).set(updates).where(and(eq(timeEntries.id, entry.id), eq(timeEntries.workspaceId, session.workspaceId)));
-
-    await appendAuditLog({
-      workspaceId: session.workspaceId,
-      timeEntryId: entry.id,
-      actorUserId: session.sub,
-      eventType: "manual_edit",
-      diff: {
-        startedAt: { before: entry.startedAt, after: updates.startedAt },
-        stoppedAt: { before: entry.stoppedAt, after: updates.stoppedAt },
-        durationSeconds: { before: entry.durationSeconds, after: updates.durationSeconds },
-        description: { before: entry.description ?? null, after: updates.description ?? null },
-        projectId: { before: entry.projectId ?? null, after: updates.projectId ?? null },
-        goalId: { before: entry.goalId ?? null, after: updates.goalId ?? null },
-        tags: { before: entry.tags, after: updates.tags },
-        action: { before: entry.action ?? null, after: updates.action ?? null },
-        hourlyRate: { before: entry.hourlyRate ?? null, after: updates.hourlyRate ?? null },
-      },
+      const startedAt = new Date(body.startedAt ?? entry.startedAt);
+      const stoppedAt = new Date(body.stoppedAt ?? entry.stoppedAt);
+      if (!Number.isFinite(startedAt.getTime()) || !Number.isFinite(stoppedAt.getTime()) || stoppedAt < startedAt) throw new WorkflowError("Choose a valid start and end time.", 400);
+      const duration = editedTimeDuration({ ...entry, stoppedAt: entry.stoppedAt }, startedAt, stoppedAt);
+      try {
+        await ensurePeriodUnlocked(session.workspaceId, entry.startedAt, entry.stoppedAt);
+        await ensurePeriodUnlocked(session.workspaceId, startedAt, stoppedAt);
+      } catch { throw new WorkflowError("This entry is in a locked period.", 409); }
+      try { await enforceDailyHoursLimit(entry.workspaceId, entry.userId, startedAt, duration.durationSeconds, entry.id); }
+      catch { throw new WorkflowError("This edit would exceed 24 logged hours in a day.", 400); }
+      const updates = {
+        taskId: body.taskId?.trim() ?? entry.taskId,
+        startedAt, stoppedAt, durationSeconds: duration.durationSeconds,
+        description: body.description !== undefined ? body.description : entry.description,
+        projectId: body.projectId !== undefined ? body.projectId : entry.projectId,
+        goalId: body.goalId !== undefined ? body.goalId : entry.goalId,
+        tags: body.tags !== undefined ? normalizeTags(body.tags) : entry.tags,
+        action, hourlyRate, isPaused: false, pausedAt: null,
+        accumulatedSeconds: duration.excludedSeconds,
+        status: "draft" as const,
+      };
+      await tx.update(timeEntries).set(updates).where(and(eq(timeEntries.id, entry.id), eq(timeEntries.workspaceId, session.workspaceId)));
+      const diff: Record<string, { before: unknown; after: unknown }> = {};
+      for (const key of Object.keys(updates) as Array<keyof typeof updates>) diff[key] = { before: entry[key], after: updates[key] };
+      await appendAuditLog({ workspaceId: session.workspaceId, timeEntryId: entry.id, actorUserId: session.sub, eventType: "manual_edit", diff }, tx);
+      return { entryId: entry.id, nextDurationSeconds: duration.durationSeconds, diff };
     });
-
-    return NextResponse.json({ ok: true, entryId: entry.id, nextDurationSeconds });
-  } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 403 });
-  }
+    after(async () => { await dispatchWebhook(session.workspaceId, "manual_edit", result.diff); });
+    return NextResponse.json({ ok: true, entryId: result.entryId, nextDurationSeconds: result.nextDurationSeconds, status: "draft" });
+  } catch (error) { return workflowErrorResponse(error, "Could not save this entry. Please try again."); }
 }

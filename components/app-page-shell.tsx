@@ -206,12 +206,12 @@ export type WorkflowRailItem = {
 };
 
 export const SOWLEDGER_WORKFLOW_STAGES: WorkflowRailItem[] = [
-  { id: "plan", label: "Plan", description: "Shape scheduled work", icon: CalendarDays, href: "/calendar" },
-  { id: "track", label: "Track", description: "Run live timers", icon: Clock3, href: "/" },
+  { id: "plan", label: "Plan", description: "Schedule your work", icon: CalendarDays, href: "/calendar" },
+  { id: "track", label: "Track", description: "Start and manage timers", icon: Clock3, href: "/dashboard" },
   { id: "log", label: "Log", description: "Add manual or calendar time", icon: CheckCircle2, href: "/activity" },
-  { id: "review", label: "Review", description: "Correct activity and analytics", icon: BarChart3, href: "/analytics" },
-  { id: "approve", label: "Approve / Invoice / Export", description: "Move proof into billing output", href: "/invoices", icon: FileCheck2 },
-  { id: "integrate", label: "Integrate", description: "Connect API and webhooks", icon: Plug, href: "/settings/integrations" },
+  { id: "review", label: "Review", description: "Compare planned and logged time", icon: BarChart3, href: "/reports" },
+  { id: "approve", label: "Invoice", description: "Bill approved time", href: "/invoices", icon: FileCheck2 },
+  { id: "integrate", label: "Integrate", description: "Connect your other tools", icon: Plug, href: "/integrations" },
 ];
 
 export type AppWorkflowRailProps = {
@@ -223,7 +223,7 @@ export type AppWorkflowRailProps = {
 export function AppWorkflowRail({ current, items = SOWLEDGER_WORKFLOW_STAGES, className }: AppWorkflowRailProps) {
   return (
     <section aria-label="SOWLedger workflow" className={cx("rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm", className)}>
-      <ol className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+      <ol className="grid grid-cols-3 gap-2 xl:grid-cols-6">
         {items.map((item, index) => {
           const Icon = item.icon;
           const active = current === item.id;
@@ -233,15 +233,15 @@ export function AppWorkflowRail({ current, items = SOWLEDGER_WORKFLOW_STAGES, cl
               <a
                 href={item.href}
                 className={cx(
-                  "block h-full rounded-2xl border px-3 py-3 transition hover:border-cyan-200 hover:bg-cyan-50/50",
+                  "block h-full rounded-2xl border px-2 py-3 transition hover:border-cyan-200 hover:bg-cyan-50/50 md:px-3",
                   active ? toneClasses.cyan.rail : toneClasses.slate.rail,
                 )}
               >
-                <div className="flex min-w-0 items-start gap-2">
-                  <Icon className={cx("mt-0.5 h-4 w-4 shrink-0", active ? "text-cyan-700" : "text-slate-400")} />
-                  <span className="min-w-0 break-words text-sm font-bold leading-5">{item.label}</span>
+                <div className="flex min-w-0 items-start gap-1 md:gap-2">
+                  <Icon className={cx("mt-0.5 hidden h-4 w-4 shrink-0 sm:block", active ? "text-cyan-700" : "text-slate-400")} />
+                  <span className="min-w-0 whitespace-nowrap text-xs font-bold leading-5 md:text-sm">{item.label}</span>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>
+                <p className="mt-1 hidden text-xs leading-5 text-slate-500 md:block">{item.description}</p>
               </a>
             </li>
           );

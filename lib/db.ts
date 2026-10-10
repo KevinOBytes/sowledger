@@ -21,7 +21,11 @@ export function getDb(): DbClient {
 
   // Remote Neon pooled connections do not reliably honor startup search_path
   // options. Tables are explicitly qualified through the Drizzle namespace.
-  const pool = globalThis.__sowledgerDbPool ?? new Pool({ connectionString: databaseUrl });
+  const pool = globalThis.__sowledgerDbPool ?? new Pool({
+    connectionString: databaseUrl,
+    connectionTimeoutMillis: 10_000,
+    query_timeout: 15_000,
+  });
   const client = drizzle(pool, { schema });
 
   globalThis.__sowledgerDbPool = pool;

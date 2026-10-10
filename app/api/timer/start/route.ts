@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { getAppOrigin } from "@/lib/app-url";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { projects, goals, userActions, scheduledWorkBlocks, timeEntries } from "@/lib/db/schema";
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
       dispatchIntegrationNotification(session.workspaceId, "time_entry.created", {
         title: "Timer started",
         body: entry.description || entry.taskId,
-        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/dashboard`,
+        url: `${getAppOrigin()}/dashboard`,
       }).catch(() => {});
     });
 

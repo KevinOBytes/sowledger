@@ -4,28 +4,28 @@ import { ArrowRight, Code2, CreditCard, LifeBuoy, Mail, ShieldCheck, Sparkles } 
 const CONTACT_TASKS = [
   {
     title: "Product and account support",
-    body: "Send workspace name, account email, page involved, browser, timestamp, and safe reproduction steps.",
+    body: "Tell us your workspace, the page you were using, and what happened. Include your browser and the approximate time if you are reporting a problem.",
     href: "/support",
     label: "Open support",
     icon: LifeBuoy,
   },
   {
     title: "Billing",
-    body: "Send workspace name, account email, selected plan, Stripe receipt, date, and the billing behavior you expected.",
+    body: "Include the workspace name, plan, charge date, and receipt reference if you have one. Do not include full payment details.",
     href: "/billing-policy",
     label: "Read billing policy",
     icon: CreditCard,
   },
   {
     title: "API and security",
-    body: "Send endpoint paths, request IDs if available, timestamps, scopes involved, and safe metadata. Never send API keys or bearer tokens.",
+    body: "Include the endpoint, response code, approximate time, and permissions used. Remove API keys and private data from any example request.",
     href: "/support/api",
     label: "Open API guide",
     icon: Code2,
   },
   {
-    title: "Sales and onboarding",
-    body: "Send team size, current billing workflow, invoice/export needs, API or webhook requirements, and target onboarding timing.",
+    title: "Choosing a plan",
+    body: "Tell us how many people and projects you have, how you track time today, and what you need to change.",
     href: "/#pricing",
     label: "View plans",
     icon: Sparkles,
@@ -34,7 +34,7 @@ const CONTACT_TASKS = [
 
 export const metadata = {
   title: "Contact - SOWLedger",
-  description: "Contact SOWLedger for product support, billing, API/security questions, sales, and onboarding without sending secrets.",
+  description: "Contact SOWLedger for help with your account, workspace, subscription, or integrations.",
 };
 
 export default function ContactPage() {
@@ -47,15 +47,15 @@ export default function ContactPage() {
               <Mail className="h-4 w-4" />
               Contact
             </p>
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Contact SOWLedger with the right context.</h1>
+            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Get in touch.</h1>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700">
-              Use one support address for product, account, billing, API, security, sales, and onboarding questions. Include safe context so the issue can be reproduced without exposing secrets.
+              Have a question about SOWLedger or need help with something? Email us with a short description and we can take it from there.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-xl shadow-stone-900/10">
             <h2 className="text-2xl font-semibold">Email support</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Keep API keys, bearer tokens, passwords, card numbers, and private customer data out of the initial message.
+              Please leave out passwords, API keys, payment card numbers, and private client information.
             </p>
             <a href="mailto:support@sowledger.com" className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
               support@sowledger.com
@@ -86,11 +86,11 @@ export default function ContactPage() {
             <ShieldCheck className="h-6 w-6 text-cyan-300" />
             <h2 className="mt-4 text-3xl font-semibold">Security reports</h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              Include the affected route, workspace context, timestamp, and safe reproduction details. Do not include full key values, tokens, passwords, or payment data.
+              Tell us which page or endpoint is affected and how to reproduce the issue without accessing another person&apos;s data. Remove secrets and private information from screenshots and examples.
             </p>
           </div>
           <div className="grid gap-3 rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5 sm:grid-cols-2">
-            <Link href="/security" className="rounded-xl border border-border bg-background/60 p-4 text-sm font-bold text-slate-800 transition hover:border-cyan-300 hover:text-cyan-700">Security posture</Link>
+            <Link href="/security" className="rounded-xl border border-border bg-background/60 p-4 text-sm font-bold text-slate-800 transition hover:border-cyan-300 hover:text-cyan-700">Security information</Link>
             <Link href="/support/api" className="rounded-xl border border-border bg-background/60 p-4 text-sm font-bold text-slate-800 transition hover:border-cyan-300 hover:text-cyan-700">API support</Link>
             <Link href="/support" className="rounded-xl border border-border bg-background/60 p-4 text-sm font-bold text-slate-800 transition hover:border-cyan-300 hover:text-cyan-700">Support home</Link>
             <Link href="/billing-policy" className="rounded-xl border border-border bg-background/60 p-4 text-sm font-bold text-slate-800 transition hover:border-cyan-300 hover:text-cyan-700">Billing policy</Link>

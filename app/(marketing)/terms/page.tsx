@@ -16,7 +16,7 @@ const TERMS: [string, string][] = [
   ],
   [
     "Third-party integrations",
-    "SOWLedger offers optional integrations with Google Calendar, Slack, and QuickBooks. When you connect an integration, you authorize SOWLedger to access your account on that service within the scopes you grant. You can disconnect any integration at any time, which revokes SOWLedger's access. SOWLedger is not responsible for third-party service availability, terms, or data practices.",
+    "SOWLedger offers optional integrations with Google Calendar, Slack, and QuickBooks. When you connect an integration, you authorize SOWLedger to access your account on that service within the scopes you grant. Workspace owners and managers can disconnect an integration from Integrations. This disables the connection and removes its stored credentials from SOWLedger. To revoke the provider's authorization as well, remove SOWLedger in that provider's account settings. SOWLedger is not responsible for third-party service availability, terms, or data practices.",
   ],
   [
     "Google Calendar",
@@ -36,7 +36,7 @@ const TERMS: [string, string][] = [
   ],
   [
     "Termination",
-    "Either party may terminate at any time. You can delete your workspace from settings. Upon termination, we will delete your data within 30 days, subject to legal and billing obligations. Pre-paid subscription fees are non-refundable after the current billing period.",
+    "Either party may terminate at any time. Contact support to request deletion of your workspace. Upon termination, we will delete your data within 30 days, subject to legal and billing obligations. Pre-paid subscription fees are non-refundable after the current billing period.",
   ],
   [
     "Limitation of liability",
@@ -65,7 +65,7 @@ export default function TermsPage() {
               Legal
             </p>
             <p className="rounded-full border border-border bg-background px-4 py-1.5 text-sm font-bold text-slate-700">
-              Last updated August 15, 2026
+              Last updated October 9, 2026
             </p>
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">
@@ -84,10 +84,10 @@ export default function TermsPage() {
             <FileText className="h-6 w-6 text-cyan-700" />
             <h2 className="mt-4 text-2xl font-semibold">Summary</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Use SOWLedger for authorized workspace operations. You own your
-              data. Third-party integrations are optional and revocable.
+              You own your data and decide who can access your workspace.
+              Third-party integrations are optional, and you can disconnect them.
               SOWLedger adheres to the Google API Services User Data Policy. Keep
-              secrets out of routine support flows.
+              passwords, API keys, and client records out of support messages.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">

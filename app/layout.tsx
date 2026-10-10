@@ -4,12 +4,13 @@ import DatadogInit from "@/components/DatadogInit";
 import { Toaster } from "sonner";
 import { CookieConsent } from "@/components/cookie-consent";
 import { AnalyticsWrapper } from "@/components/analytics-wrapper";
+import { getAppOrigin } from "@/lib/app-url";
 import "./globals.css";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.sowledger.com";
+const appUrl = getAppOrigin();
 const googleAnalyticsId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-const metadataTitle = "SOWLedger Workforce Intelligence";
-const metadataDescription = "Recover revenue and prove every invoice with proof-backed time tracking, retainer leak radar, client sign-off, and agency APIs.";
+const metadataTitle = "SOWLedger | Time tracking and invoicing for client work";
+const metadataDescription = "Plan your work, track your time, and create invoices with the details behind each total. Built for freelancers, agencies, and service teams.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -21,21 +22,12 @@ export const metadata: Metadata = {
     description: metadataDescription,
     url: "/",
     siteName: "SOWLedger",
-    images: [
-      {
-        url: "/images/marketing/sowledger-og.png",
-        width: 1200,
-        height: 630,
-        alt: "SOWLedger proof-backed billing preview.",
-      },
-    ],
     type: "website",
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: metadataTitle,
     description: metadataDescription,
-    images: ["/images/marketing/sowledger-og.png"],
   },
   appleWebApp: {
     capable: true,

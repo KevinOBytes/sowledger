@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Clock3, Lock, Pencil, LayoutList, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   AppEmptyState,
-  AppMetricCard,
   AppPageHeader,
   AppPageShell,
   AppWorkflowRail,
@@ -32,6 +31,7 @@ type Entry = {
 
 type Project = { id: string; name: string };
 type GroupedEntries = { key: string; label: string; totalSeconds: number; entries: Entry[] };
+const PAGE_SIZE = 25;
 
 function formatDurationCompact(seconds: number) {
   const h = Math.floor(seconds / 3600);
@@ -70,30 +70,62 @@ export default function ActivityPage() {
   const [description, setDescription] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [projectsError, setProjectsError] = useState(false);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [submittingIds, setSubmittingIds] = useState<string[]>([]);
+  const requestId = useRef(0);
 
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
     try {
-      const res = await fetch("/api/timer/list?limit=100");
-      if (res.ok) {
-        const data = await res.json();
+      if (fromDate && toDate && toDate < fromDate) throw new Error("Invalid date range");
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
+      if (statusFilter) params.set("status", statusFilter);
+      if (fromDate) params.set("from", new Date(`${fromDate}T00:00:00`).toISOString());
+      if (toDate) params.set("to", new Date(`${toDate}T23:59:59.999`).toISOString());
+      const res = await fetch(`/api/timer/list?${params}`);
+      if (!res.ok) throw new Error("Activity unavailable");
+      const data = await res.json();
+      if (currentRequest === requestId.current) {
+        if (page > 0 && !data.entries?.length) { setPage((value) => Math.max(0, value - 1)); return; }
         setEntries(data.entries ?? []);
+        setTotal(data.total ?? data.entries?.length ?? 0);
+        setHasMore(Boolean(data.hasMore));
+        setLoadError(false);
       }
     } catch {
-      toast.error("Failed to load activity feed.");
+      if (currentRequest === requestId.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  };
+  }, [fromDate, page, statusFilter, toDate]);
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await fetch("/api/projects");
+      if (!response.ok) throw new Error("Projects unavailable");
+      const data = await response.json();
+      setProjects(data.projects ?? []);
+      setProjectsError(false);
+    } catch { setProjectsError(true); }
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchEntries();
-    fetch("/api/projects")
-      .then((res) => res.json())
-      .then((data) => setProjects(data.projects ?? []))
-      .catch(() => null);
-  }, []);
+    void fetchEntries();
+  }, [fetchEntries]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchProjects();
+  }, [fetchProjects]);
 
   useEffect(() => {
     const onTimeSaved = () => {
@@ -101,7 +133,7 @@ export default function ActivityPage() {
     };
     window.addEventListener("sowledger:time-saved", onTimeSaved);
     return () => window.removeEventListener("sowledger:time-saved", onTimeSaved);
-  }, []);
+  }, [fetchEntries]);
 
   const groupedEntries = useMemo<GroupedEntries[]>(() => {
     const groups = new Map<string, GroupedEntries>();
@@ -121,6 +153,23 @@ export default function ActivityPage() {
   const visibleTotalSeconds = useMemo(() => entries.reduce((sum, entry) => sum + (entry.durationSeconds ?? 0), 0), [entries]);
   const manualCount = entries.filter((entry) => entry.source === "manual").length;
   const runningCount = entries.filter((entry) => !entry.stoppedAt).length;
+  const eligibleEntries = entries.filter((entry) => entry.stoppedAt && entry.status === "draft");
+
+  async function submitForApproval(entryIds: string[]) {
+    if (!entryIds.length || submittingIds.length) return;
+    setSubmittingIds(entryIds);
+    try {
+      const response = await fetch("/api/timer/submit", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entryIds }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error("Could not submit time. Refresh Activity and try again.");
+      toast.success(`${data.submitted} ${data.submitted === 1 ? "entry" : "entries"} submitted for approval`);
+      await fetchEntries();
+    } catch {
+      toast.error("Could not submit time", { description: "Refresh Activity and try again. If this continues, ask your workspace manager for help." });
+    } finally { setSubmittingIds([]); }
+  }
 
   async function startTimerNow() {
     if (!taskId.trim()) {
@@ -166,11 +215,10 @@ export default function ActivityPage() {
     <>
       <AppPageShell>
         <AppPageHeader
-          eyebrow="Correct logged time"
           title="Activity"
-          description="Review timers and completed work by day. Use this page for corrections before approval, invoicing, analytics, or export."
+          description="Review your time, make corrections, and send completed work for approval."
           icon={LayoutList}
-          metadata={[
+          metadata={loading || loadError ? [] : [
             { label: "Log and review", tone: "cyan", icon: Clock3 },
             { label: `${groupedEntries.length} day${groupedEntries.length === 1 ? "" : "s"}`, tone: "slate", icon: CalendarDays },
           ]}
@@ -185,13 +233,22 @@ export default function ActivityPage() {
           )}
         />
 
-        <AppWorkflowRail current="review" />
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Activity filters">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-sm font-semibold text-slate-700">From date<input type="date" value={fromDate} onChange={(event) => { setFromDate(event.target.value); setPage(0); }} className="mt-1 h-11 w-full min-w-0 rounded-xl border border-slate-200 px-3 font-normal" /></label>
+            <label className="text-sm font-semibold text-slate-700">To date<input type="date" value={toDate} onChange={(event) => { setToDate(event.target.value); setPage(0); }} className="mt-1 h-11 w-full min-w-0 rounded-xl border border-slate-200 px-3 font-normal" /></label>
+            <label className="text-sm font-semibold text-slate-700">Status<select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }} className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal"><option value="">All statuses</option><option value="draft">Draft</option><option value="rejected">Sent back</option><option value="submitted">Submitted</option><option value="approved">Approved</option><option value="invoiced">Invoiced</option></select></label>
+            <div className="flex items-end"><button type="button" onClick={() => { setFromDate(""); setToDate(""); setStatusFilter(""); setPage(0); }} className="h-11 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600">Clear filters</button></div>
+          </div>
+        </section>
 
-        <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-sm">
+        <details className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-sm">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-700">Start a timer from Activity</summary>
+          {projectsError && <p className="mt-3 text-sm text-amber-800" role="alert">Could not load projects. <button type="button" onClick={() => void fetchProjects()} className="font-semibold underline">Retry projects</button></p>}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-950">Start live work</h2>
-              <p className="mt-1 text-sm text-slate-500">Capture new work now, then reconcile it in this activity trail.</p>
+              <p className="mt-1 text-sm text-slate-500">Start tracking a task. It will appear below.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(160px,1.2fr)_minmax(0,1.6fr)_auto]">
@@ -230,29 +287,28 @@ export default function ActivityPage() {
               {submittingStart ? "Starting..." : "Start timer"}
             </button>
           </div>
-        </section>
+        </details>
 
-        <section className="grid gap-4 sm:grid-cols-3">
-          <AppMetricCard label="Visible entries" value={entries.length} detail="Loaded from the current activity feed." accent="slate" icon={LayoutList} />
-          <AppMetricCard label="Completed without timer" value={manualCount} detail="Manual entries visible in this review set." accent="cyan" icon={Plus} />
-          <AppMetricCard
-            label="Total tracked"
-            value={<span className="font-mono">{formatDurationClock(visibleTotalSeconds)}</span>}
-            detail={runningCount > 0 ? `${runningCount} running` : "Completed duration in the current feed."}
-            accent={runningCount > 0 ? "emerald" : "cyan"}
-            icon={Clock3}
-          />
-        </section>
+        {!loading && !loadError && <section className="flex flex-wrap gap-x-6 gap-y-2 px-1 text-sm text-slate-600" aria-label="Activity summary">
+          <span><strong className="text-slate-900">{entries.length}</strong> of {total} matching entries</span>
+          <span><strong className="text-slate-900">{formatDurationCompact(visibleTotalSeconds)}</strong> completed on this page</span>
+          <span>{manualCount} manual{runningCount ? ` · ${runningCount} running` : ""}</span>
+        </section>}
 
-        {loading ? (
+        {loadError ? (
+          <section role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+            <p>{fromDate && toDate && toDate < fromDate ? "The end date must be on or after the start date." : "Could not load your activity. Check your connection and try again."}</p>
+            <button type="button" onClick={() => void fetchEntries()} disabled={loading} className="mt-3 font-semibold underline">{loading ? "Retrying..." : "Retry activity"}</button>
+          </section>
+        ) : loading ? (
           <section className="rounded-[32px] border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
             Loading activity...
           </section>
         ) : entries.length === 0 ? (
           <AppEmptyState
             icon={Clock3}
-            title="No time entries yet."
-            description="Start a timer or log completed work to build your activity trail before review and approval."
+            title={fromDate || toDate || statusFilter ? "No entries match these filters" : "No time entries yet"}
+            description={fromDate || toDate || statusFilter ? "Try a different date range or status, or clear the filters." : "Start a timer or log completed work to begin."}
             action={(
               <button
                 onClick={openManualLog}
@@ -265,6 +321,7 @@ export default function ActivityPage() {
           />
         ) : (
           <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
+            {eligibleEntries.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4"><p className="text-sm text-slate-600">{eligibleEntries.length} completed {eligibleEntries.length === 1 ? "entry is" : "entries are"} ready to submit on this page.</p><button type="button" disabled={submittingIds.length > 0} onClick={() => void submitForApproval(eligibleEntries.map((entry) => entry.id))} className="rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Submit page for approval</button></div>}
             <div className="divide-y divide-slate-100">
               {groupedEntries.map((group) => (
                 <section key={group.key}>
@@ -299,8 +356,8 @@ export default function ActivityPage() {
                           <div className="font-mono text-sm text-slate-500">{timeRange}</div>
                           <div className="font-mono text-sm font-bold text-slate-950">{formatDurationClock(entry.durationSeconds)}</div>
                           <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold capitalize ${statusPillClass(entry.status)}`}>{entry.status}</span>
-                            <span className="text-xs font-bold uppercase tracking-wide text-slate-400">{entry.source}</span>
+                            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold capitalize ${statusPillClass(entry.status)}`}>{entry.status === "draft" && entry.rejectionReason ? "Sent back" : entry.status}</span>
+                            <span className="text-xs font-semibold text-slate-400">{entry.source === "web" ? "Timer" : entry.source === "calendar" ? "Calendar" : "Manual"}</span>
                             {correctionLockReason(entry) ? (
                               <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-500" title={correctionLockReason(entry) ?? undefined}>
                                 <Lock className="h-3 w-3" />
@@ -317,6 +374,7 @@ export default function ActivityPage() {
                                 Correct
                               </button>
                             )}
+                            {entry.stoppedAt && entry.status === "draft" && <button type="button" disabled={submittingIds.length > 0} onClick={() => void submitForApproval([entry.id])} className="rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" aria-label={`Submit ${title} for approval`}>{submittingIds.includes(entry.id) ? "Submitting..." : entry.rejectionReason ? "Resubmit for approval" : "Submit for approval"}</button>}
                           </div>
                         </article>
                       );
@@ -325,8 +383,14 @@ export default function ActivityPage() {
                 </section>
               ))}
             </div>
+            <nav aria-label="Activity pages" className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-4 text-sm">
+              <button type="button" disabled={page === 0 || loading} onClick={() => setPage((value) => value - 1)} className="rounded-xl border border-slate-200 px-3 py-2 font-semibold disabled:opacity-40">Previous page</button>
+              <span className="text-center text-slate-500">Page {page + 1} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
+              <button type="button" disabled={!hasMore || loading} onClick={() => setPage((value) => value + 1)} className="rounded-xl border border-slate-200 px-3 py-2 font-semibold disabled:opacity-40">Next page</button>
+            </nav>
           </section>
         )}
+        <details className="rounded-2xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-semibold text-slate-700">More ways to work with your time</summary><div className="mt-3"><AppWorkflowRail current="log" /></div></details>
       </AppPageShell>
       <ManualTimeDialog
         open={manualOpen}

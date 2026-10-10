@@ -6,7 +6,7 @@ import { workspaces } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" || process.env.SOWLEDGER_TEST_DATABASE !== "true") {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
   

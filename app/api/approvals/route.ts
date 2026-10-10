@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { memberships, timeEntries, users, projects } from "@/lib/db/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, or, isNotNull } from "drizzle-orm";
+import { workflowErrorResponse } from "@/lib/workflow-validation";
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
     if (statusFilter === "pending") {
       condition = and(condition, eq(timeEntries.status, "submitted"))!;
     } else {
-      condition = and(condition, inArray(timeEntries.status, ["submitted", "approved", "invoiced"]))!;
+      condition = and(condition, or(inArray(timeEntries.status, ["submitted", "approved", "invoiced"]), and(eq(timeEntries.status, "draft"), isNotNull(timeEntries.rejectionReason))))!;
     }
 
     const pendingEntriesData = await db.select().from(timeEntries)
@@ -44,8 +45,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, entries: pendingEntries });
   } catch (error) {
-    const err = error as Record<string, unknown>;
-    const status = err.code === "FORBIDDEN" || err.status === 403 ? 403 : 401;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "Could not load approvals. Please try again.");
   }
 }

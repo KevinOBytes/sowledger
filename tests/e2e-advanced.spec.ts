@@ -12,7 +12,8 @@ const unique = () => Date.now().toString(36);
 test.describe('Deep Authenticated Workflows', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'sowledger-cookie-consent', value: 'false', url: 'http://localhost:3008' }]);
     const workspace = `advanced-${unique()}`;
     const res = await requestGetApp(page, `/api/test/login?plan=free&workspace=${workspace}&clean=true`);
     expect(res.ok()).toBeTruthy();
@@ -96,14 +97,14 @@ test.describe('Deep Authenticated Workflows', () => {
   test('Test 14: planner visualization renders', async ({ page }) => {
     await gotoApp(page, '/planner');
     await expect(page.getByRole('heading', { level: 1, name: 'Resource Planner' })).toBeVisible();
-    await expect(page.getByText('Total Backlog Output')).toBeVisible();
+    await expect(page.getByText('Estimated hours', { exact: true })).toBeVisible();
   });
 
   test('Test 15: analytics dashboard maps telemetry', async ({ page }) => {
     await gotoApp(page, '/reports');
-    await expect(page.getByRole('heading', { name: 'Work performance and billable output' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Analytics', exact: true })).toBeVisible();
     await expect(page.getByText('Logged hours', { exact: true })).toBeVisible();
-    await expect(page.getByText('Billable pipeline', { exact: true })).toBeVisible();
+    await expect(page.getByText('Logged time value', { exact: true })).toBeVisible();
   });
 
   test('Test 16: client route blocks member access', async ({ page }) => {
@@ -113,7 +114,7 @@ test.describe('Deep Authenticated Workflows', () => {
 
   test('Test 17: approvals pipeline renders for managers', async ({ page }) => {
     await gotoApp(page, '/approvals');
-    await expect(page.getByRole('heading', { level: 1, name: 'Timesheet Approvals' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible();
     await expect(page.getByText('All caught up!').or(page.getByText('Duration').first())).toBeVisible();
   });
 
@@ -121,13 +122,13 @@ test.describe('Deep Authenticated Workflows', () => {
     const login = await requestGetApp(page, '/api/test/login?plan=smb');
     expect(login.ok()).toBeTruthy();
     await gotoApp(page, '/invoices');
-    await expect(page.getByRole('heading', { name: 'Approved Billables Pipeline' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Approved billable time' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Invoicing is a Starter feature' })).not.toBeVisible();
   });
 
   test('Test 19: export center returns digest header', async ({ page }) => {
     await gotoApp(page, '/exports');
-    await expect(page.getByRole('heading', { name: 'Complete and filtered data exports' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Exports', exact: true })).toBeVisible();
     const response = await page.request.get('/api/export/csv?format=json');
     expect(response.ok()).toBeTruthy();
     expect(response.headers()['x-sowledger-export-sha256']).toBeTruthy();
@@ -135,7 +136,7 @@ test.describe('Deep Authenticated Workflows', () => {
 
   test('Test 20: developers page creates a scoped API key once', async ({ page }) => {
     await gotoApp(page, '/settings/developers');
-    await expect(page.getByRole('heading', { name: 'Agency integrations, API keys, usage, and docs' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Developers', exact: true })).toBeVisible();
     await expect(page.getByText('read:proof-packs')).toBeVisible();
     await expect(page.getByText('read:revenue-intelligence')).toBeVisible();
     await page.getByLabel('Name').fill(`E2E API Key ${unique()}`);
@@ -185,7 +186,7 @@ test.describe('Deep Authenticated Workflows', () => {
     expect(invalidAssigneeImport.status()).toBe(400);
 
     await gotoApp(page, '/integrations');
-    await expect(page.getByRole('heading', { name: 'Connect the systems around SOWLedger' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Integrations', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Slack alerts' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'QuickBooks Online' })).toBeVisible();
@@ -283,6 +284,9 @@ test.describe('Deep Authenticated Workflows', () => {
     expect(invoiceResponse.ok()).toBeTruthy();
     const invoice = (await invoiceResponse.json()).invoice;
 
+    const markSent = await page.request.patch(`/api/invoices/${invoice.id}`, { data: { status: 'sent' } });
+    expect(markSent.ok()).toBeTruthy();
+
     const unrelatedClientLogin = await requestGetApp(page, `/api/test/login?plan=smb&role=client&email=other-${workspace}%40example.com&workspace=${workspace}`);
     expect(unrelatedClientLogin.ok()).toBeTruthy();
     const unrelatedPortal = await page.request.get('/api/client');
@@ -290,7 +294,7 @@ test.describe('Deep Authenticated Workflows', () => {
     const unrelatedPortalBody = await unrelatedPortal.json();
     expect(unrelatedPortalBody.projects).toEqual([]);
     expect(unrelatedPortalBody.invoices).toEqual([]);
-    const unrelatedSignoff = await page.request.post('/api/client/signoff', { data: { invoiceId: invoice.id } });
+    const unrelatedSignoff = await page.request.post('/api/client/signoff', { data: { invoiceId: invoice.id, digest: '0'.repeat(64) } });
     expect(unrelatedSignoff.status()).toBe(404);
 
     const entitledClientLogin = await requestGetApp(page, `/api/test/login?plan=smb&role=client&email=client-${workspace}%40example.com&workspace=${workspace}`);
@@ -300,7 +304,10 @@ test.describe('Deep Authenticated Workflows', () => {
     const entitledPortalBody = await entitledPortal.json();
     expect(entitledPortalBody.projects.map((item: { id: string }) => item.id)).toContain(project.id);
     expect(entitledPortalBody.invoices.map((item: { id: string }) => item.id)).toContain(invoice.id);
-    const entitledSignoff = await page.request.post('/api/client/signoff', { data: { invoiceId: invoice.id } });
+    const review = await page.request.get(`/api/invoices/${invoice.id}/proof-pack`);
+    expect(review.ok()).toBeTruthy();
+    const reviewed = await review.json();
+    const entitledSignoff = await page.request.post('/api/client/signoff', { data: { invoiceId: invoice.id, digest: reviewed.digest } });
     expect(entitledSignoff.ok()).toBeTruthy();
   });
 
@@ -364,6 +371,8 @@ test.describe('Deep Authenticated Workflows', () => {
     });
     expect(mixedInvoiceResponse.ok()).toBeTruthy();
     const mixedInvoice = (await mixedInvoiceResponse.json()).invoice;
+    const markMixedSent = await page.request.patch(`/api/invoices/${mixedInvoice.id}`, { data: { status: 'sent' } });
+    expect(markMixedSent.ok()).toBeTruthy();
 
     const entitledClientLogin = await requestGetApp(page, `/api/test/login?plan=smb&role=client&email=client-${workspace}%40example.com&workspace=${workspace}`);
     expect(entitledClientLogin.ok()).toBeTruthy();
@@ -372,7 +381,7 @@ test.describe('Deep Authenticated Workflows', () => {
     const portalBody = await portal.json();
     expect(portalBody.invoices.map((item: { id: string }) => item.id)).not.toContain(mixedInvoice.id);
 
-    const signoff = await page.request.post('/api/client/signoff', { data: { invoiceId: mixedInvoice.id } });
+    const signoff = await page.request.post('/api/client/signoff', { data: { invoiceId: mixedInvoice.id, digest: '0'.repeat(64) } });
     expect(signoff.status()).toBe(404);
   });
 
@@ -438,7 +447,7 @@ test.describe('Deep Authenticated Workflows', () => {
     const ownerRelogin = await requestGetApp(page, `/api/test/login?plan=smb&role=owner&email=owner-${workspace}%40example.com&workspace=${workspace}`);
     expect(ownerRelogin.ok()).toBeTruthy();
     const draftInvoice = await page.request.post('/api/invoices', { data: { timeEntryIds: [entry.id] } });
-    expect(draftInvoice.status()).toBe(400);
+    expect(draftInvoice.status()).toBe(409);
 
     const approveResponse = await page.request.post('/api/timer/approve', { data: { entryId: entry.id } });
     expect(approveResponse.ok()).toBeTruthy();
@@ -452,7 +461,7 @@ test.describe('Deep Authenticated Workflows', () => {
     expect(validInvoice.ok()).toBeTruthy();
     expect((await validInvoice.json()).invoice.number).toMatch(/^INV-\d{8}-[A-F0-9]{8}$/);
     const duplicateInvoice = await page.request.post('/api/invoices', { data: { timeEntryIds: [entry.id] } });
-    expect(duplicateInvoice.status()).toBe(400);
+    expect(duplicateInvoice.status()).toBe(409);
 
     const patchInvoicedDescription = await page.request.patch('/api/v1/time-entries', {
       headers: { authorization: `Bearer ${rawKey}` },
@@ -468,7 +477,7 @@ test.describe('Deep Authenticated Workflows', () => {
       .set({ status: 'approved' })
       .where(and(eq(timeEntries.id, openEntry.id), eq(timeEntries.workspaceId, ownerData.workspaceId)));
     const openInvoice = await page.request.post('/api/invoices', { data: { timeEntryIds: [openEntry.id] } });
-    expect(openInvoice.status()).toBe(400);
+    expect(openInvoice.status()).toBe(409);
 
     const invalidRateEntryResponse = await page.request.post('/api/v1/time-entries', {
       headers: { authorization: `Bearer ${rawKey}` },
@@ -644,7 +653,7 @@ test.describe('Deep Authenticated Workflows', () => {
       data: { timeEntryIds: [entry.id], projectId: projectB.id },
     });
     expect(mismatchedInvoice.status()).toBe(400);
-    await expect(mismatchedInvoice.json()).resolves.toMatchObject({ error: expect.stringContaining('projectId') });
+    await expect(mismatchedInvoice.json()).resolves.toMatchObject({ error: expect.stringContaining('chosen project') });
 
     const storedEntry = await db
       .select({ projectId: timeEntries.projectId })

@@ -43,27 +43,27 @@ export async function checkWorkspaceLimits(
   const plan = await resolveWorkspacePlan(workspaceId);
   const planData = STRIPE_PLANS[plan.plan];
 
-  if (feature === "invoices" && !planData.features.includes("invoicing")) return { allowed: false, error: "Invoices require the Starter plan." };
-  if (feature === "webhooks" && !planData.features.includes("webhooks") && plan.plan !== "smb" && plan.plan !== "enterprise") return { allowed: false, error: "Webhooks require the Studio plan." };
+  if (feature === "invoices" && !planData.features.includes("invoicing")) return { allowed: false, error: "Invoicing is available on Starter and higher plans." };
+  if (feature === "webhooks" && !planData.features.includes("webhooks") && plan.plan !== "smb" && plan.plan !== "enterprise") return { allowed: false, error: "Webhooks are available on Studio and Business." };
 
   if (feature === "members") {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(memberships).where(eq(memberships.workspaceId, workspaceId));
     if (result.count >= planData.limits.members) {
-      return { allowed: false, error: `Member limit reached (${planData.limits.members}). Please upgrade your plan to invite more users.` };
+      return { allowed: false, error: `Your plan includes ${planData.limits.members} workspace member${planData.limits.members === 1 ? "" : "s"}. Choose a larger plan to invite more people.` };
     }
   }
 
   if (feature === "projects") {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(projects).where(eq(projects.workspaceId, workspaceId));
     if (result.count >= planData.limits.projects) {
-      return { allowed: false, error: `Project limit reached (${planData.limits.projects}). Please upgrade your plan to create more projects.` };
+      return { allowed: false, error: `Your plan includes ${planData.limits.projects} projects. Choose a larger plan to add more.` };
     }
   }
 
   if (feature === "goals") {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(goals).where(eq(goals.workspaceId, workspaceId));
     if (result.count >= planData.limits.goals) {
-      return { allowed: false, error: `Goal limit reached (${planData.limits.goals}). Please upgrade your plan to create more goals.` };
+      return { allowed: false, error: `Your plan includes ${planData.limits.goals} goal${planData.limits.goals === 1 ? "" : "s"}. Choose a larger plan to add more.` };
     }
   }
 
