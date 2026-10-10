@@ -39,6 +39,21 @@ test.describe("isolated time, approval and invoice regressions", () => {
     return entry;
   }
 
+  test("new work types preserve an explicit zero rate separately from no rate", async ({ page }) => {
+    await login(page, `zero-rate-${crypto.randomUUID()}`);
+    const zero = await page.request.post("/api/user/actions", { data: { name: "Complimentary review", hourlyRate: 0 } });
+    expect(zero.ok()).toBeTruthy();
+    expect((await zero.json()).action.hourlyRate).toBe(0);
+    const unset = await page.request.post("/api/user/actions", { data: { name: "Unrated research" } });
+    expect(unset.ok()).toBeTruthy();
+    expect((await unset.json()).action.hourlyRate).toBeNull();
+    const saved = await page.request.get("/api/user/actions");
+    expect((await saved.json()).actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "Complimentary review", hourlyRate: 0 }),
+      expect.objectContaining({ name: "Unrated research", hourlyRate: null }),
+    ]));
+  });
+
   test("invoice totals and reviewed line amounts use the same cent rounding", async ({ page }) => {
     const owner = await login(page, `rounding-${crypto.randomUUID()}`);
     const entry = await seedEntry(owner, { status: "approved", durationSeconds: 1800, hourlyRate: 99.99 });

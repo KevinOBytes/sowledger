@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimitIdentity } from "./lib/rate-limit-identity";
 const AUTH_COOKIE_NAME = "sowledger_session";
 const PUBLIC_PREFIXES = [
   "/login",
@@ -53,14 +54,6 @@ function addSecurityHeaders(response: NextResponse) {
   return response;
 }
 
-function clientIdentifier(req: NextRequest) {
-  const sessionPrefix = req.cookies.get(AUTH_COOKIE_NAME)?.value?.slice(0, 18);
-  if (sessionPrefix) return `session:${sessionPrefix}`;
-
-  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "anonymous";
-  return ip.split(",")[0].trim();
-}
-
 async function incrementWithUpstash(key: string, windowSeconds: number) {
   const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
@@ -94,7 +87,7 @@ async function rateLimit(req: NextRequest, pathname: string) {
   const rule = RATE_LIMIT_RULES.find((item) => item.matches(pathname));
   if (!rule) return null;
 
-  const key = `sowledger:${rule.name}:${clientIdentifier(req)}`;
+  const key = `sowledger:${rule.name}:${rateLimitIdentity(req.headers, req.cookies.get(AUTH_COOKIE_NAME)?.value)}`;
   let count: number;
   try {
     count = await incrementWithUpstash(key, rule.windowSeconds) ?? incrementInMemory(key, rule.windowSeconds);
@@ -124,7 +117,7 @@ export async function proxy(req: NextRequest) {
   const isPublicAudienceRoute = pathname === "/for" || pathname.startsWith("/for/");
 
   // Allow public paths without a session.
-  if (pathname === "/" || pathname === "/sitemap.xml" || isPublicAudienceRoute || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (["/", "/sitemap.xml", "/robots.txt", "/opengraph-image"].includes(pathname) || isPublicAudienceRoute || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return addSecurityHeaders(NextResponse.next());
   }
 

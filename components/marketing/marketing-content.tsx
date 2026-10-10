@@ -22,7 +22,7 @@ const INTEGRATIONS = [
 export function MarketingContent({ plans }: { plans: MarketingPlan[] }) {
   return (
     <>
-      <section id="proof-packs" className="px-4 py-20 sm:px-6 sm:py-24">
+      <section id="proof-packs" className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Invoicing</p>
@@ -38,7 +38,7 @@ export function MarketingContent({ plans }: { plans: MarketingPlan[] }) {
         </div>
       </section>
 
-      <section id="recovery" className="border-y border-border bg-surface px-4 py-20 sm:px-6 sm:py-24">
+      <section id="recovery" className="scroll-mt-20 border-y border-border bg-surface px-4 py-20 sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div className="rounded-2xl border border-border bg-background p-6 shadow-sm sm:p-8">
             <BarChart3 className="h-7 w-7 text-cyan-700" aria-hidden="true" />
@@ -63,7 +63,7 @@ export function MarketingContent({ plans }: { plans: MarketingPlan[] }) {
 
       <section className="bg-white px-4 py-20 sm:px-6 sm:py-24"><div className="mx-auto max-w-5xl"><RoiCalculator /></div></section>
 
-      <section id="signoff" className="px-4 py-20 sm:px-6 sm:py-24">
+      <section id="signoff" className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Client review</p>
@@ -82,7 +82,7 @@ export function MarketingContent({ plans }: { plans: MarketingPlan[] }) {
         </div>
       </section>
 
-      <section id="integrations" className="bg-slate-950 px-4 py-20 text-white sm:px-6 sm:py-24">
+      <section id="integrations" className="scroll-mt-20 bg-slate-950 px-4 py-20 text-white sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-300">Integrations</p>
@@ -107,24 +107,24 @@ export function MarketingContent({ plans }: { plans: MarketingPlan[] }) {
         </div>
       </section>
 
-      <section id="pricing" className="border-y border-border bg-surface px-4 py-20 sm:px-6 sm:py-24">
+      <section id="pricing" className="scroll-mt-20 border-y border-border bg-surface px-4 py-20 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-7xl">
           <div className="mb-10 max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Pricing</p>
             <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">One monthly price for your workspace.</h2>
-            <p className="mt-4 max-w-2xl text-lg text-slate-600">Start with free time tracking. Add invoicing, team approvals, and integrations as you need them. Each plan includes the people and projects listed below.</p>
+            <p className="mt-4 max-w-2xl text-lg text-slate-600">Every plan includes planning, timers, manual entries, analytics, exports, API keys, and time review. Upgrade for invoicing, webhooks, or more people and projects.</p>
           </div>
           <div className="overflow-hidden rounded-2xl border border-border bg-border">
             {plans.map((plan) => (
               <div key={plan.planId} data-testid="pricing-plan" className={`grid gap-5 border-b border-border p-5 last:border-b-0 lg:grid-cols-[13rem_1fr_11rem_9rem] lg:items-center ${plan.recommended ? "bg-cyan-50/70" : "bg-surface"}`}>
                 <div><h3 className="text-2xl font-semibold">{plan.name}</h3>{plan.recommended && <p className="mt-2 text-sm font-medium text-cyan-800">For small teams</p>}</div>
                 <div><p className="text-sm leading-6 text-slate-600">{plan.description}</p><ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">{plan.features.map((feature) => <li key={feature} className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-700" aria-hidden="true" />{feature}</li>)}</ul></div>
-                <div><span className="text-4xl font-semibold tracking-tight">${plan.price}</span><span className="text-sm font-semibold text-slate-500"> / month</span><p className="mt-1 text-xs text-slate-500">Per workspace · {plan.limits.members} {plan.limits.members === 1 ? "person" : "people"} · {plan.limits.projects} projects</p></div>
-                <Link href="/login" className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">{plan.price === 0 ? "Start free" : `Choose ${plan.name}`}</Link>
+                <div><span className="text-4xl font-semibold tracking-tight">${plan.price}</span><span className="text-sm font-semibold text-slate-600"> / month</span><p className="mt-1 text-xs text-slate-600">Per workspace · {plan.limits.members} {plan.limits.members === 1 ? "person" : "people"} · {plan.limits.projects} projects</p></div>
+                <Link href="/login" className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">Start free</Link>
               </div>
             ))}
           </div>
-          <p className="mt-5 text-sm text-slate-600">Prices are in USD. <Link href="/billing-policy" className="font-semibold text-cyan-800 underline underline-offset-4">Read the billing policy</Link> for subscription and cancellation details.</p>
+          <p className="mt-5 text-sm leading-6 text-slate-600">Create a free workspace, then choose a paid plan in Billing when you need it. Client access counts toward your workspace&apos;s member limit and uses the permissions you assign. Prices are in USD. <Link href="/billing-policy" className="font-semibold text-cyan-800 underline underline-offset-4">Read the billing policy</Link> for subscription and cancellation details.</p>
         </div>
       </section>
 

@@ -1,13 +1,13 @@
-import type { Metadata } from "next";
 import { ArrowRight, Layers3 } from "lucide-react";
 import Link from "next/link";
 import { industries } from "@/lib/content/industries";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 
-export const metadata: Metadata = {
-  title: "Built for service teams | SOWLedger",
-  description: "See how freelancers, agencies, and service teams use SOWLedger to plan work, track time, and prepare clear invoices.",
-  alternates: { canonical: "https://www.sowledger.com/for" },
-};
+export const metadata = publicPageMetadata(
+  "/for",
+  "Built for service teams | SOWLedger",
+  "See how freelancers, agencies, and service teams use SOWLedger to plan work, track time, and prepare clear invoices.",
+);
 
 export default function BuiltForPage() {
   return (

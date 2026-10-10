@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 import { ArrowRight, CreditCard, ReceiptText, ShieldCheck } from "lucide-react";
 
 const POLICIES = [
@@ -10,10 +11,11 @@ const POLICIES = [
   ["Checkout boundary", "SOWLedger checkout uses workspace plan selections. Do not send Stripe price IDs or payment data through support requests."],
 ];
 
-export const metadata = {
-  title: "Billing Policy - SOWLedger",
-  description: "SOWLedger billing and refund policy for flat workspace pricing, plan changes, cancellations, receipts, taxes, and checkout boundaries.",
-};
+export const metadata = publicPageMetadata(
+  "/billing-policy",
+  "Billing Policy - SOWLedger",
+  "SOWLedger billing and refund policy for flat workspace pricing, plan changes, cancellations, receipts, taxes, and checkout boundaries.",
+);
 
 export default function BillingPolicyPage() {
   return (

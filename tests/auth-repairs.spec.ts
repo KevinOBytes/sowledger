@@ -41,6 +41,22 @@ test("equal email names on different domains create separate workspaces", async 
   expect(wrongMembership).toHaveLength(0);
 });
 
+test("session authentication rejects alternate MAC encodings that would select another rate bucket", async ({ page, context }) => {
+  const suffix = randomUUID();
+  const response = await page.request.get(`/api/test/login?workspace=token-grammar-${suffix}&email=token-${suffix}@example.com`);
+  expect(response.ok()).toBeTruthy();
+  const cookie = (await context.cookies()).find((item) => item.name === "sowledger_session");
+  expect(cookie).toBeDefined();
+  const [raw, mac] = cookie!.value.split(".");
+  expect((await page.request.get("/api/auth/me")).status()).toBe(200);
+  for (const value of [`${raw}.${mac.toUpperCase()}`, `${cookie!.value}.extra`, `${cookie!.value}not-hex`]) {
+    await context.addCookies([{ ...cookie!, value }]);
+    expect((await page.request.get("/api/auth/me")).status()).toBe(401);
+  }
+  await context.addCookies([cookie!]);
+  expect((await page.request.get("/api/auth/me")).status()).toBe(200);
+});
+
 test("a pending invitation is reachable for an existing account and keeps its client role", async () => {
   const email = `invited-${randomUUID()}@example.com`;
   const original = await consumeMagicLink(await createMagicLink(email));
