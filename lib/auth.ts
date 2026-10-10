@@ -4,16 +4,12 @@ import { env } from "./env";
 import { isAdminEmail } from "./admin";
 import {
   createInvitation,
-  ensureMembership,
-  ensureUser,
-  ensureWorkspace,
-  findPendingInvitation,
   getMembership,
   type WorkspaceRole,
 } from "./store";
 import { db } from "./db";
 import { users, memberships, workspaces, magicLinks, invitations } from "./db/schema";
-import { desc, eq, and, gt, isNull } from "drizzle-orm";
+import { asc, desc, eq, and, gt, isNull } from "drizzle-orm";
 
 export class UnauthorizedError extends Error {
   readonly status = 401;
@@ -69,8 +65,15 @@ async function decode(token: string): Promise<SessionPayload> {
     throw new UnauthorizedError("Invalid token signature");
   }
 
-  const payload = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as SessionPayload;
-  if (payload.exp < Date.now()) throw new UnauthorizedError("Expired token");
+  let payload: SessionPayload;
+  try {
+    payload = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as SessionPayload;
+  } catch {
+    throw new UnauthorizedError("Please sign in again.");
+  }
+  if (!payload.sub || !payload.workspaceId || !payload.email || !Number.isFinite(payload.exp) || payload.exp < Date.now()) {
+    throw new UnauthorizedError("Please sign in again.");
+  }
 
   let membership = await getMembership(payload.sub, payload.workspaceId);
   if (!membership) throw new UnauthorizedError("Membership revoked");
@@ -98,7 +101,7 @@ async function repairSetupRole(email: string, membership: typeof memberships.$in
     return await updateMembershipRole(membership.userId, membership.workspaceId, "owner") ?? membership;
   }
 
-  if (roleWeights[membership.role as WorkspaceRole] >= roleWeights.manager || !env.ALLOW_BOOTSTRAP_OWNER) {
+  if (membership.role === "client" || roleWeights[membership.role as WorkspaceRole] >= roleWeights.manager || !env.ALLOW_BOOTSTRAP_OWNER) {
     return membership;
   }
 
@@ -115,30 +118,20 @@ function hashMagic(tokenSecret: string) {
   return createHash("sha256").update(`${tokenSecret}:${secret()}`).digest("hex");
 }
 
-function generatedWorkspaceSlug(email: string) {
-  return `${email.split("@")[0].replace(/[^a-z0-9-]/g, "")}-workspace`;
-}
-
-async function memberCount(workspaceId: string) {
-  return (await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.workspaceId, workspaceId))).length;
+export function generatedWorkspaceSlug(email: string) {
+  const normalized = email.trim().toLowerCase();
+  const label = normalized.split("@")[0].replace(/[^a-z0-9-]/g, "").slice(0, 48) || "personal";
+  // Include the complete address in the identity. alex@one.example and
+  // alex@two.example must never be enrolled into the same workspace.
+  const identity = createHash("sha256").update(normalized).digest("hex").slice(0, 24);
+  return `${label}-${identity}-workspace`;
 }
 
 async function resolveMagicLinkWorkspace(email: string) {
   const normEmail = email.trim().toLowerCase();
 
-  // Find their existing workspace if they have one
-  const [userResult] = await db.select().from(users).where(eq(users.email, normEmail));
-
-  if (userResult) {
-    const mems = await db.select().from(memberships).where(eq(memberships.userId, userResult.id));
-    if (mems.length > 0) {
-       const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, mems[0].workspaceId));
-       if (ws) return { email: normEmail, workspaceSlug: ws.slug, reason: "existing_member" as const, workspace: ws };
-    }
-  }
-
-  // Invited users may not have an account yet, so resolve their magic link
-  // into the inviting workspace instead of creating a personal workspace slug.
+  // A new invitation must remain reachable for people who already belong
+  // to another workspace. Membership is validated again when the link is used.
   const [pendingInvite] = await db
     .select({ workspaceSlug: workspaces.slug, workspaceId: workspaces.id, workspaceName: workspaces.name })
     .from(invitations)
@@ -153,6 +146,18 @@ async function resolveMagicLinkWorkspace(email: string) {
       reason: "pending_invite" as const,
       workspace: { id: pendingInvite.workspaceId, slug: pendingInvite.workspaceSlug, name: pendingInvite.workspaceName },
     };
+  }
+
+  const [existing] = await db
+    .select({ workspace: workspaces })
+    .from(users)
+    .innerJoin(memberships, eq(memberships.userId, users.id))
+    .innerJoin(workspaces, eq(workspaces.id, memberships.workspaceId))
+    .where(eq(users.email, normEmail))
+    .orderBy(asc(workspaces.createdAt), asc(workspaces.id))
+    .limit(1);
+  if (existing) {
+    return { email: normEmail, workspaceSlug: existing.workspace.slug, reason: "existing_member" as const, workspace: existing.workspace };
   }
 
   // If no existing workspace, dynamically generate one
@@ -172,24 +177,15 @@ export async function checkMagicLinkEligibility(email: string) {
     return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
   }
 
-  if (env.ALLOW_SELF_REGISTRATION) {
+  if (env.ALLOW_SELF_REGISTRATION || env.ALLOW_BOOTSTRAP_OWNER) {
     return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
-  }
-
-  if (env.ALLOW_BOOTSTRAP_OWNER) {
-    if (!resolved.workspace) {
-      return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
-    }
-    if (await memberCount(resolved.workspace.id) === 0) {
-      return { eligible: true as const, email: resolved.email, workspaceSlug: resolved.workspaceSlug };
-    }
   }
 
   return {
     eligible: false as const,
     email: resolved.email,
     workspaceSlug: resolved.workspaceSlug,
-    error: "This SOWLedger workspace is invite-only. Ask a workspace owner or manager to invite this email before requesting a sign-in link.",
+    error: "Sign-up is invite-only. Ask your workspace owner to invite this email address, then try again.",
   };
 }
 
@@ -226,60 +222,72 @@ export async function inviteUser(input: { email: string; workspaceId: string; ro
 }
 
 export async function consumeMagicLink(token: string) {
-  const parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as { tid: string; sec: string };
-  const [record] = await db.select().from(magicLinks).where(eq(magicLinks.tokenId, parsed.tid));
-  
-  if (!record) throw new Error("Magic link not found");
-  if (record.usedAt) throw new Error("Magic link already used");
-  if (record.expiresAt < Date.now()) throw new Error("Magic link expired");
-
-  const computed = hashMagic(parsed.sec);
-  const hashBuf = Buffer.from(record.tokenHash, "hex");
-  const computedBuf = Buffer.from(computed, "hex");
-  if (hashBuf.length !== computedBuf.length || !timingSafeEqual(hashBuf, computedBuf)) {
-    throw new UnauthorizedError("Magic link validation failed");
+  let parsed: { tid: string; sec: string };
+  try {
+    parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
+    if (typeof parsed.tid !== "string" || typeof parsed.sec !== "string") throw new Error();
+  } catch {
+    throw new UnauthorizedError("This sign-in link is invalid. Request a new one.");
   }
 
-  await db.update(magicLinks).set({ usedAt: Date.now() }).where(eq(magicLinks.tokenId, record.tokenId));
-
-  const user = await ensureUser(record.email);
-  const workspace = await ensureWorkspace(record.workspaceSlug);
-
-  const existingMembership = await getMembership(user.id, workspace.id);
-  if (existingMembership) {
-    const invite = await findPendingInvitation(user.email, workspace.id);
-    if (invite && roleWeights[invite.role as WorkspaceRole] > roleWeights[existingMembership.role as WorkspaceRole]) {
-      await db.update(invitations).set({ acceptedAt: Date.now() }).where(eq(invitations.id, invite.id));
-      return { user, workspace, membership: await updateMembershipRole(user.id, workspace.id, invite.role as WorkspaceRole) ?? existingMembership };
+  return db.transaction(async (tx) => {
+    const [record] = await tx.select().from(magicLinks).where(eq(magicLinks.tokenId, parsed.tid)).for("update");
+    if (!record || record.expiresAt < Date.now()) throw new UnauthorizedError("This sign-in link has expired. Request a new one.");
+    if (record.usedAt) throw new UnauthorizedError("This sign-in link has already been used. Request a new one.");
+    const hashBuf = Buffer.from(record.tokenHash, "hex");
+    const computedBuf = Buffer.from(hashMagic(parsed.sec), "hex");
+    if (hashBuf.length !== computedBuf.length || !timingSafeEqual(hashBuf, computedBuf)) {
+      throw new UnauthorizedError("This sign-in link is invalid. Request a new one.");
     }
-    return { user, workspace, membership: await repairSetupRole(user.email, existingMembership) };
-  }
 
-  // Internal site-admin domains always get owner role on first join.
-  if (isAdminEmail(user.email)) {
-    const adminMembership = await ensureMembership(user.id, workspace.id, "owner");
-    return { user, workspace, membership: adminMembership };
-  }
+    await tx.insert(users).values({ id: crypto.randomUUID(), email: record.email }).onConflictDoNothing({ target: users.email });
+    const [user] = await tx.select().from(users).where(eq(users.email, record.email));
+    if (!user) throw new Error("Account setup did not complete");
 
-  const hasAnyMember = (await db.select().from(memberships).where(eq(memberships.workspaceId, workspace.id))).length > 0;
-  if (!hasAnyMember && env.ALLOW_BOOTSTRAP_OWNER) {
-    const bootstrap = await ensureMembership(user.id, workspace.id, "owner");
-    return { user, workspace, membership: bootstrap };
-  }
+    let [workspace] = await tx.select().from(workspaces).where(eq(workspaces.slug, record.workspaceSlug)).for("update");
+    const ownsGeneratedSlug = record.workspaceSlug === generatedWorkspaceSlug(record.email);
+    const canCreate = env.ALLOW_SELF_REGISTRATION || env.ALLOW_BOOTSTRAP_OWNER || isAdminEmail(record.email);
+    if (!workspace) {
+      if (!ownsGeneratedSlug || !canCreate) throw new ForbiddenError("This invitation is no longer available. Ask the workspace owner for a new invitation.");
+      await tx.insert(workspaces).values({ id: crypto.randomUUID(), slug: record.workspaceSlug, name: "My workspace", baseCurrency: "USD" }).onConflictDoNothing({ target: workspaces.slug });
+      [workspace] = await tx.select().from(workspaces).where(eq(workspaces.slug, record.workspaceSlug)).for("update");
+    }
+    if (!workspace) throw new Error("Workspace setup did not complete");
 
-  if (env.ALLOW_SELF_REGISTRATION) {
-    const member = await ensureMembership(user.id, workspace.id, "member");
-    return { user, workspace, membership: member };
-  }
+    const [existing] = await tx.select().from(memberships).where(and(eq(memberships.userId, user.id), eq(memberships.workspaceId, workspace.id))).for("update");
+    const [invite] = await tx.select().from(invitations).where(and(
+      eq(invitations.email, user.email), eq(invitations.workspaceId, workspace.id),
+      gt(invitations.expiresAt, Date.now()), isNull(invitations.acceptedAt),
+    )).orderBy(desc(invitations.expiresAt)).limit(1).for("update");
 
-  const invite = await findPendingInvitation(user.email, workspace.id);
-  if (!invite) {
-    throw new Error("Registration disabled: user must be invited by workspace manager/owner.");
-  }
-
-  await db.update(invitations).set({ acceptedAt: Date.now() }).where(eq(invitations.id, invite.id));
-  const membership = await ensureMembership(user.id, workspace.id, invite.role as WorkspaceRole);
-  return { user, workspace, membership };
+    let role: WorkspaceRole;
+    if (existing) {
+      role = existing.role;
+      if (invite && roleWeights[invite.role] > roleWeights[role]) role = invite.role;
+    } else if (invite) {
+      // Invitation roles take precedence over open sign-up.
+      role = invite.role;
+    } else {
+      const [anyMember] = await tx.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.workspaceId, workspace.id)).limit(1);
+      if (!ownsGeneratedSlug || !canCreate || anyMember) {
+        throw new ForbiddenError("You need an invitation to join this workspace.");
+      }
+      role = "owner";
+    }
+    if (isAdminEmail(user.email)) role = "owner";
+    // Ordinary sign-in must not write back a stale role over a manager's change.
+    let membership = existing;
+    if (!membership) {
+      [membership] = await tx.insert(memberships).values({ userId: user.id, workspaceId: workspace.id, role }).returning();
+    } else if (membership.role !== role) {
+      [membership] = await tx.update(memberships).set({ role })
+        .where(and(eq(memberships.userId, user.id), eq(memberships.workspaceId, workspace.id))).returning();
+    }
+    if (invite) await tx.update(invitations).set({ acceptedAt: Date.now() }).where(eq(invitations.id, invite.id));
+    // Claim the link atomically with setup: a failed transaction leaves it usable.
+    await tx.update(magicLinks).set({ usedAt: Date.now() }).where(eq(magicLinks.tokenId, record.tokenId));
+    return { user, workspace, membership };
+  });
 }
 
 export async function createSessionToken(payload: { sub: string; email: string; workspaceId: string; role: WorkspaceRole }) {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Building2, Check, CreditCard, ShieldCheck, Sparkles, Users, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { DataLoadNotice } from "@/components/data-load-notice";
 
 type Plan = {
   planId: "free" | "pro" | "smb" | "enterprise";
@@ -117,7 +118,7 @@ export default function BillingPage() {
     );
   }
 
-  if (!data || !usage) return <div className="min-h-screen bg-[#f6f3ee] p-8 text-slate-950">Error loading billing</div>;
+  if (!data || !usage) return <main className="min-h-screen bg-[#f6f3ee] p-8 text-slate-950"><h1 className="mb-5 text-3xl font-semibold">Billing</h1><DataLoadNotice message="We couldn't load your plan or subscription details." /></main>;
 
   return (
     <main className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
@@ -126,8 +127,8 @@ export default function BillingPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Billing</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Plans and subscription</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Flat workspace pricing keeps the first paid step easy to approve. Stripe checkout follows the selected SOWLedger plan, so customers never handle Stripe price IDs.</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Billing</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Check your plan, see how many people and projects it includes, or manage your subscription through Stripe.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {data.planSource === "internal" && (
@@ -143,7 +144,7 @@ export default function BillingPage() {
           </div>
           {checkoutNotice && (
             <div className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${checkoutNotice === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-              {checkoutNotice === "success" ? "Stripe checkout returned to billing. Your plan updates after Stripe confirms the subscription." : "Checkout was canceled. You can choose a plan again when you are ready."}
+              {checkoutNotice === "success" ? "You have returned from checkout. Your plan will update once Stripe confirms the subscription." : "Checkout was canceled. You can choose a plan again when you are ready."}
             </div>
           )}
         </header>
@@ -155,7 +156,7 @@ export default function BillingPage() {
             {data.limits.members <= 1000 && <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-600" style={{ width: `${usage.memberPercent}%` }} /></div>}
           </div>
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3 text-slate-500"><CreditCard className="h-5 w-5 text-cyan-700" /><span className="text-sm font-bold uppercase tracking-wide">Active projects</span></div>
+            <div className="flex items-center gap-3 text-slate-500"><CreditCard className="h-5 w-5 text-cyan-700" /><span className="text-sm font-bold uppercase tracking-wide">Projects</span></div>
             <div className="mt-4 flex items-end justify-between"><span className="text-4xl font-semibold">{data.usage.projects}</span><span className="text-sm font-semibold text-slate-500">/ {limitLabel(data.limits.projects)}</span></div>
             {data.limits.projects <= 1000 && <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${usage.projectPercent}%` }} /></div>}
           </div>
@@ -179,12 +180,12 @@ export default function BillingPage() {
                 <ul className={`flex-1 space-y-3 text-sm ${current ? "text-slate-200" : "text-slate-600"}`}>
                   <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{limitLabel(plan.limits.members)} member{plan.limits.members === 1 ? "" : "s"}</li>
                   <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{limitLabel(plan.limits.projects)} projects</li>
-                  <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{plan.features.includes("schedule") ? "Planning calendar" : "Core timers"}</li>
-                  <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{plan.features.includes("api") ? "API keys and webhooks" : plan.features.includes("exports") ? "CSV and JSON exports" : "Manual logging"}</li>
+                  <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{plan.features.includes("schedule") ? "Planning calendar" : "Live timers"}</li>
+                  <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{plan.features.includes("api") ? "API keys and webhooks" : plan.features.includes("exports") ? "CSV and JSON exports" : "Manual time entries"}</li>
                 </ul>
                 {canUpgrade && (
                   <button onClick={() => handleUpgrade(plan.planId)} disabled={processing !== null || !plan.configured} className="mt-7 w-full rounded-2xl bg-cyan-600 py-3 text-sm font-bold text-white transition hover:bg-cyan-500 disabled:opacity-50">
-                    {processing === plan.planId ? "Redirecting..." : plan.configured ? `Move to ${plan.name}` : "Price not configured"}
+                    {processing === plan.planId ? "Redirecting..." : plan.configured ? `Move to ${plan.name}` : "Contact support to upgrade"}
                   </button>
                 )}
               </article>

@@ -1,15 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Workflow } from "lucide-react";
-import Image from "next/image";
+import { ArrowRight, FileText, Workflow } from "lucide-react";
 import Link from "next/link";
 
-const PROOF_ROWS = [
-  { label: "Invoice record", value: "Issued invoices, totals, client, project, and status" },
-  { label: "Work basis", value: "Planned vs actual hours with timer, manual, and calendar source mix" },
-  { label: "Approval trail", value: "Sign-off state, audit events, and client-facing context" },
-  { label: "Integrity", value: "CSV/JSON exports with x-sowledger-export-sha256 digest headers" },
+const EXAMPLE_ENTRIES = [
+  { work: "Discovery call", time: "45m", amount: "$90" },
+  { work: "Website updates", time: "2h 30m", amount: "$300" },
+  { work: "Review changes", time: "1h", amount: "$120" },
 ];
 
 interface HeroSectionProps {
@@ -20,10 +18,10 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({
-  label = "Proof-backed billing for agencies and service teams",
+  label = "Time tracking and invoicing for client work",
   headline,
   subhead,
-  primaryCtaLabel = "Start recovering time",
+  primaryCtaLabel = "Start free",
 }: HeroSectionProps) {
   return (
     <div className="grid gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
@@ -49,7 +47,7 @@ export function HeroSection({
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link href="#proof-packs" className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface px-7 py-4 text-base font-bold text-slate-800 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">
-            See invoice proof
+            See how invoicing works
           </Link>
         </div>
       </motion.div>
@@ -60,22 +58,36 @@ export function HeroSection({
         transition={{ duration: 0.5, delay: 0.08 }}
         className="overflow-hidden rounded-2xl border border-border bg-surface shadow-xl shadow-stone-900/10"
       >
-        <Image
-          src="/images/marketing/invoice-proof-pack.png"
-          alt="SOWLedger invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours."
-          width={1152}
-          height={1000}
-          priority
-          sizes="(min-width: 1024px) 52vw, 100vw"
-          className="aspect-[1.2/1] w-full object-cover object-top"
-        />
-        <figcaption className="grid gap-px border-t border-border bg-border text-sm sm:grid-cols-4">
-          {PROOF_ROWS.map((row) => (
-            <div key={row.label} className="bg-surface px-4 py-3">
-              <p className="font-bold text-slate-950">{row.label}</p>
-              <p className="mt-1 leading-5 text-slate-600">{row.value}</p>
+        <div className="p-6 sm:p-8">
+          <div className="flex items-center justify-between gap-4 border-b border-border pb-6">
+            <div>
+              <p className="text-sm font-semibold text-cyan-800">Example invoice</p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-950">Website refresh</h2>
             </div>
-          ))}
+            <FileText className="h-8 w-8 text-cyan-700" aria-hidden="true" />
+          </div>
+          <table className="mt-5 w-full text-left text-sm">
+            <thead className="text-slate-500">
+              <tr><th className="pb-3 font-medium">Work</th><th className="pb-3 pr-4 text-right font-medium">Time</th><th className="pb-3 text-right font-medium">Amount</th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {EXAMPLE_ENTRIES.map((entry) => (
+                <tr key={entry.work}>
+                  <td className="py-5 pr-3 font-medium text-slate-800">{entry.work}</td>
+                  <td className="whitespace-nowrap py-5 pr-4 text-right text-slate-600">{entry.time}</td>
+                  <td className="py-5 text-right font-semibold text-slate-900">{entry.amount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="mt-4 flex items-end justify-between gap-4 rounded-xl bg-cyan-50 p-5">
+            <div><p className="font-semibold text-slate-900">4h 15m of work</p><p className="mt-1 text-sm text-slate-600">Billed at $120 per hour</p></div>
+            <p className="text-3xl font-semibold tracking-tight text-slate-950">$510</p>
+          </div>
+          <p className="mt-5 text-sm leading-6 text-slate-600">An invoice with the time and work details behind the total.</p>
+        </div>
+        <figcaption className="border-t border-border px-6 py-3 text-xs text-slate-500 sm:px-8">
+          Illustrative example, not customer data or an app screenshot.
         </figcaption>
       </motion.figure>
     </div>

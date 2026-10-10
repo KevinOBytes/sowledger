@@ -1,48 +1,46 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { ArrowRight, BarChart3, FileCheck2, ShieldCheck, TimerReset, Webhook } from "lucide-react";
 import { HeroSection } from "@/components/marketing/hero-section";
 import { WorkflowSection } from "@/components/marketing/workflow-section";
 import { MarketingContent } from "@/components/marketing/marketing-content";
+import { marketingPlans } from "@/lib/content/marketing-plans";
 
 const CAPABILITIES = [
   {
-    title: "Invoice Proof Packs",
-    shortTitle: "Proof packs",
-    description: "Source mix, planned vs actual work, approvals, issued invoices, and digest evidence travel together.",
-    metric: "SHA-256",
+    title: "Invoices",
+    shortTitle: "Invoices",
+    description: "Keep the hours, rates, and work details behind each invoice together.",
+    metric: "Bill",
     icon: FileCheck2,
     href: "#proof-packs",
   },
   {
-    title: "Retainer Leak Radar",
-    shortTitle: "Leak radar",
-    description: "Budget pressure, approved unbilled time, and missing rates surface before the retainer meeting.",
-    metric: "Risk queue",
+    title: "Project analytics",
+    shortTitle: "Analytics",
+    description: "See how actual time compares with the work you planned.",
+    metric: "Review",
     icon: BarChart3,
     href: "#recovery",
   },
   {
-    title: "Client Sign-Off Portal",
-    shortTitle: "Sign-off",
-    description: "Clients approve focused proof packets without seeing team planning, timers, or workspace settings.",
-    metric: "Approve",
+    title: "Client review",
+    shortTitle: "Client review",
+    description: "Give clients a place to review their project work and record approval.",
+    metric: "Share",
     icon: ShieldCheck,
     href: "#signoff",
   },
   {
-    title: "Missing Billable Recovery",
-    shortTitle: "Recovery",
-    description: "Scheduled work without completed time, stale drafts, and manual gaps become a recovery queue.",
-    metric: "Gap queue",
+    title: "Time tracking",
+    shortTitle: "Time tracking",
+    description: "Use timers, manual entries, or completed calendar blocks to log your work.",
+    metric: "Track",
     icon: TimerReset,
-    href: "#recovery",
+    href: "#workflow",
   },
   {
-    title: "Developer/Agency Integration Layer",
+    title: "Integrations",
     shortTitle: "Integrations",
-    description: "Scoped keys, exports, proof endpoints, revenue intelligence, and webhooks sync billing evidence.",
+    description: "Connect your work records to other tools with exports, API access, and webhooks.",
     metric: "API",
     icon: Webhook,
     href: "#integrations",
@@ -57,14 +55,11 @@ export default function MarketingPage() {
         <div className="relative mx-auto grid min-h-[calc(100vh-64px)] max-w-7xl grid-rows-[1fr_auto] gap-8">
           
           <HeroSection 
-            headline="Recover revenue. Prove every invoice."
-            subhead="SOWLedger connects planning, timers, manual work, calendar logs, analytics, invoices, exports, sign-off, and APIs into one defensible billing system."
+            headline="Your work, your time, your invoices. Together."
+            subhead="Plan the day, track what you do, and turn approved time into invoices your clients can understand. One place for the work and the details behind the bill."
           />
 
-          <motion.nav
-            initial={{ y: 18, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.16 }}
+          <nav
             className="grid overflow-hidden rounded-2xl border border-border bg-border shadow-sm md:grid-cols-5"
             aria-label="SOWLedger capability navigation"
           >
@@ -82,16 +77,16 @@ export default function MarketingPage() {
                 </a>
               );
             })}
-          </motion.nav>
+          </nav>
         </div>
       </section>
 
       <WorkflowSection 
-        headline="The work path ends in proof, not a timesheet dump."
-        subhead="Plan work, capture what happened, find leakage, approve the record, then export or integrate the evidence clients need to trust the bill."
+        headline="From the first task to the final invoice."
+        subhead="Keep planning, time tracking, and billing in the same place, so you can review the work without piecing together a week of notes."
       />
 
-      <MarketingContent />
+      <MarketingContent plans={marketingPlans} />
 
     </div>
   );

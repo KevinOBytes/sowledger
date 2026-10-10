@@ -13,52 +13,52 @@ async function expectNoHorizontalOverflow(page: import('@playwright/test').Page)
 }
 
 const internalAppRoutes = [
-  { path: '/dashboard', heading: 'Today’s command center' },
+  { path: '/dashboard', heading: 'Your time today' },
   { path: '/activity', heading: 'Activity' },
-  { path: '/reports', heading: 'Work performance and billable output' },
-  { path: '/exports', heading: 'Complete and filtered data exports' },
-  { path: '/integrations', heading: 'Connect the systems around SOWLedger' },
-  { path: '/settings/developers', heading: 'Agency integrations, API keys, usage, and docs' },
+  { path: '/reports', heading: 'Analytics' },
+  { path: '/exports', heading: 'Exports' },
+  { path: '/integrations', heading: 'Integrations' },
+  { path: '/settings/developers', heading: 'Developers' },
 ];
 
 test.describe('Mobile Web Support', () => {
   test.setTimeout(60_000);
+  test.beforeEach(async ({ context }) => {
+    await context.addCookies([{ name: 'sowledger-cookie-consent', value: 'false', url: 'http://localhost:3008' }]);
+  });
 
   test('iPhone viewport supports public pages, auth, and core bottom navigation', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoApp(page, '/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Recover revenue. Prove every invoice.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Your work, your time, your invoices. Together.' })).toBeVisible();
     await expect(page.getByLabel('SOWLedger capability navigation')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Invoice Proof Packs', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Retainer Leak Radar', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Client Sign-Off Portal', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Missing Billable Recovery', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Developer/Agency Integration Layer', exact: true })).toBeVisible();
-    await expect(page.getByRole('img', { name: /SOWLedger invoice proof pack screenshot/i }).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Open marketing menu' }).click();
+    await expect(page.getByRole('navigation', { name: 'Mobile marketing navigation' }).getByRole('link', { name: 'Built for', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Close marketing menu' }).click();
     await expectNoHorizontalOverflow(page);
 
     await gotoApp(page, '/support');
-    await expect(page.getByRole('heading', { level: 1, name: 'Get help moving work into invoice proof.' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Open API guide/i })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'How can we help?' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Read API docs', exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await gotoApp(page, '/support/api');
-    await expect(page.getByRole('heading', { level: 1, name: 'Build on SOWLedger.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Connect your work records.' })).toBeVisible();
     await expect(page.getByRole('link', { name: /Support home/i })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await gotoApp(page, '/security');
-    await expect(page.getByRole('heading', { level: 1, name: 'Security posture for proof-backed billing.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'How access and data are handled.' })).toBeVisible();
     await expect(page.getByRole('link', { name: /Contact security/i })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await gotoApp(page, '/contact');
-    await expect(page.getByRole('heading', { level: 1, name: 'Contact SOWLedger with the right context.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Get in touch.' })).toBeVisible();
     await expect(page.getByRole('link', { name: /support@sowledger\.com/i })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await gotoApp(page, '/privacy');
-    await expect(page.getByRole('heading', { level: 1, name: 'Privacy notice' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Privacy policy' })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await gotoApp(page, '/terms');

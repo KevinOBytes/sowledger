@@ -20,6 +20,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DataLoadNotice } from "@/components/data-load-notice";
 
 import { AppEmptyState, AppMetricCard, AppPageHeader, AppPageShell, AppWorkflowRail } from "@/components/app-page-shell";
 
@@ -54,21 +55,21 @@ type IntegrationsResponse = {
 const PROVIDER_META: Record<Provider, { title: string; subtitle: string; icon: typeof Plug; authPath: string; readinessKey: keyof NonNullable<IntegrationsResponse["readiness"]> }> = {
   google_calendar: {
     title: "Google Calendar",
-    subtitle: "Two-way planning sync: SOWLedger scheduled blocks out, external busy time in.",
+    subtitle: "Show planned work in Google Calendar and bring busy events into SOWLedger.",
     icon: CalendarDays,
     authPath: "/api/integrations/google-calendar/oauth/start",
     readinessKey: "googleCalendarOAuth",
   },
   slack: {
     title: "Slack alerts",
-    subtitle: "Send reminders, missed-block recovery prompts, timer notices, and invoice updates.",
+    subtitle: "Send work reminders, timer notices, and invoice updates to a Slack channel.",
     icon: MessageSquare,
     authPath: "/api/integrations/slack/oauth/start",
     readinessKey: "slackOAuth",
   },
   quickbooks: {
     title: "QuickBooks Online",
-    subtitle: "Push approved SOWLedger invoices with proof-pack digest metadata into accounting.",
+    subtitle: "Send SOWLedger invoices to a connected QuickBooks account.",
     icon: Receipt,
     authPath: "/api/integrations/quickbooks/oauth/start",
     readinessKey: "quickBooksOAuth",
@@ -107,6 +108,7 @@ export function IntegrationCenterClient() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [readiness, setReadiness] = useState<NonNullable<IntegrationsResponse["readiness"]> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
   const [slackChannelLabel, setSlackChannelLabel] = useState("");
@@ -129,6 +131,7 @@ export function IntegrationCenterClient() {
       const nextConnections = data.connections ?? [];
       setConnections(nextConnections);
       setReadiness(data.readiness ?? null);
+      setLoadError(false);
       const quickBooks = nextConnections.find((connection) => connection.provider === "quickbooks");
       if (quickBooks) {
         setQuickBooksCustomerRefId(configString(quickBooks.config, "customerRefId"));
@@ -141,6 +144,7 @@ export function IntegrationCenterClient() {
         setGoogleSyncScheduled(configBoolean(google.config, "syncScheduled", true));
       }
     } catch (error) {
+      setLoadError(true);
       toast.error("Integrations unavailable", { description: error instanceof Error ? error.message : "Unknown error" });
     } finally {
       setLoading(false);
@@ -160,7 +164,7 @@ export function IntegrationCenterClient() {
       const message = params.get("message");
 
       if (connected) {
-        toast.success(`${connected === "google_calendar" ? "Google Calendar" : connected === "quickbooks" ? "QuickBooks" : connected} connected successfully!`);
+        toast.success(`${connected === "google_calendar" ? "Google Calendar" : connected === "quickbooks" ? "QuickBooks" : connected} connected`);
         window.history.replaceState({}, document.title, window.location.pathname);
       } else if (error) {
         toast.error(`Could not connect ${error === "google_calendar" ? "Google Calendar" : error === "quickbooks" ? "QuickBooks" : error}`, {
@@ -214,23 +218,27 @@ export function IntegrationCenterClient() {
     const meta = PROVIDER_META[provider];
     const configured = readiness?.[meta.readinessKey];
     if (!configured) {
-      toast.error(`${meta.title} OAuth is not configured`, { description: "Add the provider client ID/secret and redirect URI in production env first." });
+      toast.error(`${meta.title} is not available yet`, { description: "Contact support or your SOWLedger administrator to finish setup. For Slack, you can use the manual webhook setup below." });
       return;
     }
     window.location.assign(meta.authPath);
+  }
+
+  if (loadError) {
+    return <AppPageShell><AppPageHeader title="Integrations" description="Manage the services connected to this workspace." icon={Plug} /><DataLoadNotice message="We couldn't load your integration connections." onRetry={() => void refresh()} /></AppPageShell>;
   }
 
   return (
     <AppPageShell contentClassName="space-y-5">
       <AppPageHeader
         eyebrow="Integrations"
-        title="Connect the systems around SOWLedger"
-        description="Calendar is the priority: sync planned SOWLedger blocks to Google Calendar, import external busy time as unavailable blocks, then route alerts and invoice proof into Slack and QuickBooks."
+        title="Integrations"
+        description="Connect your calendar, send updates to Slack, or export invoices to QuickBooks. Check each connection before relying on it."
         icon={Plug}
         metadata={[
-          { label: "Calendar-first operations", tone: "cyan", icon: CalendarDays },
-          { label: "Workspace-scoped credentials", tone: "slate", icon: ShieldCheck },
-          { label: "API and webhook fallback", tone: "emerald", icon: Webhook },
+          { label: "Calendar sync", tone: "cyan", icon: CalendarDays },
+          { label: "Workspace connections", tone: "slate", icon: ShieldCheck },
+          { label: "API and webhooks", tone: "emerald", icon: Webhook },
         ]}
         primaryAction={(
           <button onClick={() => void refresh()} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 sm:w-auto">
@@ -245,8 +253,8 @@ export function IntegrationCenterClient() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AppMetricCard label="Connected" value={loading ? "..." : connectedCount} detail="Active provider connections." accent="emerald" icon={CheckCircle2} />
         <AppMetricCard label="Needs attention" value={loading ? "..." : errorCount} detail="Provider errors to fix." accent={errorCount ? "rose" : "slate"} icon={AlertTriangle} />
-        <AppMetricCard label="Calendar sync" value={connectionByProvider.get("google_calendar")?.status === "connected" ? "Ready" : "Setup"} detail="Must-have operational integration." accent="cyan" icon={CalendarDays} />
-        <AppMetricCard label="Fallbacks" value="API + webhooks" detail="Zapier, Make, and custom agency systems." accent="slate" icon={KeyRound} />
+        <AppMetricCard label="Calendar sync" value={connectionByProvider.get("google_calendar")?.status === "connected" ? "Ready" : "Setup"} detail="Plan around your calendar." accent="cyan" icon={CalendarDays} />
+        <AppMetricCard label="Custom connections" value="API + webhooks" detail="Connect tools using API requests and webhooks." accent="slate" icon={KeyRound} />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-3">
@@ -272,7 +280,7 @@ export function IntegrationCenterClient() {
                 <div><dt className="font-bold text-slate-700">Connected account</dt><dd>{connection?.displayName || connection?.externalAccountId || "Not connected"}</dd></div>
                 <div><dt className="font-bold text-slate-700">Last sync</dt><dd>{formatDateTime(connection?.lastSyncedAt)}</dd></div>
                 {connection?.lastError && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-rose-700"><dt className="font-bold">Last error</dt><dd className="mt-1 break-words text-xs">{connection.lastError}</dd></div>}
-                {!configured && provider !== "slack" && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800"><dt className="font-bold">Environment needed</dt><dd className="mt-1 text-xs">Configure the provider&apos;s OAuth client ID and secret in your server environment variables (.env) before connecting.</dd></div>}
+                {!configured && provider !== "slack" && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800"><dt className="font-bold">Setup required</dt><dd className="mt-1 text-xs">This provider is not available yet. Contact support or your SOWLedger administrator to finish setup.</dd></div>}
               </dl>
 
               <div className="mt-5 flex flex-wrap gap-2">
@@ -298,7 +306,7 @@ export function IntegrationCenterClient() {
             <CalendarDays className="mt-1 h-6 w-6 text-cyan-700" />
             <div>
               <h2 className="text-2xl font-semibold">Calendar sync controls</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">Use Google Calendar as the external planning mirror. SOWLedger remains source-of-truth for planned work; imported external events become unavailable blocks.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Send planned blocks to Google Calendar and import busy events so you can plan around them. Edit planned work in SOWLedger; imported busy time is not logged as work.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -322,7 +330,7 @@ export function IntegrationCenterClient() {
             <MessageSquare className="mt-1 h-6 w-6 text-cyan-700" />
             <div>
               <h2 className="text-2xl font-semibold">Slack manual setup</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">If Slack OAuth is not configured yet, paste an incoming webhook URL to make alerts work immediately.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">You can also connect Slack with an incoming webhook URL. Save it, then test the connection to confirm a message arrives in the right channel.</p>
             </div>
           </div>
           <div className="mt-5 space-y-3">
@@ -343,7 +351,7 @@ export function IntegrationCenterClient() {
             <Receipt className="mt-1 h-6 w-6 text-cyan-700" />
             <div>
               <h2 className="text-2xl font-semibold">QuickBooks invoice defaults</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">QuickBooks needs a customer reference and service item reference before SOWLedger can push invoices safely.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Choose the QuickBooks customer and service item IDs to use for exported invoices. Confirm the connected account and whether it is a test account before sending an invoice.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -357,14 +365,14 @@ export function IntegrationCenterClient() {
           <div className="flex items-start gap-3">
             <Workflow className="mt-1 h-6 w-6 text-cyan-700" />
             <div>
-              <h2 className="text-2xl font-semibold">Zapier, Make, and custom systems</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">Use API keys and webhooks for long-tail automation while native integrations stay focused on calendar, alerts, and accounting.</p>
+              <h2 className="text-2xl font-semibold">Connect other tools</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Use API requests or webhook events with your automation tools. These are custom connections, not prebuilt Zapier or Make integrations.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <Link href="/settings/developers" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"><KeyRound className="mb-3 h-5 w-5 text-cyan-700" />Create scoped API keys</Link>
+            <Link href="/settings/developers" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"><KeyRound className="mb-3 h-5 w-5 text-cyan-700" />Create API keys</Link>
             <Link href="/settings/webhooks" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"><Webhook className="mb-3 h-5 w-5 text-cyan-700" />Configure event webhooks</Link>
-            <Link href="/support/api" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800 sm:col-span-2"><ExternalLink className="mb-3 h-5 w-5 text-cyan-700" />Open API usage guide and endpoint list</Link>
+            <Link href="/support/api" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800 sm:col-span-2"><ExternalLink className="mb-3 h-5 w-5 text-cyan-700" />Read API documentation</Link>
           </div>
         </article>
       </section>
@@ -372,8 +380,8 @@ export function IntegrationCenterClient() {
       {!loading && connectedCount === 0 && (
         <AppEmptyState
           icon={Plug}
-          title="Start with calendar sync."
-          description="Connect Google Calendar first so planned SOWLedger work appears where users already live. Slack and QuickBooks can follow once schedule behavior is proven."
+          title="No integrations connected"
+          description="Choose a service above and connect an account. Google Calendar is a useful place to start if you plan work around meetings."
           action={<button onClick={() => connect("google_calendar")} className="rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">Connect Google Calendar</button>}
         />
       )}

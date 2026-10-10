@@ -1,6 +1,8 @@
+import { getAppOrigin } from "./app-url";
+
 export const env = {
   NODE_ENV: process.env.NODE_ENV ?? "development",
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ? getAppOrigin(process.env.NEXT_PUBLIC_APP_URL) : undefined,
   AUTH_SHARED_KEY: process.env.AUTH_SHARED_KEY,
   CRON_SECRET: process.env.CRON_SECRET,
   AUTH_COOKIE_SECRET: process.env.AUTH_COOKIE_SECRET,

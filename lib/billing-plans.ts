@@ -2,7 +2,7 @@ export const STRIPE_PLANS = {
   free: {
     planId: "free",
     name: "Free",
-    description: "Try the full workflow on a small workspace before committing.",
+    description: "Time tracking and manual entries for one person and two projects.",
     price: 0,
     priceId: "", // Free tier has no price ID
     features: ["time-tracking", "manual-logging"],
@@ -11,7 +11,7 @@ export const STRIPE_PLANS = {
   pro: {
     planId: "pro",
     name: "Starter",
-    description: "Flat workspace pricing for solo operators who need invoices, exports, and planned work.",
+    description: "Add scheduling, analytics, invoices, and exports for up to two people.",
     price: 9, // $9 / month flat workspace
     priceId: process.env.STRIPE_PRO_PRICE_ID || "price_dummy_pro",
     features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "invoicing"],
@@ -20,7 +20,7 @@ export const STRIPE_PLANS = {
   smb: {
     planId: "smb",
     name: "Studio",
-    description: "Small-team operations with approvals, API keys, webhooks, and complete exports.",
+    description: "Everything in Starter, plus approvals, API access, and webhooks for a small team.",
     price: 29, // $29 / month flat workspace
     priceId: process.env.STRIPE_SMB_PRICE_ID || "price_dummy_smb",
     features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "api", "webhooks", "invoicing", "approvals"],
@@ -29,7 +29,7 @@ export const STRIPE_PLANS = {
   enterprise: {
     planId: "enterprise",
     name: "Business",
-    description: "Growing firms that need more seats, audit depth, advanced API usage, and priority support.",
+    description: "Everything in Studio, with room for up to 20 people and 200 projects.",
     price: 79, // $79 / month flat workspace
     priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID || "price_dummy_enterprise",
     features: ["time-tracking", "manual-logging", "schedule", "analytics", "exports", "api", "webhooks", "invoicing", "approvals", "advanced-reports", "saml"],

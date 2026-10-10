@@ -25,6 +25,8 @@ export default defineConfig({
   webServer: {
     command: 'PORT=3008 npm run dev',
     url: 'http://localhost:3008',
-    reuseExistingServer: !process.env.CI,
+    // Isolated DB runs must own the server process and its environment. Never
+    // reuse a local server that might have been started with a production DB.
+    reuseExistingServer: !process.env.CI && process.env.SOWLEDGER_TEST_DATABASE !== 'true',
   },
 });

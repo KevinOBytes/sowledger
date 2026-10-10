@@ -15,18 +15,22 @@ import {
 
 type PendingEntry = {
   id: string;
+  taskId: string;
   userEmail: string;
   projectName: string;
   description: string;
   startedAt: string;
   durationSeconds: number | null;
   status: string;
+  rejectionReason?: string | null;
 };
 
 export default function ApprovalsPage() {
   const [entries, setEntries] = useState<PendingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [statusFilter, setStatusFilter] = useState<"pending" | "all">("pending");
   const [pendingEntryIds, setPendingEntryIds] = useState<Set<string>>(new Set());
   const pendingEntryIdsRef = useRef<Set<string>>(new Set());
@@ -44,6 +48,7 @@ export default function ApprovalsPage() {
     async function fetchEntries() {
       setLoading(true);
       setError(null);
+      setAccessDenied(false);
       try {
         const res = await fetch(`/api/approvals?status=${statusFilter}`);
         if (!active) return;
@@ -52,6 +57,7 @@ export default function ApprovalsPage() {
           setEntries(data.entries || []);
         } else {
           const err = await res.json();
+          setAccessDenied(res.status === 401 || res.status === 403);
           setError(err.error || "Failed to load approvals.");
         }
       } catch {
@@ -63,7 +69,7 @@ export default function ApprovalsPage() {
     }
     fetchEntries();
     return () => { active = false; };
-  }, [statusFilter]);
+  }, [statusFilter, retryCount]);
 
   async function handleApprove(entryId: string) {
     if (pendingEntryIdsRef.current.has(entryId)) return;
@@ -103,7 +109,7 @@ export default function ApprovalsPage() {
       });
       if (res.ok) {
         if (statusFilter === "pending") setEntries((prev) => prev.filter((entry) => entry.id !== entryId));
-        else setEntries((prev) => prev.map((entry) => entry.id === entryId ? { ...entry, status: "rejected" } : entry));
+        else setEntries((prev) => prev.map((entry) => entry.id === entryId ? { ...entry, status: "draft", rejectionReason: reason || "Please review this entry before resubmitting." } : entry));
         toast.success("Time sent back");
       } else {
         const data = await res.json();
@@ -132,21 +138,20 @@ export default function ApprovalsPage() {
       <AppPageShell width="standard">
         <AppPageHeader
           eyebrow="Approve"
-          title="Timesheet Approvals"
-          description="Managers and owners review submitted time before invoicing. Restricted access is shown clearly so members can continue reviewing their own activity."
+          title="Approvals"
+          description="Review submitted time before it is invoiced."
           icon={Check}
-          metadata={[{ label: "Restricted", tone: "amber", icon: X }]}
         />
         <AppWorkflowRail current="approve" />
         <AppEmptyState
           icon={X}
-          title="Approvals are restricted"
-          description={`${error} Managers and owners can approve time. Members can still review their own entries in Activity.`}
-          action={(
+          title={accessDenied ? "Manager access required" : "Could not load approvals"}
+          description={accessDenied ? "Managers and owners can approve time. You can review and submit your own entries in Activity." : error}
+          action={accessDenied ? (
             <a href="/activity" className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800">
               Review Activity
             </a>
-          )}
+          ) : <button onClick={() => setRetryCount((value) => value + 1)} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white">Try again</button>}
         />
       </AppPageShell>
     );
@@ -155,9 +160,8 @@ export default function ApprovalsPage() {
   return (
     <AppPageShell>
       <AppPageHeader
-        eyebrow="Approve"
-        title="Timesheet Approvals"
-        description="Managers and owners review submitted time before invoicing. If you cannot approve, the page explains the role requirement instead of failing silently."
+        title="Approvals"
+        description="Approve submitted time or send it back with a note. Approved time can then be added to an invoice."
         icon={Check}
         metadata={[
           { label: statusFilter === "pending" ? "Pending review" : "All history", tone: "cyan", icon: Clock },
@@ -183,10 +187,10 @@ export default function ApprovalsPage() {
 
       <AppWorkflowRail current="approve" />
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="hidden gap-4 sm:grid sm:grid-cols-3">
         <AppMetricCard label="Visible entries" value={entries.length} detail="Loaded for the selected approval filter." accent="slate" icon={Clock} />
         <AppMetricCard label="Pending approval" value={submittedCount} detail="Submitted time ready for manager action." accent="amber" icon={Clock} />
-        <AppMetricCard label="Approved output" value={approvedOutputCount} detail="Approved or invoiced entries in this view." accent="emerald" icon={Check} />
+        <AppMetricCard label="Approved time" value={approvedOutputCount} detail="Approved or invoiced entries in this view." accent="emerald" icon={Check} />
       </section>
 
         <section className="grid gap-4">
@@ -222,14 +226,15 @@ export default function ApprovalsPage() {
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-bold text-slate-950">{entry.userEmail}</span>
+                      <span className="break-all font-bold text-slate-950">{entry.userEmail}</span>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${entry.status === "approved" || entry.status === "invoiced" ? "bg-emerald-50 text-emerald-700" : entry.status === "draft" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}>
-                        {entry.status === "draft" ? "sent back" : entry.status}
+                        {entry.status === "draft" && entry.rejectionReason ? "sent back" : entry.status}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-600">
-                      <span className="font-semibold text-cyan-700">{entry.projectName}</span> - {entry.description || "No description provided"}
+                      <span className="font-semibold text-cyan-700">{entry.projectName}</span> - {entry.description || entry.taskId || "No notes"}
                     </p>
+                    {entry.rejectionReason && <p className="mt-2 text-sm text-rose-700">Sent back: {entry.rejectionReason}</p>}
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
                       <Clock className="h-3.5 w-3.5" />
                       {new Date(entry.startedAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}

@@ -9,7 +9,7 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ page, context }) => {
-    await context.addCookies([{ name: 'sowledger-cookie-consent', value: 'true', domain: 'localhost', path: '/' }, { name: 'sowledger-cookie-consent', value: 'true', domain: '127.0.0.1', path: '/' }]);
+    await context.addCookies([{ name: 'sowledger-cookie-consent', value: 'false', domain: 'localhost', path: '/' }, { name: 'sowledger-cookie-consent', value: 'false', domain: '127.0.0.1', path: '/' }]);
     const cleanParam = !didClean ? '&clean=true' : '';
     didClean = true;
     const res = await requestGetApp(page, `/api/test/login?plan=pro&workspace=${professionalWorkspace}${cleanParam}`);
@@ -65,7 +65,7 @@ test.describe('Professional Feature Suite (10 User Stories)', () => {
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Start another timer' }).click();
     await page.waitForTimeout(1000);
-    await expect(page.getByText('2 running')).toBeVisible();
+    await expect(page.getByText('2 active timers', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Stop focused timer' }).click();
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stop focused timer' }).click();

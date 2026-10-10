@@ -27,6 +27,7 @@ import {
   AppWorkflowRail,
 } from "@/components/app-page-shell";
 import { ManualTimeDialog } from "@/components/manual-time-dialog";
+import { DataLoadNotice } from "@/components/data-load-notice";
 
 type ReportData = {
   ok: boolean;
@@ -123,7 +124,7 @@ export function ReportsPageClient() {
       const queryString = query.toString();
       const [reportResult, intelligenceResult] = await Promise.allSettled([
         fetchJson<ReportData>(`/api/reports?${queryString}`, "Unable to load analytics"),
-        fetchJson<RevenueIntelligenceData>(`/api/revenue-intelligence?${queryString}`, "Unable to load revenue intelligence"),
+        fetchJson<RevenueIntelligenceData>(`/api/revenue-intelligence?${queryString}`, "Could not load budget and time review"),
       ]);
 
       if (reportResult.status === "fulfilled") {
@@ -138,7 +139,7 @@ export function ReportsPageClient() {
         setIntelligence(intelligenceResult.value);
       } else {
         setIntelligence(null);
-        setIntelligenceError(intelligenceResult.reason instanceof Error ? intelligenceResult.reason.message : "Unable to load revenue intelligence");
+        setIntelligenceError("We couldn't load budget and time review.");
       }
     } finally {
       setLoading(false);
@@ -185,8 +186,8 @@ export function ReportsPageClient() {
       <AppPageShell>
         <AppPageHeader
           eyebrow="Analytics"
-          title="Work performance and billable output"
-          description="Track planned vs actual work, manual vs timer entries, utilization, project allocation, and export-ready billing signals."
+          title="Analytics"
+          description="Compare planned and logged time, see where the hours went, and review work before invoicing."
           icon={LineChart}
           metadata={[
             { label: scope === "mine" ? "My analytics" : "Team analytics", tone: "cyan", icon: TrendingUp },
@@ -249,13 +250,13 @@ export function ReportsPageClient() {
             <section className="flex min-h-[360px] flex-col items-center justify-center rounded-[32px] border border-slate-200 bg-white p-10 text-center shadow-sm" aria-live="polite">
               <div className="mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-cyan-600" />
               <h2 className="text-xl font-semibold text-slate-950">Loading analytics...</h2>
-              <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">Preparing your planned vs actual, recovery, utilization, and billable output views.</p>
+              <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">Loading time entries, planned work, and project totals.</p>
             </section>
           ) : (
             <AppEmptyState
               icon={AlertTriangle}
-              title="Failed to load analytics."
-              description="Try a narrower date range or switch back to my analytics if team reporting is restricted."
+              title="We couldn't load analytics."
+              description="Please try again. Team analytics is available to workspace owners and managers."
               action={(
                 <button
                   onClick={() => fetchReports().catch(() => null)}
@@ -270,29 +271,30 @@ export function ReportsPageClient() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className={`space-y-6 transition-opacity ${loading ? "opacity-60" : "opacity-100"}`}>
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <AppMetricCard label="Logged hours" value={metric(data.totalHours, "h")} detail="Actual time in this range." accent="slate" icon={Timer} />
-              <AppMetricCard label="Planned hours" value={metric(data.plannedHours, "h")} detail="Scheduled work for comparison." accent="slate" icon={CalendarIcon} />
-              <AppMetricCard label="Utilization" value={utilizationLabel} detail="Actual time against plan." accent="cyan" icon={TrendingUp} />
+              <AppMetricCard label="Planned hours" value={metric(data.plannedHours, "h")} detail={`${data.missedBlocks} past work blocks are still marked planned.`} accent="slate" icon={CalendarIcon} />
+              <AppMetricCard label="Logged / planned" value={utilizationLabel} detail="Logged hours divided by planned hours; not a measure of availability." accent="cyan" icon={TrendingUp} />
               <AppMetricCard
-                label="Manual vs timer"
+                label="Time sources"
                 value={metric(data.manualHours, "h")}
                 detail={`manual / ${metric(data.timerHours, "h")} timer / ${metric(data.calendarHours, "h")} calendar`}
                 accent="slate"
                 icon={Timer}
               />
               <AppMetricCard
-                label="Billable pipeline"
+                label="Logged time value"
                 value={`$${data.totalBillableAmount.toFixed(0)}`}
-                detail={`${data.missedBlocks} missed scheduled work item(s)`}
+                detail="Time multiplied by saved rates; not an invoice or payment total."
                 accent="emerald"
                 icon={DownloadIcon}
               />
             </section>
+            <p className="text-xs leading-5 text-slate-500">Time and value totals include all logged entries in this range, including drafts, rejected entries, and non-billable work.</p>
 
             <section className="grid gap-6 lg:grid-cols-2">
               <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="mb-6 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold">Daily execution trend</h2>
+                    <h2 className="text-lg font-semibold">Hours by day</h2>
                     <p className="text-sm text-slate-500">Actual logged hours by day.</p>
                   </div>
                   <LineChart className="h-5 w-5 text-cyan-700" />
@@ -314,7 +316,7 @@ export function ReportsPageClient() {
                 <div className="mb-6 flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold">Project distribution</h2>
-                    <p className="text-sm text-slate-500">Where billable capacity is going.</p>
+                    <p className="text-sm text-slate-500">Logged hours by project, including non-billable time.</p>
                   </div>
                   <TrendingUp className="h-5 w-5 text-cyan-700" />
                 </div>
@@ -333,13 +335,12 @@ export function ReportsPageClient() {
                     <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-center text-slate-500">
                       <Timer className="mb-3 h-8 w-8 text-slate-400" />
                       <p className="font-semibold text-slate-700">No project data yet.</p>
-                      <button onClick={() => setManualOpen(true)} className="mt-3 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white">Log first block</button>
+                      <button onClick={() => setManualOpen(true)} className="mt-3 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white">Log time</button>
                     </div>
                   )}
                 </div>
               </div>
             </section>
-
             <section className="grid gap-6 lg:grid-cols-2">
               <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 px-6 py-4"><h3 className="font-semibold">Top projects</h3></div>
@@ -390,21 +391,21 @@ function RevenueIntelligenceSection({
   return (
     <section className="grid gap-6 lg:grid-cols-2">
       <IntelligencePanel
-        title="Retainer Leak Radar"
-        description="Spot retained work trending past plan before it leaks margin."
+        title="Budget review"
+        description="Review project budgets, missing rates, and approved time not yet invoiced. Amounts are estimates to check, not promised revenue."
         icon={<AlertTriangle className="h-5 w-5 text-amber-600" />}
         items={risks}
-        empty="No retainer leaks detected for this range."
+        empty="No budget or billing review items found for this range."
         amountKeys={["amountAtRisk", "leakAmount", "amount"]}
         loading={loading}
         error={error}
       />
       <IntelligencePanel
-        title="Missing Billable Recovery"
-        description="Find completed work that looks recoverable but has not reached the billable pipeline."
+        title="Time awaiting review"
+        description="Check planned work without linked time, entries missing a rate, and approved time that may be ready to invoice."
         icon={<Search className="h-5 w-5 text-cyan-700" />}
         items={opportunities}
-        empty="No missing billable recovery opportunities found."
+        empty="No time review items found for this range."
         amountKeys={["recoverableAmount", "amount", "amountAtRisk"]}
         loading={loading}
         error={error}
@@ -447,9 +448,9 @@ function IntelligencePanel({
 
       <div className="mt-5 space-y-3">
         {error ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-            Revenue intelligence is unavailable: {error}
-          </div>
+          <DataLoadNotice message={error} />
+        ) : loading ? (
+          <p role="status" className="text-sm text-slate-500">Loading review items...</p>
         ) : items.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
             {empty}
@@ -457,8 +458,8 @@ function IntelligencePanel({
         ) : (
           items.map((item, index) => {
             const amount = itemAmount(item, amountKeys);
-            const label = item.title || item.projectName || item.clientName || `Signal ${index + 1}`;
-            const detail = item.reason || item.notes || "Review this billing signal before the next approval cycle.";
+            const label = item.title || item.projectName || item.clientName || `Review item ${index + 1}`;
+            const detail = item.reason || item.notes || "Check the related time and project details before invoicing.";
             const flaggedHours = [item.missingHours, item.hours, item.plannedHours].find(
               (value): value is number => typeof value === "number" && Number.isFinite(value),
             );
@@ -479,8 +480,8 @@ function IntelligencePanel({
                     <p className="mt-1 text-sm text-slate-500">{detail}</p>
                     {flaggedHours != null && (
                       <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        {metric(flaggedHours, "h")} flagged
-                        {actualHours != null ? ` / ${metric(actualHours, "h")} actual` : ""}
+                        {metric(flaggedHours, "h")} {item.missingHours != null ? "awaiting review" : item.hours != null ? "logged" : "planned"}
+                        {actualHours != null ? ` / ${metric(actualHours, "h")} logged` : ""}
                       </p>
                     )}
                   </div>

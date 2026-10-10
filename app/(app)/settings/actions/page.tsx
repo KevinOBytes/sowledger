@@ -1,93 +1,87 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { DataLoadNotice } from "@/components/data-load-notice";
 import { Check, Edit2, Plus, Trash2, X } from "lucide-react";
 
 type UserAction = {
   id: string;
   name: string;
-  hourlyRate?: number;
+  hourlyRate?: number | null;
 };
 
 export default function ActionsSettingsPage() {
   const [actions, setActions] = useState<UserAction[]>([]);
   const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editRate, setEditRate] = useState("");
   const [newName, setNewName] = useState("");
   const [newRate, setNewRate] = useState("");
 
-  const loadActions = async () => {
-    setStatus("Loading...");
-    const res = await fetch("/api/user/actions");
-    const data = await res.json();
-    if (res.ok) {
+  const loadActions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/user/actions");
+      if (!res.ok) throw new Error("Work types unavailable");
+      const data = await res.json();
       setActions(data.actions || []);
+      setLoadError(false);
       setStatus("");
-    } else {
-      setStatus(`Error loading work types: ${data.error}`);
+    } catch {
+      setLoadError(true);
+      setStatus("");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-    async function fetchInitial() {
-      setStatus("Loading...");
-      const res = await fetch("/api/user/actions");
-      const data = await res.json();
-      if (!mounted) return;
-      if (res.ok) {
-        setActions(data.actions || []);
-        setStatus("");
-      } else {
-        setStatus(`Error loading work types: ${data.error}`);
-      }
-    }
-    fetchInitial();
-    return () => { mounted = false; };
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadActions();
+  }, [loadActions]);
 
   async function createAction(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
 
     setStatus("Saving...");
-    const res = await fetch("/api/user/actions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: newName.trim(),
-        hourlyRate: newRate ? parseFloat(newRate) : undefined,
-      }),
-    });
-
-    const data = await res.json();
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/user/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName.trim(),
+          hourlyRate: newRate ? parseFloat(newRate) : undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("Request failed");
       setNewName("");
       setNewRate("");
       await loadActions();
-    } else {
-      setStatus(`Error: ${data.error}`);
+    } catch {
+      setStatus("Could not add the work type. Check the name and rate, then try again.");
     }
   }
 
   async function deleteAction(id: string) {
     if (!confirm("Delete this work type and rate? Existing time entries keep their saved label.")) return;
     setStatus("Deleting...");
-    const res = await fetch(`/api/user/actions?actionId=${id}`, { method: "DELETE" });
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/user/actions?actionId=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Request failed");
       await loadActions();
-    } else {
-      const data = await res.json();
-      setStatus(`Error: ${data.error}`);
+    } catch {
+      setStatus("Could not delete the work type. Please try again.");
     }
   }
 
   function startEdit(action: UserAction) {
     setEditingId(action.id);
     setEditName(action.name);
-    setEditRate(action.hourlyRate !== undefined ? action.hourlyRate.toString() : "");
+    setEditRate(action.hourlyRate != null ? action.hourlyRate.toString() : "");
   }
 
   function cancelEdit() {
@@ -97,21 +91,21 @@ export default function ActionsSettingsPage() {
   async function saveEdit(id: string) {
     if (!editName.trim()) return;
     setStatus("Saving...");
-    const res = await fetch("/api/user/actions", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        actionId: id,
-        name: editName.trim(),
-        hourlyRate: editRate ? parseFloat(editRate) : undefined,
-      }),
-    });
-    const data = await res.json();
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/user/actions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionId: id,
+          name: editName.trim(),
+          hourlyRate: editRate ? parseFloat(editRate) : null,
+        }),
+      });
+      if (!res.ok) throw new Error("Request failed");
       setEditingId(null);
       await loadActions();
-    } else {
-      setStatus(`Error: ${data.error}`);
+    } catch {
+      setStatus("Could not save the work type. Your changes are still here; please try again.");
     }
   }
 
@@ -122,7 +116,7 @@ export default function ActionsSettingsPage() {
           <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Rates</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Work types and rates</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-            Define the work labels and optional hourly rates you reuse while tracking time. This keeps timer setup simple without exposing system labels to your team.
+            Save the work types you use often, such as design or consulting. Add an hourly rate to use when you start a timer or log completed work.
           </p>
         </header>
 
@@ -134,11 +128,15 @@ export default function ActionsSettingsPage() {
 
         <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-6 py-4">
-            <h2 className="text-xl font-semibold">Reusable work types</h2>
+            <h2 className="text-xl font-semibold">Your work types</h2>
             <p className="mt-1 text-sm text-slate-500">Examples: Code review, client strategy, research, design QA, admin.</p>
           </div>
 
-          {actions.length === 0 ? (
+          {loading ? (
+            <p role="status" className="p-6 text-sm text-slate-500">Loading work types...</p>
+          ) : loadError ? (
+            <DataLoadNotice message="We couldn't load your work types." onRetry={() => void loadActions()} />
+          ) : actions.length === 0 ? (
             <div className="p-10 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700">
                 <Plus className="h-6 w-6" />
@@ -177,10 +175,10 @@ export default function ActionsSettingsPage() {
                     <>
                       <div>
                         <p className="font-bold text-slate-950">{action.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">Visible as a selectable rate while starting timers or logging completed work.</p>
+                        <p className="mt-1 text-xs text-slate-500">Available when you start a timer or log time.</p>
                       </div>
                       <div className="font-mono text-sm font-semibold text-slate-700">
-                        {action.hourlyRate !== undefined ? `$${action.hourlyRate.toFixed(2)}/hr` : "No rate"}
+                        {action.hourlyRate != null ? `$${action.hourlyRate.toFixed(2)}/hr` : "No rate"}
                       </div>
                       <div className="flex gap-2 md:justify-end">
                         <button type="button" onClick={() => startEdit(action)} className="rounded-xl border border-slate-200 px-3 py-2 text-slate-600 hover:border-cyan-200 hover:text-cyan-700" aria-label={`Edit ${action.name}`}><Edit2 className="h-4 w-4" /></button>

@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { auditLogs, invoices, projects, scheduledWorkBlocks, timeEntries, users } from "@/lib/db/schema";
+import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
+import { timeEntryAmountCents } from "@/lib/invoice-amount";
 
 type JsonValue = null | string | number | boolean | JsonValue[] | { [key: string]: JsonValue };
 
@@ -98,10 +100,10 @@ export type InvoiceProofPackResult = {
   digest: string;
 };
 
-export async function buildInvoiceProofPack(workspaceId: string, invoiceId: string): Promise<InvoiceProofPackResult | null> {
+export async function buildInvoiceProofPack(workspaceId: string, invoiceId: string, client: Pick<typeof db, "select"> = db): Promise<InvoiceProofPackResult | null> {
   await ensureWorkspaceSchema();
 
-  const [invoice] = await db
+  const [invoice] = await client
     .select()
     .from(invoices)
     .where(and(eq(invoices.workspaceId, workspaceId), eq(invoices.id, invoiceId)));
@@ -110,10 +112,10 @@ export async function buildInvoiceProofPack(workspaceId: string, invoiceId: stri
 
   const entryIds = Array.isArray(invoice.timeEntryIds) ? invoice.timeEntryIds : [];
   const linkedEntries = entryIds.length > 0
-    ? await db
+    ? await client
       .select()
       .from(timeEntries)
-      .where(and(eq(timeEntries.workspaceId, workspaceId), inArray(timeEntries.id, entryIds)))
+      .where(and(eq(timeEntries.workspaceId, workspaceId), inArray(timeEntries.id, entryIds))).orderBy(asc(timeEntries.id))
     : [];
 
   const projectIds = [...new Set([
@@ -124,19 +126,20 @@ export async function buildInvoiceProofPack(workspaceId: string, invoiceId: stri
   const scheduledBlockIds = [...new Set(linkedEntries.map((entry) => entry.scheduledBlockId).filter((value): value is string => Boolean(value)))];
 
   const [workspaceProjects, workspaceUsers, workspaceBlocks, workspaceAuditLogs] = await Promise.all([
-    projectIds.length > 0 ? db.select().from(projects).where(and(eq(projects.workspaceId, workspaceId), inArray(projects.id, projectIds))) : Promise.resolve([]),
-    userIds.length > 0 ? db.select().from(users).where(inArray(users.id, userIds)) : Promise.resolve([]),
-    scheduledBlockIds.length > 0 ? db.select().from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.workspaceId, workspaceId), inArray(scheduledWorkBlocks.id, scheduledBlockIds))) : Promise.resolve([]),
+    projectIds.length > 0 ? client.select().from(projects).where(and(eq(projects.workspaceId, workspaceId), inArray(projects.id, projectIds))) : Promise.resolve([]),
+    userIds.length > 0 ? client.select().from(users).where(inArray(users.id, userIds)) : Promise.resolve([]),
+    scheduledBlockIds.length > 0 ? client.select().from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.workspaceId, workspaceId), inArray(scheduledWorkBlocks.id, scheduledBlockIds))).orderBy(asc(scheduledWorkBlocks.id)) : Promise.resolve([]),
     entryIds.length > 0
-      ? db.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, workspaceId), inArray(auditLogs.timeEntryId, [...entryIds, invoiceId])))
-      : db.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, workspaceId), eq(auditLogs.timeEntryId, invoiceId))),
+      ? client.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, workspaceId), inArray(auditLogs.timeEntryId, [...entryIds, invoiceId]), ne(auditLogs.eventType, "client_invoice_signed_off"))).orderBy(asc(auditLogs.createdAt), asc(auditLogs.id))
+      : client.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, workspaceId), eq(auditLogs.timeEntryId, invoiceId), ne(auditLogs.eventType, "client_invoice_signed_off"))).orderBy(asc(auditLogs.createdAt), asc(auditLogs.id)),
   ]);
 
   const projectsById = new Map(workspaceProjects.map((project) => [project.id, project]));
   const usersById = new Map(workspaceUsers.map((user) => [user.id, user]));
 
   const actualSeconds = linkedEntries.reduce((sum, entry) => sum + (entry.durationSeconds ?? 0), 0);
-  const plannedSeconds = workspaceBlocks.reduce((sum, block) => {
+  const workBlocks = workspaceBlocks.filter((block) => block.status !== "canceled" && !isUnavailableScheduledBlock(block) && !/^busy(?:\b|:)/i.test(block.title.trim()) && !block.tags.some((tag) => tag.toLowerCase() === "busy"));
+  const plannedSeconds = workBlocks.reduce((sum, block) => {
     return sum + Math.max(0, Math.floor((new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000));
   }, 0);
 
@@ -168,7 +171,7 @@ export async function buildInvoiceProofPack(workspaceId: string, invoiceId: stri
       plannedHours: hours(plannedSeconds),
       auditEventCount: workspaceAuditLogs.length,
     },
-    sourceMix: [...sourceStats.entries()].map(([source, value]) => ({
+    sourceMix: [...sourceStats.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([source, value]) => ({
       source,
       label: sourceLabel(source),
       seconds: value.seconds,
@@ -192,13 +195,13 @@ export async function buildInvoiceProofPack(workspaceId: string, invoiceId: stri
         durationSeconds,
         hours: hours(durationSeconds),
         hourlyRate: entry.hourlyRate,
-        amount: Number((((durationSeconds / 3600) * (entry.hourlyRate ?? 0))).toFixed(2)),
+        amount: timeEntryAmountCents(durationSeconds, entry.hourlyRate ?? 0) / 100,
         status: entry.status,
         source: entry.source,
         tags: Array.isArray(entry.tags) ? entry.tags : [],
       };
     }),
-    plannedBlocks: workspaceBlocks.map((block) => {
+    plannedBlocks: workBlocks.map((block) => {
       const planned = Math.max(0, Math.floor((new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000));
       return {
         id: block.id,

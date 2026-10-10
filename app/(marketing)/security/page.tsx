@@ -13,40 +13,40 @@ import {
 
 const TRUST_CONTROLS = [
   {
-    title: "Workspace isolation",
-    body: "Workspace data access is treated as scoped by workspaceId unless a proven global resource is being accessed.",
+    title: "Workspace access",
+    body: "Workspace membership and role determine which records and actions a person can access. API keys belong to one workspace and have their own permissions.",
     icon: Database,
   },
   {
-    title: "API key lifecycle",
-    body: "Keys are scoped, revocable, expirable, usage-tracked, shown once, and stored as hashes rather than full secret values.",
+    title: "API keys",
+    body: "Full keys are shown only when created or rotated. SOWLedger stores a hash, supports expiry and revocation, and records recent key usage.",
     icon: KeyRound,
   },
   {
-    title: "Billing boundary",
-    body: "Stripe checkout accepts SOWLedger workspace plans only. The API does not expose billing changes or subscription management.",
+    title: "Subscription billing",
+    body: "Workspace owners manage subscriptions through Stripe checkout and the billing portal. Public API keys cannot change a workspace subscription.",
     icon: CreditCard,
   },
   {
-    title: "Export integrity",
-    body: "Exports avoid secrets and include x-sowledger-export-sha256 integrity headers where supported.",
+    title: "Export checksums",
+    body: "CSV and JSON downloads include a SHA-256 checksum so you can check whether a file has changed. Review exports before sharing them; they contain workspace data.",
     icon: FileCheck2,
   },
   {
-    title: "Public-route checks",
-    body: "API and Stripe webhook routes are internet-facing by design, with authentication or signature checks on every protected request.",
+    title: "Request authentication",
+    body: "API v1 requests require a valid key and the required permissions. Stripe webhook requests are checked against their signature before processing.",
     icon: Route,
   },
   {
-    title: "Migration safety",
-    body: "Database changes are handled through a reviewed migration workflow instead of one-off production edits.",
+    title: "Connected services",
+    body: "Stored integration credentials are encrypted. Owners and managers control the workspace's provider connections; raw provider tokens are not shown in the app.",
     icon: LockKeyhole,
   },
 ];
 
 export const metadata = {
   title: "Security - SOWLedger",
-  description: "SOWLedger trust center for workspace isolation, API key lifecycle, billing boundaries, export integrity, public-route checks, and security reporting.",
+  description: "How SOWLedger handles workspace access, API keys, connected services, and exports, and how to report a security concern.",
 };
 
 export default function SecurityPage() {
@@ -57,17 +57,17 @@ export default function SecurityPage() {
           <div className="max-w-3xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-surface px-4 py-1.5 text-sm font-bold text-cyan-800 shadow-sm">
               <ShieldCheck className="h-4 w-4" />
-              Trust center
+              Security
             </p>
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">Security posture for proof-backed billing.</h1>
+            <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">How access and data are handled.</h1>
             <p className="mt-5 text-lg leading-8 text-slate-700">
-              SOWLedger handles operational time, billing evidence, exports, and API access. This page states practical controls without implying formal certifications or compliance programs.
+              Your workspace holds project, time, and invoice records. Here is how SOWLedger handles access to those records and connections to other services. These controls are not a claim of formal security certification.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-xl shadow-stone-900/10">
             <h2 className="text-2xl font-semibold">Report a security concern</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Send the affected workspace, endpoint, timestamp, expected behavior, observed behavior, and safe reproduction details. Do not include passwords, API keys, bearer tokens, or payment data.
+              Tell us what you found, where it happened, and how to reproduce it safely. Remove passwords, API keys, tokens, payment details, and private customer data from your report.
             </p>
             <Link href="/contact" className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
               Contact security
@@ -96,9 +96,9 @@ export default function SecurityPage() {
         <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.75fr_1.25fr]">
           <div className="rounded-2xl bg-slate-950 p-7 text-white shadow-sm">
             <Siren className="h-6 w-6 text-cyan-300" />
-            <h2 className="mt-4 text-3xl font-semibold">Boundaries that stay inside SOWLedger</h2>
+            <h2 className="mt-4 text-3xl font-semibold">Keep sensitive actions in the app</h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              The API is for scoped operational integrations. Billing changes, invites, subscription management, and workspace administration remain inside authenticated app workflows.
+              Manage subscriptions, invitations, and workspace settings while signed in with the required role. These actions are not available through public API keys.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">
@@ -108,7 +108,7 @@ export default function SecurityPage() {
                 "Workspace name or identifier",
                 "Affected route or endpoint",
                 "Approximate timestamp and timezone",
-                "Safe reproduction steps",
+                "Steps to reproduce without exposing private data",
                 "Observed response code or error text",
                 "No secrets, tokens, or card data",
               ].map((item) => (
@@ -118,7 +118,7 @@ export default function SecurityPage() {
               ))}
             </div>
             <Link href="/support/api" className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-cyan-800 transition hover:text-cyan-600">
-              Review API support details
+              Read API documentation
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

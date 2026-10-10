@@ -3,6 +3,8 @@ import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { timeEntries, projects, users, scheduledWorkBlocks } from "@/lib/db/schema";
 import { eq, and, gte, inArray, lt } from "drizzle-orm";
+import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
+import { workflowErrorResponse } from "@/lib/workflow-validation";
 
 function endExclusive(value: string) {
   const date = new Date(value);
@@ -20,6 +22,7 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("end");
     const scope = searchParams.get("scope") ?? "mine";
     const projectId = searchParams.get("projectId");
+    if (!["mine", "team"].includes(scope) || (startDate && !Number.isFinite(Date.parse(startDate))) || (endDate && !Number.isFinite(Date.parse(endDate))) || (startDate && endDate && new Date(startDate) >= endExclusive(endDate))) return NextResponse.json({ error: "Choose a valid report scope and date range." }, { status: 400 });
 
     if (scope === "team") {
       requireRole("manager", session.role);
@@ -47,7 +50,8 @@ export async function GET(req: NextRequest) {
     if (projectId) scheduleConditions.push(eq(scheduledWorkBlocks.projectId, projectId));
     if (startDate) scheduleConditions.push(gte(scheduledWorkBlocks.startsAt, new Date(startDate)));
     if (endDate) scheduleConditions.push(lt(scheduledWorkBlocks.startsAt, endExclusive(endDate)));
-    const scheduled = await db.select().from(scheduledWorkBlocks).where(and(...scheduleConditions));
+    const scheduledRows = await db.select().from(scheduledWorkBlocks).where(and(...scheduleConditions));
+    const scheduled = scheduledRows.filter((block) => block.status !== "canceled" && !isUnavailableScheduledBlock(block) && !/^busy(?:\b|:)/i.test(block.title.trim()) && !block.tags.some((tag) => tag.toLowerCase() === "busy"));
     
     // Process aggregations
     let totalDurationSeconds = 0;
@@ -133,8 +137,6 @@ export async function GET(req: NextRequest) {
       userDistribution,
     });
   } catch (error) {
-    const err = error as Record<string, unknown>;
-    const status = err.code === "FORBIDDEN" || err.status === 403 ? 403 : 401;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "Could not load analytics. Please try again.");
   }
 }

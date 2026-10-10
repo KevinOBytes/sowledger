@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { users, workspaces, memberships, projects, goals, invitations, magicLinks, timeEntries, auditLogs, lockPeriods, userActions, projectTasks, notifications, invoices, webhooks, scheduledWorkBlocks, apiKeys, apiKeyRequests, organizations, workspacePeople, integrationConnections, integrationSyncRecords } from "@/lib/db/schema";
-import { eq, and, gt, desc } from "drizzle-orm";
+import { eq, and, gt, desc, isNull } from "drizzle-orm";
 
 export type WorkspaceRole = "client" | "member" | "manager" | "owner";
 export type KanbanColumn = "todo" | "in_progress" | "review" | "done";
@@ -107,10 +107,10 @@ export async function findPendingInvitation(email: string, workspaceId: string) 
     .where(and(
       eq(invitations.workspaceId, workspaceId),
       eq(invitations.email, normalized),
-      gt(invitations.expiresAt, now)
+      gt(invitations.expiresAt, now),
+      isNull(invitations.acceptedAt)
     )).orderBy(desc(invitations.expiresAt));
-  if (invite && !invite.acceptedAt) return invite;
-  return null;
+  return invite ?? null;
 }
 
 export async function listWorkspaceTags(workspaceId: string) {
