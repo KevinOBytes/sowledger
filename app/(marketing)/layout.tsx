@@ -6,8 +6,9 @@ import { MarketingHeader } from "@/components/marketing/marketing-header";
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex min-h-screen flex-col bg-background text-slate-950 selection:bg-cyan-500/30">
+      <a href="#main-content" className="fixed left-4 top-2 z-[110] -translate-y-24 rounded-lg bg-slate-950 px-4 py-3 font-semibold text-white focus:translate-y-0 focus:outline-2 focus:outline-offset-2 focus:outline-cyan-700">Skip to main content</a>
       <MarketingHeader />
-      <main className="flex-1 pt-16">{children}</main>
+      <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 pt-16">{children}</main>
       <footer className="border-t border-border bg-surface py-12 text-sm text-stone-500">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-10 md:grid-cols-2">

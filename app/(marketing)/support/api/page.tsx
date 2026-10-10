@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 import { ArrowLeft, ArrowRight, Code2, FileDown, KeyRound, LockKeyhole, Server, ShieldCheck, Webhook } from "lucide-react";
 
 const ENDPOINTS = [
@@ -35,10 +36,11 @@ const EXTENSIONS = [
   ["Webhooks", "Configure event notifications in Settings → Webhooks to keep another system up to date."],
 ];
 
-export const metadata = {
-  title: "API documentation | SOWLedger",
-  description: "Use SOWLedger API keys to read and update work records, retrieve invoice details, and export workspace data.",
-};
+export const metadata = publicPageMetadata(
+  "/support/api",
+  "API documentation | SOWLedger",
+  "Use SOWLedger API keys to read and update work records, retrieve invoice details, and export workspace data.",
+);
 
 export default function ApiSupportPage() {
   return (
@@ -58,7 +60,7 @@ export default function ApiSupportPage() {
                 <div className="min-w-0 flex-1">
                   <h2 className="text-2xl font-semibold">Authentication</h2>
                   <p className="mt-2 text-sm text-slate-600">Owners and managers can create keys in Settings → Developers. Copy the key when it is shown, store it securely, and send it as a bearer token. Keep it out of browser code and source control.</p>
-                  <pre className="mt-4 min-w-0 max-w-full overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-cyan-100 sm:text-sm"><code>{`Authorization: Bearer $SOWLEDGER_API_KEY`}</code></pre>
+                  <pre tabIndex={0} role="region" aria-label="Authorization header example" className="mt-4 min-w-0 max-w-full overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-cyan-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-700 sm:text-sm"><code>{`Authorization: Bearer $SOWLEDGER_API_KEY`}</code></pre>
                 </div>
               </div>
             </div>
@@ -98,10 +100,10 @@ export default function ApiSupportPage() {
           <div className="flex items-center gap-3"><Code2 className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">Example requests</h2></div>
           <p className="mt-3 text-sm leading-6 text-slate-600">Set the key in your local environment and replace example IDs with records from your workspace. A project filter narrows time entries, projects, tasks, and schedule data; a JSON export can still include other workspace-wide records. Use a time-entry CSV when that is all you intend to share.</p>
           <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
+            <pre tabIndex={0} role="region" aria-label="Read projects request example" className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-700 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
 curl https://your-domain.com/api/v1/projects \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
+            <pre tabIndex={0} role="region" aria-label="Export records request example" className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-700 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
 curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
           </div>
@@ -113,10 +115,10 @@ curl "https://your-domain.com/api/v1/export?format=json&projectId=proj_123" \
           <div className="flex items-center gap-3"><FileDown className="h-5 w-5 text-cyan-700" /><h2 className="text-2xl font-semibold">Invoice details and time review</h2></div>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">The proof-packs endpoint returns invoice details, linked time entries, and audit events. Revenue-intelligence returns budget and time-entry review checks; it does not manage recurring retainers or predict recovered revenue. CSV and JSON exports include the <code className="break-all rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">x-sowledger-export-sha256</code> checksum header.</p>
           <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
+            <pre tabIndex={0} role="region" aria-label="Read invoice details request example" className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-700 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
 curl "https://your-domain.com/api/v1/proof-packs?invoiceId=inv_123" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
-            <pre className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
+            <pre tabIndex={0} role="region" aria-label="Read time review checks request example" className="min-w-0 max-w-full overflow-x-auto rounded-3xl bg-slate-950 p-5 text-xs text-cyan-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-700 sm:text-sm"><code>{`export SOWLEDGER_API_KEY="sow-example_replace_me"
 curl "https://your-domain.com/api/v1/revenue-intelligence" \
   --oauth2-bearer "$SOWLEDGER_API_KEY"`}</code></pre>
           </div>
@@ -127,7 +129,7 @@ curl "https://your-domain.com/api/v1/revenue-intelligence" \
         <div className="mx-auto max-w-6xl overflow-hidden rounded-2xl border border-border bg-surface shadow-sm shadow-stone-900/5">
           <div className="border-b border-slate-100 px-6 py-4"><h2 className="text-2xl font-semibold">Version 1 endpoints</h2></div>
           <p className="px-6 py-4 text-sm leading-6 text-slate-600">Writable resources also support PATCH with the relevant record ID. DELETE archives clients, projects, and tags; removes tasks; or cancels scheduled blocks. Deleting time entries and writing invoices through API v1 are not supported. Time-entry creation requires a user ID and both start and stop times; it does not start or stop a live timer.</p>
-          <div className="max-w-full overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="API version 1 endpoints" className="max-w-full overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan-700">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500"><tr><th className="px-6 py-3">Method</th><th className="px-6 py-3">Path</th><th className="px-6 py-3">Use</th></tr></thead>
               <tbody className="divide-y divide-slate-100">

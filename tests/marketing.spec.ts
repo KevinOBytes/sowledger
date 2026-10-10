@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { gotoApp } from "./helpers/navigation";
 import { STRIPE_PLANS } from "../lib/billing-plans";
+import { industries } from "../lib/content/industries";
 
 const industryRoutes = [
   { slug: "freelance-developers", name: "Freelance Developers" },
@@ -66,7 +67,7 @@ test.describe("Public marketing", () => {
   });
 
   test("keeps the audience hub and every audience page public", async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     const hubResponse = await gotoApp(page, "/for");
     expect(hubResponse?.status()).toBe(200);
     await expect(page).toHaveURL(/\/for$/);
@@ -83,6 +84,7 @@ test.describe("Public marketing", () => {
       await expect(page).toHaveTitle(new RegExp(industry.name));
       await expect(page.getByRole("link", { name: "Start free", exact: true }).first()).toBeVisible();
       await expect(page.getByRole("heading", { name: "Integrate", exact: true })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "On this page" }).getByRole("link")).toHaveCount(4);
     }
   });
 
@@ -163,9 +165,182 @@ test.describe("Public marketing", () => {
   });
 
   test("keeps public content within the viewport", async ({ page }) => {
-    for (const route of ["/", "/for/freelance-developers", "/support/api"]) {
+    for (const route of ["/", "/for/freelance-developers", "/for/seo-consultants", "/support/api"]) {
       await gotoApp(page, route);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `${route} should not overflow horizontally`).toBeLessThanOrEqual(1);
     }
+  });
+
+  test("publishes exact public metadata, a real robots file, and a branded social image", async ({ page }) => {
+    test.setTimeout(120_000);
+    const routes = ["/", "/for", ...industryRoutes.map(({ slug }) => `/for/${slug}`), "/support", "/support/api", "/security", "/privacy", "/terms", "/billing-policy", "/contact"];
+    for (const route of routes) {
+      await gotoApp(page, route);
+      // Next normalizes the root URL without a trailing slash.
+      const canonical = route === "/" ? "https://www.sowledger.com" : new URL(route, "https://www.sowledger.com").href;
+      const title = await page.title();
+      const description = await page.locator('meta[name="description"]').getAttribute("content");
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", canonical);
+      await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", canonical);
+      await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", title);
+      await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", description!);
+      await expect(page.locator('meta[name="twitter:title"]')).toHaveAttribute("content", title);
+      await expect(page.locator('meta[name="twitter:description"]')).toHaveAttribute("content", description!);
+      await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+      await expect(page.locator('meta[property="og:image"]').first()).toHaveAttribute("content", /^https:\/\/www\.sowledger\.com\/opengraph-image(?:\?|$)/);
+      await expect(page.locator('meta[name="twitter:image"]').first()).toHaveAttribute("content", /^https:\/\/www\.sowledger\.com\/opengraph-image(?:\?|$)/);
+    }
+
+    const robots = await page.request.get("/robots.txt");
+    expect(robots.status()).toBe(200);
+    expect(robots.headers()["content-type"]).toContain("text/plain");
+    expect(await robots.text()).toContain("Sitemap: https://www.sowledger.com/sitemap.xml");
+    expect(await robots.text()).toContain("Disallow: /api/");
+    expect(await robots.text()).not.toContain("Disallow: /login");
+    const socialImage = await page.request.get("/opengraph-image");
+    expect(socialImage.status()).toBe(200);
+    expect(socialImage.headers()["content-type"]).toContain("image/png");
+
+    await gotoApp(page, "/login");
+    await expect(page).toHaveTitle("Sign in | SOWLedger");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://www.sowledger.com/login");
+    expect((await page.request.get("/for/not-a-real-audience")).status()).toBe(404);
+  });
+
+  test("keeps essential hero content visible without JavaScript", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false, baseURL, viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    try {
+      for (const route of ["/", "/for/seo-consultants"]) {
+        await gotoApp(page, route);
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await expect(page.locator("h1").locator("..")).toHaveCSS("opacity", "1");
+        await expect(page.locator("main figure")).toHaveCSS("opacity", "1");
+        await expect(page.getByRole("main").getByRole("link", { name: "Start free", exact: true }).first()).toBeVisible();
+      }
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("keeps every audience hero word intact and content within responsive bounds", async ({ page }) => {
+    test.setTimeout(120_000);
+    for (const width of [320, 390, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const route of ["/", ...industryRoutes.map(({ slug }) => `/for/${slug}`)]) {
+        await gotoApp(page, route);
+        await page.evaluate(() => document.fonts.ready);
+        const wordLayout = await page.getByRole("heading", { level: 1 }).evaluate((heading) => {
+          const bounds = heading.getBoundingClientRect();
+          const splitWords: string[] = [];
+          const overflowingWords: string[] = [];
+          const walker = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT);
+          let wordsMeasured = 0;
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            for (const match of (node.textContent ?? "").matchAll(/\S+/g)) {
+              const range = document.createRange();
+              range.setStart(node, match.index!);
+              range.setEnd(node, match.index! + match[0].length);
+              const rects = [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0);
+              wordsMeasured += 1;
+              // A heading can fit the viewport while overflow-wrap splits a word.
+              if (rects.some((rect) => Math.abs(rect.top - rects[0].top) > 1)) splitWords.push(match[0]);
+              // Normal word wrapping must not let a word spill into the adjacent invoice.
+              if (rects.some((rect) => rect.left < bounds.left - 1 || rect.right > bounds.right + 1)) overflowingWords.push(match[0]);
+            }
+          }
+          return { splitWords, overflowingWords, wordsMeasured };
+        });
+        expect(wordLayout.wordsMeasured, `${route} headline should contain measurable words`).toBeGreaterThan(0);
+        expect(wordLayout.splitWords, `${route} should keep whole words at ${width}px`).toEqual([]);
+        expect(wordLayout.overflowingWords, `${route} headline should fit its own column at ${width}px`).toEqual([]);
+        const clipped = await page.locator("main section").first().evaluate((section) => {
+          // overflow-hidden can mask clipping from document.scrollWidth checks.
+          return [...section.querySelectorAll("h1, p, a, figure")].flatMap((element) => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            const rects = [element.getBoundingClientRect(), ...range.getClientRects()];
+            return rects.some((rect) => rect.width > 0 && (rect.left < -1 || rect.right > innerWidth + 1))
+              ? [element.textContent?.slice(0, 100)] : [];
+          });
+        });
+        expect(clipped, `${route} should not clip at ${width}px`).toEqual([]);
+        const header = await page.locator("header").evaluate((element) => {
+          const brand = element.querySelector("a")!.getBoundingClientRect();
+          const actions = [...element.querySelectorAll("a, button")].slice(1)
+            .map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0);
+          return { brandRight: brand.right, firstActionLeft: Math.min(...actions.map((rect) => rect.left)), right: Math.max(...actions.map((rect) => rect.right)) };
+        });
+        expect(header.brandRight).toBeLessThanOrEqual(header.firstActionLeft);
+        expect(header.right).toBeLessThanOrEqual(width);
+      }
+      if (width < 768) {
+        await gotoApp(page, "/");
+        const navigation = await page.getByRole("navigation", { name: "SOWLedger capability navigation" }).boundingBox();
+        expect(navigation!.height).toBeLessThan(220);
+      }
+    }
+  });
+
+  test("supports skip navigation, Escape, and keyboard-accessible API examples", async ({ page, browserName }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoApp(page, "/");
+    await expect(page.getByRole("region", { name: "Cookie preferences", exact: true })).toBeVisible();
+    // Safari uses Option-Tab to include links in keyboard navigation.
+    await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
+    const skip = page.getByRole("link", { name: "Skip to main content" });
+    await expect(skip).toBeFocused();
+    await skip.press("Enter");
+    await expect(page.getByRole("main")).toBeFocused();
+
+    const menu = page.getByRole("button", { name: "Open marketing menu" });
+    await menu.click();
+    const navigation = page.getByRole("navigation", { name: "Mobile marketing navigation" });
+    await expect(navigation.getByRole("link", { name: "Log in", exact: true })).toBeVisible();
+    await navigation.getByRole("link", { name: "Built for", exact: true }).focus();
+    await page.keyboard.press("Escape");
+    await expect(navigation).toHaveCount(0);
+    await expect(menu).toBeFocused();
+
+    await gotoApp(page, "/support/api");
+    for (const region of await page.locator("main pre, main div[aria-label='API version 1 endpoints']").all()) {
+      await expect(region).toHaveAttribute("tabindex", "0");
+      await expect(region).toHaveAttribute("aria-label", /.+/);
+      await region.focus();
+      await expect(region).toBeFocused();
+    }
+    await expect(page.getByRole("region", { name: "Cookie preferences", exact: true })).toBeVisible();
+  });
+
+  test("uses audience-relevant illustrations and related links without customer claims", async ({ page }) => {
+    for (const industry of industries) {
+      expect(industry.relatedSlugs.length).toBeGreaterThan(0);
+      expect(new Set(industry.relatedSlugs).size).toBe(industry.relatedSlugs.length);
+      for (const slug of industry.relatedSlugs) {
+        expect(slug).not.toBe(industry.slug);
+        expect(industries.some((item) => item.slug === slug)).toBe(true);
+      }
+    }
+    await gotoApp(page, "/for/legal-consultants");
+    await expect(page.getByRole("heading", { name: "Advisory engagement", exact: true })).toBeVisible();
+    await expect(page.locator("main figure")).toContainText("Research and drafting");
+    await expect(page.locator("main figure")).toContainText("Illustrative example, not customer data or an app screenshot.");
+    const related = page.locator("section[aria-labelledby='next-audience-heading']");
+    await expect(related.locator("a")).toHaveCount(2);
+    await expect(related.locator('a[href="/for/accounting-firms"]')).toBeVisible();
+    await expect(related.locator('a[href="/for/management-consultants"]')).toBeVisible();
+
+    await gotoApp(page, "/");
+    const pricing = page.locator("#pricing");
+    await expect(pricing).toContainText("Every plan includes planning, timers, manual entries, analytics, exports, API keys, and time review.");
+    const free = pricing.getByTestId("pricing-plan").filter({ has: page.getByRole("heading", { name: "Free", exact: true }) });
+    await expect(free).toContainText("API keys");
+    await expect(free).not.toContainText(/invoices|webhooks/i);
+    const starter = pricing.getByTestId("pricing-plan").filter({ has: page.getByRole("heading", { name: "Starter", exact: true }) });
+    await expect(starter).toContainText("Invoices");
+    await expect(starter).not.toContainText(/webhooks/i);
+    await expect(pricing).not.toContainText(/SAML|advanced reports/i);
   });
 });

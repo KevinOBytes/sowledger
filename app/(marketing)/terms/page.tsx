@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 import { ArrowRight, FileText, Scale, ShieldCheck } from "lucide-react";
 
 const TERMS: [string, string][] = [
@@ -48,11 +49,11 @@ const TERMS: [string, string][] = [
   ],
 ];
 
-export const metadata = {
-  title: "Terms of Service - SOWLedger",
-  description:
-    "SOWLedger terms of service covering service use, account access, customer data, third-party integrations including Google Calendar and QuickBooks, availability, acceptable use, and product changes.",
-};
+export const metadata = publicPageMetadata(
+  "/terms",
+  "Terms of Service - SOWLedger",
+  "SOWLedger terms of service covering service use, account access, customer data, third-party integrations including Google Calendar and QuickBooks, availability, acceptable use, and product changes.",
+);
 
 export default function TermsPage() {
   return (

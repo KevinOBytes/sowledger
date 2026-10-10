@@ -3,6 +3,9 @@ import { HeroSection } from "@/components/marketing/hero-section";
 import { WorkflowSection } from "@/components/marketing/workflow-section";
 import { MarketingContent } from "@/components/marketing/marketing-content";
 import { marketingPlans } from "@/lib/content/marketing-plans";
+import { MARKETING_DESCRIPTION, MARKETING_TITLE, publicPageMetadata } from "@/lib/marketing-metadata";
+
+export const metadata = publicPageMetadata("/", MARKETING_TITLE, MARKETING_DESCRIPTION);
 
 const CAPABILITIES = [
   {
@@ -52,7 +55,7 @@ export default function MarketingPage() {
     <div className="bg-background text-slate-950">
       <section className="relative overflow-hidden border-b border-border px-4 pb-10 pt-10 sm:px-6 lg:pt-12">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(15,159,154,0.08)_1px,transparent_1px),linear-gradient(180deg,rgba(22,60,54,0.06)_1px,transparent_1px)] bg-[length:88px_88px]" />
-        <div className="relative mx-auto grid min-h-[calc(100vh-64px)] max-w-7xl grid-rows-[1fr_auto] gap-8">
+        <div className="relative mx-auto grid min-w-0 max-w-7xl gap-8 lg:min-h-[calc(100vh-64px)] lg:grid-rows-[1fr_auto]">
           
           <HeroSection 
             headline="Your work, your time, your invoices. Together."
@@ -60,20 +63,20 @@ export default function MarketingPage() {
           />
 
           <nav
-            className="grid overflow-hidden rounded-2xl border border-border bg-border shadow-sm md:grid-cols-5"
+            className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm md:grid-cols-5"
             aria-label="SOWLedger capability navigation"
           >
             {CAPABILITIES.map((capability) => {
               const Icon = capability.icon;
               return (
-                <a key={capability.title} href={capability.href} className="group min-h-36 bg-surface p-4 transition hover:bg-white">
+                <a key={capability.title} href={capability.href} className="group flex min-w-0 items-center gap-2 bg-surface p-3 transition hover:bg-white md:block md:min-h-36 md:p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <Icon className="h-5 w-5 text-cyan-700" />
-                    <span className="font-mono text-xs font-bold text-slate-500">{capability.metric}</span>
+                    <Icon className="h-5 w-5 shrink-0 text-cyan-700" aria-hidden="true" />
+                    <span className="hidden font-mono text-xs font-bold text-slate-500 md:inline">{capability.metric}</span>
                   </div>
-                  <p className="mt-5 text-sm font-bold text-slate-950">{capability.shortTitle}</p>
-                  <p className="mt-2 text-xs leading-5 text-slate-600">{capability.description}</p>
-                  <ArrowRight className="mt-4 h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-cyan-700" />
+                  <p className="text-sm font-bold text-slate-950 md:mt-5">{capability.shortTitle}</p>
+                  <p className="mt-2 hidden text-xs leading-5 text-slate-600 md:block">{capability.description}</p>
+                  <ArrowRight className="mt-4 hidden h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-cyan-700 md:block" aria-hidden="true" />
                 </a>
               );
             })}

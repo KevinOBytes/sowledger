@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       workspaceId: session.workspaceId,
       userId: session.sub,
       name: body.name,
-      hourlyRate: body.hourlyRate || null,
+      hourlyRate: body.hourlyRate ?? null,
     };
 
     const [action] = await db.insert(userActions).values(newAction).returning();

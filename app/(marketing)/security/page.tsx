@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 import {
   ArrowRight,
   CreditCard,
@@ -44,10 +45,11 @@ const TRUST_CONTROLS = [
   },
 ];
 
-export const metadata = {
-  title: "Security - SOWLedger",
-  description: "How SOWLedger handles workspace access, API keys, connected services, and exports, and how to report a security concern.",
-};
+export const metadata = publicPageMetadata(
+  "/security",
+  "Security - SOWLedger",
+  "How SOWLedger handles workspace access, API keys, connected services, and exports, and how to report a security concern.",
+);
 
 export default function SecurityPage() {
   return (
