@@ -11,7 +11,7 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [
         "/api/", "/admin", "/app/", "/dashboard", "/activity", "/planner",
         "/calendar", "/clients", "/people", "/projects", "/reports",
-        "/approvals", "/invoices", "/integrations", "/exports", "/settings",
+        "/approvals", "/invoices", "/integrations", "/exports", "/notifications", "/settings",
         "/client", "/monitoring",
       ],
     },

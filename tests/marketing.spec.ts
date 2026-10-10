@@ -196,6 +196,7 @@ test.describe("Public marketing", () => {
     expect(robots.headers()["content-type"]).toContain("text/plain");
     expect(await robots.text()).toContain("Sitemap: https://www.sowledger.com/sitemap.xml");
     expect(await robots.text()).toContain("Disallow: /api/");
+    expect(await robots.text()).toContain("Disallow: /notifications");
     expect(await robots.text()).not.toContain("Disallow: /login");
     const socialImage = await page.request.get("/opengraph-image");
     expect(socialImage.status()).toBe(200);
