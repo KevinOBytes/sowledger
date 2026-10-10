@@ -29,6 +29,7 @@ export function CalendarIntegrationPanel() {
   const [oauthReady, setOauthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const connected = connection?.status === "connected";
   const statusText = useMemo(() => {
@@ -38,14 +39,16 @@ export function CalendarIntegrationPanel() {
   }, [connected, connection?.status]);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await fetch("/api/integrations");
       const data = await response.json() as IntegrationsResponse;
       if (!response.ok) throw new Error(data.error || "Unable to load integration status");
       setConnection((data.connections ?? []).find((item) => item.provider === "google_calendar") ?? null);
       setOauthReady(Boolean(data.readiness?.googleCalendarOAuth));
+      setLoadError(false);
     } catch {
-      // Calendar should still work if integration metadata is unavailable.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -63,15 +66,22 @@ export function CalendarIntegrationPanel() {
       const data = await response.json() as { error?: string; result?: { exported?: number; imported?: number; updated?: number } };
       if (!response.ok) throw new Error(data.error || "Google Calendar sync failed");
       toast.success("Calendar sync complete", { description: `${data.result?.exported ?? 0} exported, ${data.result?.imported ?? 0} imported, ${data.result?.updated ?? 0} updated.` });
+      window.dispatchEvent(new CustomEvent("sowledger:calendar-updated"));
       await load();
-    } catch (error) {
-      toast.error("Calendar sync failed", { description: error instanceof Error ? error.message : "Unknown error" });
+    } catch {
+      toast.error("Calendar sync failed", { description: "Try again, or open integration settings to check the connection." });
     } finally {
       setSyncing(false);
     }
   }
 
-  if (loading) return null;
+  if (loading) return <p className="px-4 text-sm text-slate-500" role="status">Checking Google Calendar connection...</p>;
+  if (loadError) return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+      <p>Could not check your Google Calendar connection. Your SOWLedger calendar is still available.</p>
+      <button type="button" onClick={() => void load()} className="font-semibold underline">Retry connection check</button>
+    </div>
+  );
 
   return (
     <section className="rounded-[28px] border border-cyan-100 bg-white p-4 shadow-sm">
@@ -85,10 +95,10 @@ export function CalendarIntegrationPanel() {
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
               {connected
                 ? `${connection?.displayName || "Google Calendar"}. ${formatSync(connection?.lastSyncedAt)}. External busy events appear as unavailable blocks.`
-                : "Make calendar planning production-grade by syncing planned blocks and importing external busy time."}
+                : "Sync scheduled work and see when you are busy in Google Calendar."}
             </p>
-            {connection?.lastError && <p className="mt-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{connection.lastError}</p>}
-            {!connected && !oauthReady && <p className="mt-2 text-xs font-semibold text-amber-700">Google OAuth env vars are not configured yet.</p>}
+            {connection?.lastError && <p className="mt-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">The last sync failed. Try again or reconnect in integration settings.</p>}
+            {!connected && !oauthReady && <p className="mt-2 text-xs font-semibold text-amber-700">Google Calendar connection is not available yet. Ask your workspace owner for help.</p>}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">

@@ -1,10 +1,10 @@
 export const WORKFLOW = [
-  { step: "Plan work", detail: "Put intended work on the calendar before the day gets noisy." },
-  { step: "Track live timers", detail: "Capture active work without losing concurrent context." },
-  { step: "Log manual/calendar time", detail: "Backfill completed work and import planned blocks." },
-  { step: "Review analytics", detail: "Compare plan, timer, manual, utilization, and billable output." },
-  { step: "Approve/invoice/export", detail: "Move corrected work into proof packs and digest-backed exports." },
-  { step: "Integrate by API", detail: "Sync scoped proof data into agency, finance, and reporting systems." },
+  { step: "Plan your day", detail: "Set aside time for project work, meetings, and follow-up on your calendar." },
+  { step: "Track as you work", detail: "Start a timer for the task at hand. Keep separate timers when you switch between projects." },
+  { step: "Add missed time", detail: "Log completed work by hand or turn a finished calendar block into a time entry." },
+  { step: "Review the week", detail: "Check planned hours against actual time and see how much of your work is billable." },
+  { step: "Approve and invoice", detail: "Review entries, approve billable time, and create an invoice or export the details." },
+  { step: "Connect your tools", detail: "Use the API and webhooks to bring work records into your reporting and other systems." },
 ];
 
 interface WorkflowSectionProps {

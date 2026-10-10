@@ -27,9 +27,12 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
   useEffect(() => {
     if (!isOpen) return;
     fetch("/api/clients")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Clients unavailable");
+        return res.json();
+      })
       .then((data) => setClients(data.clients ?? []))
-      .catch(() => null);
+      .catch(() => setError("We couldn't load your clients. Close this form and try again to choose a client."));
   }, [isOpen]);
 
   function resetForm() {
@@ -102,20 +105,20 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
                   <div className="mb-6 rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Sparkles className="h-4 w-4 text-cyan-600" />
-                      <p className="text-sm font-bold text-cyan-900">Quick-start templates</p>
+                      <p className="text-sm font-bold text-cyan-900">Example setups</p>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-3">
-                      <button type="button" onClick={() => { setName(name || "Monthly Retainer"); setBillingModel("fixed_fee"); setBudgetType("none"); setBudgetAmount(""); }} className="rounded-xl border border-cyan-200 bg-white p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50">
-                        <p className="text-sm font-bold text-slate-800">Retainer</p>
-                        <p className="text-xs text-slate-500">Fixed monthly</p>
+                      <button type="button" onClick={() => { setName(name || "Client project"); setBillingModel("fixed_fee"); setBudgetType("none"); setBudgetAmount(""); }} className="rounded-xl border border-cyan-200 bg-white p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50">
+                        <p className="text-sm font-bold text-slate-800">Fixed-fee work</p>
+                        <p className="text-xs text-slate-500">Track the hours</p>
                       </button>
                       <button type="button" onClick={() => { setName(name || "Website Launch"); setBillingModel("fixed_fee"); setBudgetType("fees"); setBudgetAmount("10000"); }} className="rounded-xl border border-cyan-200 bg-white p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50">
-                        <p className="text-sm font-bold text-slate-800">Milestone</p>
-                        <p className="text-xs text-slate-500">Fixed project total</p>
+                        <p className="text-sm font-bold text-slate-800">Fee budget</p>
+                        <p className="text-xs text-slate-500">$10,000 estimate</p>
                       </button>
-                      <button type="button" onClick={() => { setName(name || "Consulting (NTE)"); setBillingModel("hourly"); setBudgetType("hours"); setBudgetAmount("100"); }} className="rounded-xl border border-cyan-200 bg-white p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50">
-                        <p className="text-sm font-bold text-slate-800">T&M (NTE)</p>
-                        <p className="text-xs text-slate-500">Hourly with cap</p>
+                      <button type="button" onClick={() => { setName(name || "Consulting"); setBillingModel("hourly"); setBudgetType("hours"); setBudgetAmount("100"); }} className="rounded-xl border border-cyan-200 bg-white p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50">
+                        <p className="text-sm font-bold text-slate-800">Hourly work</p>
+                        <p className="text-xs text-slate-500">100-hour estimate</p>
                       </button>
                     </div>
                   </div>
@@ -125,10 +128,10 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
               ) : (
                 <>
                   <div>
-                    <p className="mb-2 text-sm font-bold text-slate-700">Billing Model</p>
+                    <p className="mb-2 text-sm font-bold text-slate-700">Billing model</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <button type="button" onClick={() => setBillingModel("hourly")} className={`rounded-2xl border p-4 text-left transition ${billingModel === "hourly" ? "border-cyan-300 bg-cyan-50 text-cyan-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}><ClockIcon className="mb-2 h-5 w-5" /><p className="font-bold">Time & Materials</p><p className="text-xs">Bill by the hour</p></button>
-                      <button type="button" onClick={() => setBillingModel("fixed_fee")} className={`rounded-2xl border p-4 text-left transition ${billingModel === "fixed_fee" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}><DollarSignIcon className="mb-2 h-5 w-5" /><p className="font-bold">Fixed Fee</p><p className="text-xs">Set project total</p></button>
+                      <button type="button" onClick={() => setBillingModel("fixed_fee")} className={`rounded-2xl border p-4 text-left transition ${billingModel === "fixed_fee" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}><DollarSignIcon className="mb-2 h-5 w-5" /><p className="font-bold">Fixed Fee</p><p className="text-xs">Track work against a fee budget</p></button>
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
@@ -137,6 +140,8 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
                   </div>
                 </>
               )}
+
+              {step === 2 && <p className="text-xs leading-5 text-slate-500">Budgets help you compare time and value; they do not cap timers or invoices. Invoices use approved time. Recurring and milestone billing are not automated.</p>}
 
               {error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p>}
               <div className="flex justify-end gap-2 border-t border-slate-100 pt-5">

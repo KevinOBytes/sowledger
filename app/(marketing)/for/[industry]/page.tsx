@@ -14,11 +14,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const industry = industries.find((item) => item.slug === slug);
 
   if (!industry) {
-    return { title: "Industry Not Found | SOWLedger" };
+    return { title: "Page not found | SOWLedger" };
   }
 
   return {
-    title: `SOWLedger for ${industry.name} | Proof-backed billing`,
+    title: `Time tracking for ${industry.name} | SOWLedger`,
     description: industry.heroSubhead,
     alternates: { canonical: `https://www.sowledger.com/for/${industry.slug}` },
   };

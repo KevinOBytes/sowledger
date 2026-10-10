@@ -132,7 +132,10 @@ async function postWebhookPayload(url: string, payload: { event: string; data: u
       },
     }, (res) => {
       res.resume();
-      res.on("end", () => resolve());
+      res.on("end", () => {
+        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) resolve();
+        else reject(new Error(`Webhook returned HTTP ${res.statusCode ?? "unknown"}`));
+      });
     });
 
     req.on("timeout", () => req.destroy(new Error("Webhook request timed out")));
@@ -150,12 +153,16 @@ export async function dispatchWebhook(workspaceId: string, eventType: string, pa
   
   if (activeHooks.length === 0) return;
 
-  for (const hook of activeHooks) {
+  await Promise.all(activeHooks.map(async (hook) => {
     const url = await validateWebhookUrl(hook.url).catch(() => null);
-    if (!url) continue;
-
-    postWebhookPayload(url, { event: eventType, data: payload }).catch((e) => console.error("Webhook failed:", e));
-  }
+    if (!url) return;
+    try {
+      await postWebhookPayload(url, { event: eventType, data: payload });
+    } catch {
+      // Keep endpoint URLs and payloads out of application logs.
+      console.error("Webhook delivery failed", { webhookId: hook.id, eventType });
+    }
+  }));
 }
 
 export async function enforceAuthKey(req: NextRequest) {
@@ -337,9 +344,9 @@ export async function appendAuditLog(params: {
   actorUserId: string;
   eventType: string;
   diff: Record<string, { before: unknown; after: unknown }>;
-}) {
+}, transaction?: Pick<typeof db, "insert">) {
   const serializedDiff = JSON.stringify(params.diff);
-  await db.insert(auditLogs).values({
+  await (transaction ?? db).insert(auditLogs).values({
     id: crypto.randomUUID(),
     workspaceId: params.workspaceId,
     timeEntryId: params.timeEntryId,
@@ -349,10 +356,13 @@ export async function appendAuditLog(params: {
     signature: signAudit(serializedDiff, params.eventType),
   });
 
-  // Fire Webhooks async without blocking the main thread
-  after(() => {
-    dispatchWebhook(params.workspaceId, params.eventType, params.diff).catch(() => {});
-  });
+  // Transactional callers dispatch only after commit so rolled-back events
+  // cannot escape to integrations. Await delivery for the serverless lifetime.
+  if (!transaction) {
+    after(async () => {
+      await dispatchWebhook(params.workspaceId, params.eventType, params.diff);
+    });
+  }
 }
 
 export async function createTimeEntry(input: Omit<typeof timeEntries.$inferInsert, "id" | "createdAt">) {

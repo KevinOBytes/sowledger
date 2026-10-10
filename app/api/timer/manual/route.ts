@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { getAppOrigin } from "@/lib/app-url";
 import { requireSession, requireRole } from "@/lib/auth";
 import {  ensurePeriodUnlocked, enforceDailyHoursLimit } from "@/lib/security";
 import { db } from "@/lib/db";
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
       dispatchIntegrationNotification(session.workspaceId, "time_entry.created", {
         title: "Completed work logged",
         body: `${entry.description || entry.taskId} (${Math.round(durationSeconds / 60)} min, ${entry.source})`,
-        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/activity`,
+        url: `${getAppOrigin()}/activity`,
       }).catch(() => {});
     });
 

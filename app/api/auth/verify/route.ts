@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consumeMagicLink, setSessionCookie } from "@/lib/auth";
+import { consumeMagicLink, ForbiddenError, setSessionCookie, UnauthorizedError } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,10 +18,15 @@ export async function GET(req: NextRequest) {
       role: membership.role,
     });
 
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+    return NextResponse.redirect(new URL(membership.role === "client" ? "/client" : "/dashboard", req.url));
   } catch (error) {
     const url = new URL("/login", req.url);
-    url.searchParams.set("error", (error as Error).message || "Could not verify sign-in link");
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+      url.searchParams.set("error", error.message);
+    } else {
+      console.error("Sign-in verification failed", { errorType: error instanceof Error ? error.name : "UnknownError" });
+      url.searchParams.set("error", "service_unavailable");
+    }
     return NextResponse.redirect(url);
   }
 }

@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { db } from "@/lib/db";
+import { sql } from "drizzle-orm";
 
-function hasNeon() {
-  return Boolean(env.DATABASE_URL && /neon|postgres/i.test(env.DATABASE_URL));
+async function hasDatabaseAccess() {
+  if (!env.DATABASE_URL) return false;
+  try {
+    await db.execute(sql`SELECT 1 FROM sowledger.memberships LIMIT 1`);
+    await db.execute(sql`SELECT 1 FROM sowledger.clients LIMIT 1`);
+    await db.execute(sql`SELECT 1 FROM sowledger.time_entries LIMIT 1`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function hasUpstash() {
@@ -21,7 +31,7 @@ export async function GET(req: NextRequest) {
     authCookieSecret: Boolean(env.AUTH_COOKIE_SECRET && env.AUTH_COOKIE_SECRET.length >= 24),
     auditSigningSecret: Boolean(env.AUDIT_SIGNING_SECRET),
     resendApiKey: Boolean(env.RESEND_API_KEY),
-    neonPostgres: hasNeon(),
+    neonPostgres: await hasDatabaseAccess(),
     stripeSecretKey: Boolean(env.STRIPE_SECRET_KEY),
     stripeWebhookSecret: Boolean(env.STRIPE_WEBHOOK_SECRET),
     stripePrices: Boolean(env.STRIPE_PRO_PRICE_ID && env.STRIPE_SMB_PRICE_ID && env.STRIPE_ENTERPRISE_PRICE_ID),

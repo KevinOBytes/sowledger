@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { getAppOrigin } from "@/lib/app-url";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 
 import { requireRole, requireSession } from "@/lib/auth";
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
       dispatchIntegrationNotification(session.workspaceId, "scheduled_block.created", {
         title: `Scheduled: ${block.title}`,
         body: `${new Date(block.startsAt).toLocaleString()} - ${new Date(block.endsAt).toLocaleString()}`,
-        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/calendar`,
+        url: `${getAppOrigin()}/calendar`,
       }).catch(() => {});
     });
 

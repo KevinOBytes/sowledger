@@ -5,7 +5,6 @@ import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent
 import {
   AlertTriangle,
   Bell,
-  CalendarClock,
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
@@ -26,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
 
 type TimeEntry = {
   id: string;
@@ -66,7 +66,7 @@ type ScheduledBlock = {
 };
 
 type ComposerMode = "scheduled" | "calendar" | "unavailable";
-type ViewMode = "week" | "team" | "month";
+type ViewMode = "day" | "week" | "team" | "month";
 type ResizeEdge = "start" | "end";
 type RepeatMode = "none" | "daily" | "weekly";
 
@@ -223,8 +223,7 @@ function eventOverlapsDay(day: Date, startsAt: string | Date, endsAt: string | D
 }
 
 function isUnavailableBlock(block: ScheduledBlock) {
-  const text = `${block.title} ${(block.tags ?? []).join(" ")}`.toLowerCase();
-  return text.includes("unavailable") || text.includes("ooo") || text.includes("out of office");
+  return isUnavailableScheduledBlock(block);
 }
 
 function statusLabel(block: ScheduledBlock) {
@@ -257,6 +256,7 @@ export function CalendarView() {
   const [actions, setActions] = useState<Action[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<ComposerMode>("scheduled");
   const [editingBlock, setEditingBlock] = useState<ScheduledBlock | null>(null);
@@ -294,7 +294,11 @@ export function CalendarView() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
-    const onResize = () => setIsMobile(window.innerWidth < 640);
+    const onResize = () => {
+      const phone = window.innerWidth < 640;
+      setIsMobile(phone);
+      if (phone) setViewMode((current) => current === "week" ? "day" : current);
+    };
     onResize();
     window.addEventListener("resize", onResize);
     const interval = setInterval(() => setNow(Date.now()), 60000);
@@ -339,6 +343,11 @@ export function CalendarView() {
   }, [currentDate]);
 
   const lanes: Lane[] = useMemo(() => {
+    if (viewMode === "day") {
+      const day = new Date(currentDate);
+      day.setHours(0, 0, 0, 0);
+      return [{ key: dateKey(day), label: day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }), date: day, userId: session?.sub }];
+    }
     if (viewMode === "team") {
       const day = new Date(currentDate);
       day.setHours(0, 0, 0, 0);
@@ -432,8 +441,9 @@ export function CalendarView() {
     return candidates[0] ?? null;
   }
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
+    try {
     const [calendarRes, scheduleRes, projectsRes, actionsRes, peopleRes, settingsRes, authRes] = await Promise.all([
       fetch("/api/calendar").catch(() => null),
       fetch("/api/schedule?scope=team").catch(() => null),
@@ -443,6 +453,9 @@ export function CalendarView() {
       fetch("/api/user/settings").catch(() => null),
       fetch("/api/auth/me").catch(() => null),
     ]);
+    if (![calendarRes, scheduleRes, projectsRes, actionsRes, settingsRes, authRes].every((response) => response?.ok)) {
+      throw new Error("Calendar data unavailable");
+    }
     if (authRes?.ok) {
       const data = await authRes.json();
       setSession(data.session ?? null);
@@ -469,32 +482,32 @@ export function CalendarView() {
         setVisibleEndHour(end);
       }
     }
-    setLoading(false);
-  }
+    setLoadError(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       fetchData().catch(() => toast.error("Unable to load calendar"));
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-    const onResize = () => setIsMobile(window.innerWidth < 640);
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  }, [fetchData]);
 
   useEffect(() => {
     const onTimeSaved = () => {
       fetchData().catch(() => null);
     };
     window.addEventListener("sowledger:time-saved", onTimeSaved);
-    return () => window.removeEventListener("sowledger:time-saved", onTimeSaved);
-  }, []);
+    window.addEventListener("sowledger:calendar-updated", onTimeSaved);
+    return () => {
+      window.removeEventListener("sowledger:time-saved", onTimeSaved);
+      window.removeEventListener("sowledger:calendar-updated", onTimeSaved);
+    };
+  }, [fetchData]);
 
   useLayoutEffect(() => {
     if (!focusBlockId) return;
@@ -622,7 +635,7 @@ export function CalendarView() {
       if (!response.ok) throw new Error(data.error || "Could not save calendar hours");
       toast.success("Calendar hours saved");
     } catch (error) {
-      toast.error("Could not save calendar hours", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error("Could not save calendar hours", { description: error instanceof Error ? error.message : "Check your connection and try again." });
     } finally {
       setSavingHours(false);
     }
@@ -697,7 +710,7 @@ export function CalendarView() {
       await fetchData();
       scrollBlockIntoView(block.id);
     } catch (error) {
-      toast.error("Could not schedule work", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error("Could not schedule work", { description: error instanceof Error ? error.message : "Check your connection and try again." });
     }
   }
 
@@ -753,7 +766,8 @@ export function CalendarView() {
           body: JSON.stringify({
             taskId: taskId || title,
             projectId: eventProjectId || undefined,
-            actionId: editingBlock?.actionId || eventActionId || undefined,
+            // An empty string explicitly clears the scheduled rate; omission inherits it.
+            actionId: eventActionId,
             description: eventNotes || title,
             tags: [...tags],
             startedAt: startsAt.toISOString(),
@@ -771,29 +785,33 @@ export function CalendarView() {
       await fetchData();
       if (targetBlockId) scrollBlockIntoView(targetBlockId);
     } catch (error) {
-      toast.error("Could not save calendar event", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error("Could not save calendar event", { description: error instanceof Error ? error.message : "Check your connection and try again." });
     } finally {
       setSavingEvent(false);
     }
   }
 
   async function startBlock(block: ScheduledBlock) {
-    const response = await fetch("/api/timer/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        taskId: block.taskId || block.title,
-        projectId: block.projectId || undefined,
-        actionId: block.actionId || undefined,
-        description: block.notes || block.title,
-        tags: block.tags,
-        scheduledBlockId: block.id,
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) toast.error("Could not start scheduled work", { description: data.error });
-    else toast.success("Timer started from schedule");
-    await fetchData();
+    try {
+      const response = await fetch("/api/timer/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: block.taskId || block.title,
+          projectId: block.projectId || undefined,
+          actionId: block.actionId || undefined,
+          description: block.notes || block.title,
+          tags: block.tags,
+          scheduledBlockId: block.id,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) toast.error("Could not start scheduled work", { description: data.error });
+      else toast.success("Timer started from schedule");
+      await fetchData();
+    } catch {
+      toast.error("Could not start scheduled work", { description: "Check your connection and try again." });
+    }
   }
 
   async function logCompletedBlock(block: ScheduledBlock) {
@@ -811,7 +829,7 @@ export function CalendarView() {
       setSelectedBlock(null);
       setDraft(null);
     } catch (error) {
-      toast.error("Could not move work", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error("Could not move work", { description: error instanceof Error ? error.message : "Check your connection and try again." });
     }
   }
 
@@ -834,7 +852,7 @@ export function CalendarView() {
       setSelectedBlock(null);
       await fetchData();
     } catch (error) {
-      toast.error("Could not duplicate block", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error("Could not duplicate block", { description: error instanceof Error ? error.message : "Check your connection and try again." });
     }
   }
 
@@ -843,19 +861,24 @@ export function CalendarView() {
       await patchBlock(block.id, { status: "skipped" }, "Scheduled work skipped");
       setSelectedBlock(null);
     } catch (error) {
-      toast.error("Could not skip work", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error("Could not skip work", { description: error instanceof Error ? error.message : "Check your connection and try again." });
     }
   }
 
   async function cancelBlock(block: ScheduledBlock) {
-    const response = await fetch(`/api/schedule?blockId=${encodeURIComponent(block.id)}`, { method: "DELETE" });
-    if (!response.ok) toast.error("Could not cancel scheduled work");
-    else toast.success("Scheduled work canceled");
-    setSelectedBlock(null);
-    await fetchData();
+    try {
+      const response = await fetch(`/api/schedule?blockId=${encodeURIComponent(block.id)}`, { method: "DELETE" });
+      if (!response.ok) toast.error("Could not cancel scheduled work");
+      else toast.success("Scheduled work canceled");
+      setSelectedBlock(null);
+      await fetchData();
+    } catch {
+      toast.error("Could not cancel scheduled work", { description: "Check your connection and try again." });
+    }
   }
 
   function beginSlotDrag(event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>, lane: Lane) {
+    if (isMobile) return;
     if (event.button !== 0) return;
     const column = event.currentTarget.closest<HTMLElement>("[data-day-column]");
     if (!column) return;
@@ -872,6 +895,7 @@ export function CalendarView() {
   }
 
   function beginBlockMove(event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>, block: ScheduledBlock, day: Date) {
+    if (isMobile) return;
     if (event.button !== 0) return;
     const column = event.currentTarget.closest<HTMLElement>("[data-day-column]");
     if (!column) return;
@@ -890,6 +914,7 @@ export function CalendarView() {
   }
 
   function beginBlockResize(event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>, block: ScheduledBlock, day: Date, edge: ResizeEdge) {
+    if (isMobile) return;
     if (event.button !== 0) return;
     const column = event.currentTarget.closest<HTMLElement>("[data-day-column]");
     if (!column) return;
@@ -916,7 +941,7 @@ export function CalendarView() {
       setDraft(null);
       setMovingBlockId(null);
     } catch (error) {
-      toast.error(draft.kind === "resize" ? "Could not resize scheduled work" : "Could not move scheduled work", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error(draft.kind === "resize" ? "Could not resize scheduled work" : "Could not move scheduled work", { description: error instanceof Error ? error.message : "Check your connection and try again." });
     } finally {
       setReschedulingBlock(false);
     }
@@ -930,7 +955,7 @@ export function CalendarView() {
     try {
       await patchBlock(block.id, { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() });
     } catch (error) {
-      toast.error("Could not move scheduled work", { description: error instanceof Error ? error.message : "Unknown error" });
+      toast.error("Could not move scheduled work", { description: error instanceof Error ? error.message : "Check your connection and try again." });
     }
   }
 
@@ -1047,12 +1072,12 @@ export function CalendarView() {
         </div>
       );
     }
-    const gridTemplateColumns = viewMode === "team"
+    const gridTemplateColumns = viewMode === "day" ? "52px minmax(0, 1fr)" : viewMode === "team"
       ? `72px repeat(${Math.max(1, lanes.length)}, minmax(170px, 1fr))`
       : "72px repeat(7, minmax(130px, 1fr))";
     return (
-      <div className="min-h-0 flex-1 overflow-auto">
-        <div className={viewMode === "team" ? "min-w-[1080px]" : "min-w-[1040px]"}>
+      <div className="max-h-[68dvh] min-h-[380px] flex-1 overflow-auto overscroll-contain" data-testid="calendar-scroll-area">
+        <div className={viewMode === "day" ? "min-w-0" : viewMode === "team" ? "min-w-[1080px]" : "min-w-[1040px]"}>
           <div className="grid border-b border-slate-200 bg-slate-50 text-sm" style={{ gridTemplateColumns }}>
             <div className="border-r border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">Time</div>
             {lanes.map((lane) => {
@@ -1079,10 +1104,10 @@ export function CalendarView() {
                   {hours.map((hour) => {
                     const slotStart = new Date(`${dateKey(lane.date)}T${String(hour).padStart(2, "0")}:00`);
                     return (
-                      <button key={`${lane.key}-${hour}`} type="button" data-calendar-slot="true" onPointerDown={(event) => beginSlotDrag(event, lane)} onMouseDown={(event) => beginSlotDrag(event, lane)} className="block w-full border-b border-slate-100 px-2 text-left text-[11px] text-transparent transition hover:bg-cyan-50 hover:text-cyan-700" style={{ height: HOUR_HEIGHT }} aria-label={`Schedule work ${lane.label} ${timeLabel(slotStart)}`}>Drag to add</button>
+                      <button key={`${lane.key}-${hour}`} type="button" data-calendar-slot="true" onPointerDown={(event) => beginSlotDrag(event, lane)} onMouseDown={(event) => beginSlotDrag(event, lane)} onClick={(event) => { if (isMobile || event.detail === 0) openComposer({ mode: "scheduled", startAt: slotStart, userId: lane.userId }); }} className="block w-full border-b border-slate-100 px-2 text-left text-[11px] text-transparent transition hover:bg-cyan-50 hover:text-cyan-700" style={{ height: HOUR_HEIGHT }} aria-label={`Schedule work ${lane.label} ${timeLabel(slotStart)}`}>{isMobile ? "Tap to add" : "Drag to add"}</button>
                     );
                   })}
-                  {!hasWork && <div data-testid="calendar-empty-day-hint" className="pointer-events-none absolute left-3 right-3 top-4 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-3 text-xs text-slate-400">Drag here to plan work, log time, or mark unavailable.</div>}
+                  {!hasWork && <div data-testid="calendar-empty-day-hint" className="pointer-events-none absolute left-3 right-3 top-4 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-3 text-xs text-slate-400">{isMobile ? "Tap a time to schedule work." : "Drag to schedule work, log time, or mark yourself unavailable."}</div>}
                   {draftForLane && (
                     <div className={`pointer-events-none absolute left-1 right-1 z-20 rounded-2xl border-2 border-dashed p-2 text-xs shadow-sm ${draftForLane.kind === "selection" ? "border-cyan-500 bg-cyan-100/85 text-cyan-950" : "border-slate-400 bg-white/90 text-slate-800"}`} style={clampEventStyle(lane.date, draftForLane.startsAt, draftForLane.endsAt)}>
                       <p className="font-bold">{draftForLane.kind === "resize" ? "Resize block" : draftForLane.kind === "move" ? "Move block here" : "New work block"}</p>
@@ -1117,17 +1142,9 @@ export function CalendarView() {
   } : undefined;
 
   return (
-    <div className="flex h-full flex-col gap-5">
-      <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.22em] text-cyan-700"><CalendarClock className="h-4 w-4" /> Calendar operations</div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Block the week. Log what happened.</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">Drag empty space to block time, use handles to resize, recover missed work, or switch to team lanes when assigning schedules.</p>
-            <div data-testid="calendar-timezone-cue" className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              <Clock className="h-3.5 w-3.5" /> Times shown in browser timezone {browserTimezone} ({timezoneLabel(browserTimezone)}){browserTimezone !== userTimezone ? ` · Account timezone ${userTimezone}` : ""}
-            </div>
-          </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => openComposer({ mode: "scheduled" })} className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"><CalendarPlus className="h-4 w-4" /> Schedule work</button>
             <button onClick={() => openComposer({ mode: "calendar" })} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-cyan-300 hover:text-cyan-700"><CheckCircle2 className="h-4 w-4" /> Log completed time</button>
@@ -1136,38 +1153,41 @@ export function CalendarView() {
         </div>
       </div>
 
-      {(upcomingBlocks.length > 0 || missedBlocks.length > 0) && (
-        <div className="grid gap-3 lg:grid-cols-2">
+      {!loadError && !loading && (upcomingBlocks.length > 0 || missedBlocks.length > 0) && (
+        <details className="rounded-2xl border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Schedule reminders ({upcomingBlocks.length + missedBlocks.length})</summary><div className="mt-3 grid gap-3 lg:grid-cols-2">
           {upcomingBlocks.length > 0 && <div className="rounded-[24px] border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900"><div className="flex items-center gap-2 font-bold"><Bell className="h-4 w-4" /> Starting soon</div>{upcomingBlocks.map((block) => <p key={block.id} className="mt-2">{block.title} starts at {timeLabel(block.startsAt)}.</p>)}</div>}
           {missedBlocks.length > 0 && <div className="rounded-[24px] border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900"><div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4" /> Missed planned work</div><div className="mt-2 space-y-2">{missedBlocks.map((block) => <div key={block.id} className="flex flex-wrap items-center justify-between gap-2"><span>{block.title} · {timeLabel(block.startsAt)}</span><span className="flex gap-2"><button className="font-bold underline" onClick={() => logCompletedBlock(block)}>Log it</button><button className="font-bold underline" onClick={() => moveToNextOpenSlot(block)}>Reschedule</button><button className="font-bold underline" onClick={() => skipBlock(block)}>Skip</button></span></div>)}</div></div>}
-        </div>
+        </div></details>
       )}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-visible rounded-[28px] border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-slate-950">{mounted ? (viewMode === "week" ? weekRangeLabel : viewMode === "team" ? `${currentDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} team lanes` : `${currentDate.toLocaleString("default", { month: "long" })} ${currentDate.getFullYear()}`) : "Loading..."}</h2>
-            <p className="text-sm text-slate-500">{viewMode === "team" ? "Assign work across members without leaving the calendar." : viewMode === "week" ? `${visibleStartHour}:00 to ${visibleEndHour === 24 ? "midnight" : `${visibleEndHour}:00`} with 15-minute drag scheduling.` : "Month overview for spotting planned and logged work."}</p>
+            <h2 className="text-xl font-semibold text-slate-950">{mounted ? (viewMode === "week" ? weekRangeLabel : viewMode === "team" || viewMode === "day" ? `${currentDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}${viewMode === "team" ? " · Team" : ""}` : `${currentDate.toLocaleString("default", { month: "long" })} ${currentDate.getFullYear()}`) : "Loading..."}</h2>
+            <p className="text-sm text-slate-500">{viewMode === "team" ? "Team schedule" : viewMode === "week" ? "Drag a time range to schedule work." : viewMode === "day" ? "Tap a time to schedule work." : "Planned and logged work this month."}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-full bg-slate-100 p-1">
-              <button onClick={() => setViewMode("week")} className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-bold transition ${viewMode === "week" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}><CalendarDays className="h-4 w-4" />Week</button>
+            <div className="inline-flex flex-wrap rounded-2xl bg-slate-100 p-1">
+              <button onClick={() => setViewMode("day")} aria-pressed={viewMode === "day"} className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-bold transition ${viewMode === "day" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Day</button>
+              <button aria-pressed={viewMode === "week"} onClick={() => setViewMode("week")} className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-bold transition ${viewMode === "week" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}><CalendarDays className="h-4 w-4" />Week</button>
               {isManager && <button onClick={() => setViewMode("team")} className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-bold transition ${viewMode === "team" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}><UsersRound className="h-4 w-4" />Team</button>}
               <button onClick={() => setViewMode("month")} className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-bold transition ${viewMode === "month" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}><LayoutGrid className="h-4 w-4" />Month</button>
             </div>
+            <details className="relative"><summary className="cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">Calendar hours</summary><div className="absolute right-0 top-full z-30 mt-2 flex w-64 flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg">
             <select aria-label="Visible start hour" value={visibleStartHour} onChange={(event) => setVisibleStartHour(Number(event.target.value))} className="h-10 rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700">{Array.from({ length: 23 }, (_, i) => i).map((hour) => <option key={hour} value={hour}>{timeLabel(new Date(2020, 0, 1, hour))}</option>)}</select>
             <select aria-label="Visible end hour" value={visibleEndHour} onChange={(event) => setVisibleEndHour(Number(event.target.value))} className="h-10 rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700">{Array.from({ length: 24 }, (_, i) => i + 1).map((hour) => <option key={hour} value={hour}>{hour === 24 ? "Midnight" : timeLabel(new Date(2020, 0, 1, hour))}</option>)}</select>
-            <button onClick={saveWorkingHours} disabled={savingHours} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">{savingHours ? "Saving..." : "Save hours"}</button>
-            <button onClick={() => setCurrentDate(viewMode === "month" ? new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1) : addDays(currentDate, viewMode === "team" ? -1 : -7))} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Previous period"><ChevronLeft className="h-5 w-5" /></button>
+            <button onClick={saveWorkingHours} disabled={savingHours} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">{savingHours ? "Saving..." : "Save hours"}</button></div></details>
+            <button onClick={() => setCurrentDate(viewMode === "month" ? new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1) : addDays(currentDate, viewMode === "team" || viewMode === "day" ? -1 : -7))} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Previous period"><ChevronLeft className="h-5 w-5" /></button>
             <button onClick={() => setCurrentDate(new Date())} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Today</button>
-            <button onClick={() => setCurrentDate(viewMode === "month" ? new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1) : addDays(currentDate, viewMode === "team" ? 1 : 7))} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Next period"><ChevronRight className="h-5 w-5" /></button>
+            <button onClick={() => setCurrentDate(viewMode === "month" ? new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1) : addDays(currentDate, viewMode === "team" || viewMode === "day" ? 1 : 7))} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Next period"><ChevronRight className="h-5 w-5" /></button>
           </div>
         </div>
 
-        {loading || !mounted ? <div className="p-10 text-center text-slate-500">Loading calendar...</div> : viewMode === "month" ? (
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="grid grid-cols-7 bg-slate-50 text-center text-xs font-bold uppercase tracking-wider text-slate-500">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div key={day} className="border-b border-slate-200 py-3">{day}</div>)}</div>
-            <div className="grid min-h-full grid-cols-7 auto-rows-[minmax(155px,1fr)]">
+        <p data-testid="calendar-timezone-cue" className="border-b border-slate-100 px-5 py-2 text-xs text-slate-500">Times shown in browser timezone {browserTimezone} ({timezoneLabel(browserTimezone)}){browserTimezone !== userTimezone ? ` · Account timezone ${userTimezone}` : ""}</p>
+        {loadError ? <div role="alert" className="m-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><p>Could not load your calendar. Check your connection and try again.</p><button type="button" onClick={() => void fetchData()} disabled={loading} className="mt-3 font-semibold underline">{loading ? "Retrying..." : "Retry calendar"}</button></div> : loading || !mounted ? <div className="p-10 text-center text-slate-500">Loading calendar...</div> : viewMode === "month" ? (
+          <div className="max-h-[68dvh] min-h-0 flex-1 overflow-auto">
+            <div className="grid min-w-[700px] grid-cols-7 bg-slate-50 text-center text-xs font-bold uppercase tracking-wider text-slate-500">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div key={day} className="border-b border-slate-200 py-3">{day}</div>)}</div>
+            <div className="grid min-h-full min-w-[700px] grid-cols-7 auto-rows-[minmax(155px,1fr)]">
               {monthDays.map((cell, index) => {
                 if (!cell) return <div key={`empty-${index}`} className="border-b border-r border-slate-100 bg-slate-50/60" />;
                 const cellDate = new Date(`${cell.dateStr}T00:00`);
@@ -1184,15 +1204,15 @@ export function CalendarView() {
       </div>
 
       {draft && !composerOpen && (
-        <div className={`fixed z-[70] rounded-3xl border border-slate-200 bg-white p-4 text-slate-950 shadow ${isMobile ? "inset-x-3 bottom-3" : "w-[22rem]"}`} style={popoverStyle} role="dialog" aria-label={draft.kind === "selection" ? "Create calendar work block" : draft.kind === "resize" ? "Resize scheduled work" : "Move scheduled work"}>
-          <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">{draft.kind === "selection" ? "Selected time" : draft.kind === "resize" ? "Resize" : "Reschedule"}</p><h3 className="mt-1 text-lg font-semibold">{draft.block?.title ?? "Fill this schedule block"}</h3><p className="mt-1 text-sm text-slate-500">{draft.startsAt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {timeLabel(draft.startsAt)} - {timeLabel(draft.endsAt)}</p></div><button onClick={() => { setDraft(null); setMovingBlockId(null); }} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Dismiss calendar selection"><X className="h-4 w-4" /></button></div>
+        <div className={`fixed z-[110] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 text-slate-950 shadow ${isMobile ? "inset-x-3 bottom-3" : "w-[22rem]"}`} style={popoverStyle} role="dialog" aria-label={draft.kind === "selection" ? "Create calendar work block" : draft.kind === "resize" ? "Resize scheduled work" : "Move scheduled work"}>
+          <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">{draft.kind === "selection" ? "Selected time" : draft.kind === "resize" ? "Resize" : "Reschedule"}</p><h3 className="mt-1 text-lg font-semibold">{draft.block?.title ?? "Schedule this time"}</h3><p className="mt-1 text-sm text-slate-500">{draft.startsAt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {timeLabel(draft.startsAt)} - {timeLabel(draft.endsAt)}</p></div><button onClick={() => { setDraft(null); setMovingBlockId(null); }} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Dismiss calendar selection"><X className="h-4 w-4" /></button></div>
           {draftConflicts.length > 0 && <div data-testid="calendar-conflict-warning" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4" />{draftConflicts.length} conflict(s)</div><p className="mt-1">Overlaps {draftConflicts.slice(0, 2).map((conflict) => conflict.label).join(", ")}.</p></div>}
-          {draft.kind === "selection" ? <div className="mt-4 space-y-3"><input value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" placeholder="Work title" /><div className="flex flex-wrap gap-2"><button onClick={() => createQuickDraft()} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white">Save plan</button><button onClick={() => openComposerFromDraft("calendar")} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Log completed</button><button onClick={() => openComposerFromDraft("unavailable")} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Unavailable</button></div>{draftConflicts.length > 0 && <div className="flex flex-wrap gap-2 text-xs"><button onClick={() => { const next = findNextOpenSlot(draft.endsAt, minuteDuration(draft.startsAt, draft.endsAt), draft.userId ?? session?.sub); if (next) setDraft({ ...draft, ...next }); }} className="font-bold text-cyan-700 underline">Move next open</button><button onClick={() => createQuickDraft({ shorten: true })} className="font-bold text-cyan-700 underline">Shorten</button><button onClick={() => createQuickDraft({ replace: true })} className="font-bold text-cyan-700 underline">Replace planned</button></div>}<button onClick={() => openComposerFromDraft("scheduled")} className="text-xs font-bold text-slate-500 underline">Plan work</button></div> : <div className="mt-4 flex flex-wrap gap-2"><button onClick={applyDraftMove} disabled={reschedulingBlock} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{reschedulingBlock ? "Saving..." : draft.kind === "resize" ? "Resize block" : "Move block"}</button>{draft.block && <button onClick={() => { openComposer({ mode: "scheduled", block: draft.block }); setDraft(null); setMovingBlockId(null); }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Edit details</button>}</div>}
+          {draft.kind === "selection" ? <div className="mt-4 space-y-3"><input value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" placeholder="Work title" /><div className="flex flex-wrap gap-2"><button onClick={() => createQuickDraft()} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white">Save plan</button><button onClick={() => openComposerFromDraft("calendar")} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Log completed</button><button onClick={() => openComposerFromDraft("unavailable")} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Unavailable</button></div>{draftConflicts.length > 0 && <div className="flex flex-wrap gap-2 text-xs"><button onClick={() => { const next = findNextOpenSlot(draft.endsAt, minuteDuration(draft.startsAt, draft.endsAt), draft.userId ?? session?.sub); if (next) setDraft({ ...draft, ...next }); }} className="font-bold text-cyan-700 underline">Move next open</button><button onClick={() => createQuickDraft({ shorten: true })} className="font-bold text-cyan-700 underline">Shorten</button><button onClick={() => createQuickDraft({ replace: true })} className="font-bold text-cyan-700 underline">Replace planned</button></div>}<button onClick={() => openComposerFromDraft("scheduled")} className="text-xs font-bold text-slate-500 underline">Plan work</button></div> : <div className="mt-4 flex flex-wrap gap-2"><button onClick={applyDraftMove} disabled={reschedulingBlock} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{reschedulingBlock ? "Saving..." : draft.kind === "resize" ? "Resize block" : "Move block"}</button>{draft.block && <button onClick={() => { openComposer({ mode: "scheduled", block: draft.block }); setDraft(null); setMovingBlockId(null); }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Edit details</button>}</div>}
         </div>
       )}
 
       {selectedBlock && !composerOpen && (
-        <div className={`fixed z-[70] rounded-3xl border border-slate-200 bg-white p-4 text-slate-950 shadow ${isMobile ? "inset-x-3 bottom-3" : "w-[23rem]"}`} style={selectedStyle} role="dialog" aria-label="Scheduled work actions">
+        <div className={`fixed z-[110] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 text-slate-950 shadow ${isMobile ? "inset-x-3 bottom-3" : "w-[23rem]"}`} style={selectedStyle} role="dialog" aria-label="Scheduled work actions">
           <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">{statusLabel(selectedBlock.block)}</p><h3 className="mt-1 text-lg font-semibold">{selectedBlock.block.title}</h3><p className="mt-1 text-sm text-slate-500">{timeLabel(selectedBlock.block.startsAt)} - {timeLabel(selectedBlock.block.endsAt)}</p></div><button onClick={() => setSelectedBlock(null)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close scheduled work actions"><X className="h-4 w-4" /></button></div>
           {selectedBlockConflicts.length > 0 && <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><AlertTriangle className="mr-1 inline h-4 w-4" />Overlaps {selectedBlockConflicts.length} item(s).</div>}
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm font-semibold">
@@ -1209,24 +1229,24 @@ export function CalendarView() {
       )}
 
       {composerOpen && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Calendar event composer">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] border border-slate-200 bg-white text-slate-950 shadow sm:rounded-[28px]">
-            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5"><div><div className="flex items-center gap-2 text-sm font-semibold text-cyan-700">{composerMode === "scheduled" ? <CalendarPlus className="h-4 w-4" /> : composerMode === "unavailable" ? <Bell className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}{editingBlock ? "Edit calendar work" : "New calendar work"}</div><h2 className="mt-1 text-2xl font-semibold tracking-tight">{composerMode === "scheduled" ? "Schedule work" : composerMode === "unavailable" ? "Mark unavailable" : "Log completed work"}</h2><p className="mt-1 text-sm text-slate-500">Use calendar-style details, recurrence, and assignment without leaving the planning surface.</p></div><button onClick={() => setComposerOpen(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close calendar composer"><X className="h-5 w-5" /></button></div>
-            <div className="border-b border-slate-100 px-6 py-4"><div className="inline-flex rounded-full bg-slate-100 p-1"><button onClick={() => setComposerMode("scheduled")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "scheduled" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Scheduled work</button><button onClick={() => setComposerMode("calendar")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "calendar" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Completed time</button><button onClick={() => setComposerMode("unavailable")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "unavailable" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Unavailable</button></div></div>
+        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Calendar event composer">
+          <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] border border-slate-200 bg-white text-slate-950 shadow sm:rounded-[28px]">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5"><div><div className="flex items-center gap-2 text-sm font-semibold text-cyan-700">{composerMode === "scheduled" ? <CalendarPlus className="h-4 w-4" /> : composerMode === "unavailable" ? <Bell className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}{editingBlock ? "Edit calendar work" : "New calendar work"}</div><h2 className="mt-1 text-2xl font-semibold tracking-tight">{composerMode === "scheduled" ? "Schedule work" : composerMode === "unavailable" ? "Mark unavailable" : "Log completed work"}</h2><p className="mt-1 text-sm text-slate-500">Set the time and add any details you need.</p></div><button onClick={() => setComposerOpen(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close calendar composer"><X className="h-5 w-5" /></button></div>
+            <div className="border-b border-slate-100 px-6 py-4"><div className="flex flex-wrap rounded-2xl bg-slate-100 p-1"><button onClick={() => setComposerMode("scheduled")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "scheduled" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Scheduled work</button><button onClick={() => setComposerMode("calendar")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "calendar" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Completed time</button><button onClick={() => setComposerMode("unavailable")} className={`rounded-full px-4 py-2 text-sm font-bold transition ${composerMode === "unavailable" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}>Unavailable</button></div></div>
             {composerConflicts.length > 0 && <div className="mx-6 mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertTriangle className="mr-2 inline h-4 w-4" />This time overlaps {composerConflicts.length} calendar item(s). Saving will allow the overlap.</div>}
             <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
-              <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Title<input value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="Client review, proposal writing, design QA" /></label>
-              <label className="space-y-1 text-sm font-medium text-slate-700">Project<select value={eventProjectId} onChange={(event) => setEventProjectId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-              <label className="space-y-1 text-sm font-medium text-slate-700">Work type / rate<select value={eventActionId} onChange={(event) => setEventActionId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No work type rate</option>{actions.map((action) => <option key={action.id} value={action.id}>{action.name}{action.hourlyRate ? ` ($${action.hourlyRate}/hr)` : ""}</option>)}</select></label>
-              <label className="space-y-1 text-sm font-medium text-slate-700">Work label<input value={eventTaskId} onChange={(event) => setEventTaskId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="Client call, research review, design QA" /></label>
-              {isManager && composerMode !== "calendar" && <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Assignee<select value={eventUserId ?? session?.sub ?? ""} onChange={(event) => setEventUserId(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white">{members.map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}</select></label>}
-              <label className="space-y-1 text-sm font-medium text-slate-700">Starts<input type="datetime-local" value={eventStart} onChange={(event) => setEventStart(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
-              <label className="space-y-1 text-sm font-medium text-slate-700">Ends<input type="datetime-local" value={eventEnd} onChange={(event) => setEventEnd(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
-              {composerMode !== "calendar" && !editingBlock && <><label className="space-y-1 text-sm font-medium text-slate-700">Repeat<Repeat className="ml-1 inline h-3 w-3" /><select value={repeatMode} onChange={(event) => setRepeatMode(event.target.value as RepeatMode)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label><label className="space-y-1 text-sm font-medium text-slate-700">Occurrences<input type="number" min={1} max={MAX_REPEAT_COUNT} value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label></>}
-              <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Notes<input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="What should happen during this block?" /></label>
-              <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Tags<input value={eventTags} onChange={(event) => setEventTags(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="research, review, billable" /></label>
+              <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Title<input value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="Client review, proposal writing, design QA" /></label>
+              <label className="space-y-1 text-sm font-medium text-slate-700">Project<select value={eventProjectId} onChange={(event) => setEventProjectId(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+              <label className="space-y-1 text-sm font-medium text-slate-700">Work type / rate<select value={eventActionId} onChange={(event) => setEventActionId(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No work type rate</option>{actions.map((action) => <option key={action.id} value={action.id}>{action.name}{action.hourlyRate ? ` ($${action.hourlyRate}/hr)` : ""}</option>)}</select></label>
+              <label className="space-y-1 text-sm font-medium text-slate-700">Work label<input value={eventTaskId} onChange={(event) => setEventTaskId(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="Client call, research review, design QA" /></label>
+              {isManager && composerMode !== "calendar" && <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Assignee<select value={eventUserId ?? session?.sub ?? ""} onChange={(event) => setEventUserId(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white">{members.map((member) => <option key={member.id} value={member.id}>{member.label}</option>)}</select></label>}
+              <label className="space-y-1 text-sm font-medium text-slate-700">Starts<input type="datetime-local" value={eventStart} onChange={(event) => setEventStart(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
+              <label className="space-y-1 text-sm font-medium text-slate-700">Ends<input type="datetime-local" value={eventEnd} onChange={(event) => setEventEnd(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
+              {composerMode !== "calendar" && !editingBlock && <><label className="space-y-1 text-sm font-medium text-slate-700">Repeat<Repeat className="ml-1 inline h-3 w-3" /><select value={repeatMode} onChange={(event) => setRepeatMode(event.target.value as RepeatMode)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label><label className="space-y-1 text-sm font-medium text-slate-700">Occurrences<input type="number" min={1} max={MAX_REPEAT_COUNT} value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value))} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label></>}
+              <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Notes<input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="What should happen during this block?" /></label>
+              <label className="space-y-1 text-sm font-medium text-slate-700 sm:col-span-2">Tags<input value={eventTags} onChange={(event) => setEventTags(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" placeholder="research, review, billable" /></label>
             </div>
-            <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2 text-sm text-slate-500"><Pencil className="h-4 w-4" />{composerMode === "scheduled" ? "Creates scheduled work visible on Dashboard and exports." : composerMode === "unavailable" ? "Blocks unavailable time and hides timer actions." : "Creates a completed time entry with source calendar."}</div><div className="flex gap-2"><button onClick={() => setComposerOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white">Cancel</button><button onClick={saveEvent} disabled={savingEvent} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">{savingEvent ? "Saving..." : composerMode === "scheduled" ? "Save scheduled work" : composerMode === "unavailable" ? "Save unavailable block" : "Log completed work"}</button></div></div>
+            <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2 text-sm text-slate-500"><Pencil className="h-4 w-4" />{composerMode === "scheduled" ? "Scheduled work appears in your calendar and dashboard." : composerMode === "unavailable" ? "Reserve time when you cannot take on work." : "Completed time will appear in Activity."}</div><div className="flex gap-2"><button onClick={() => setComposerOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white">Cancel</button><button onClick={saveEvent} disabled={savingEvent} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">{savingEvent ? "Saving..." : composerMode === "scheduled" ? "Save scheduled work" : composerMode === "unavailable" ? "Save unavailable block" : "Log completed work"}</button></div></div>
           </div>
         </div>
       )}

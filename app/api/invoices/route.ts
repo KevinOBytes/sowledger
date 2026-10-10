@@ -3,7 +3,11 @@ import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { invoices as invoicesTable, memberships as membershipsTable, timeEntries as timeEntriesTable, projects as projectsTable, users as usersTable } from "@/lib/db/schema";
 import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
-import { desc, eq, and, inArray, isNotNull, sql } from "drizzle-orm";
+import { appendAuditLog, dispatchWebhook } from "@/lib/security";
+import { entryIdsFrom, WorkflowError, workflowErrorResponse } from "@/lib/workflow-validation";
+import { getAppOrigin } from "@/lib/app-url";
+import { timeEntryAmountCents } from "@/lib/invoice-amount";
+import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
 
 function invoiceNumberFromId(id: string, date = new Date()) {
   const day = date.toISOString().slice(0, 10).replaceAll("-", "");
@@ -65,11 +69,9 @@ export async function GET() {
         };
       });
 
-    return NextResponse.json({ ok: true, invoices, billableEntries });
+    return NextResponse.json({ ok: true, invoices, billableEntries, canManage: session.role === "manager" || session.role === "owner" });
   } catch (error) {
-    const err = error as Record<string, unknown>;
-    const status = err.code === "FORBIDDEN" || err.status === 403 ? 403 : 401;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "Could not load invoices. Please try again.");
   }
 }
 
@@ -77,103 +79,59 @@ export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("manager", session.role);
-    
     const { checkWorkspaceLimits } = await import("@/lib/billing");
     const limits = await checkWorkspaceLimits(session.workspaceId, "invoices");
     if (!limits.allowed) return NextResponse.json({ error: limits.error }, { status: 402 });
-
-    const body = await req.json() as { timeEntryIds: string[]; projectId?: string; dueDate?: string };
-    
-    if (!Array.isArray(body.timeEntryIds) || body.timeEntryIds.length === 0) {
-      return NextResponse.json({ error: "No time entries selected." }, { status: 400 });
-    }
-    const timeEntryIds = [...new Set(body.timeEntryIds.filter((id): id is string => typeof id === "string" && id.length > 0))];
-    if (timeEntryIds.length !== body.timeEntryIds.length) {
-      return NextResponse.json({ error: "Time entry IDs must be unique strings." }, { status: 400 });
-    }
-
-    if (body.projectId) {
-      const [project] = await db
-        .select({ id: projectsTable.id })
-        .from(projectsTable)
-        .where(and(eq(projectsTable.id, body.projectId), eq(projectsTable.workspaceId, session.workspaceId)));
-      if (!project) return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
-    }
-
-    const entries = await db
-      .select()
-      .from(timeEntriesTable)
-      .where(and(
-        eq(timeEntriesTable.workspaceId, session.workspaceId),
-        inArray(timeEntriesTable.id, timeEntryIds),
-      ));
-    const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
-    for (const id of timeEntryIds) {
-      const entry = entriesById.get(id);
-      if (!entry) return NextResponse.json({ error: `Invalid entry ${id}` }, { status: 400 });
-      if (entry.status !== "approved") return NextResponse.json({ error: `Entry ${id} must be approved before invoicing` }, { status: 400 });
-      if (!entry.stoppedAt) return NextResponse.json({ error: `Entry ${id} must be completed before invoicing` }, { status: 400 });
-      if (!Number.isFinite(entry.durationSeconds) || entry.durationSeconds === null || entry.durationSeconds < 0) {
-        return NextResponse.json({ error: `Entry ${id} has invalid duration` }, { status: 400 });
-      }
-      if (!Number.isFinite(entry.hourlyRate) || entry.hourlyRate === null || entry.hourlyRate < 0) {
-        return NextResponse.json({ error: `Entry ${id} has invalid hourly rate` }, { status: 400 });
-      }
-    }
-    if (body.projectId && entries.some((entry) => entry.projectId !== body.projectId)) {
-      return NextResponse.json({ error: "Selected entries must match supplied projectId" }, { status: 400 });
-    }
-
-    const totalAmount = entries.reduce((sum, entry) => sum + ((entry.durationSeconds ?? 0) / 3600) * (entry.hourlyRate ?? 0), 0);
-    if (!Number.isFinite(totalAmount) || totalAmount < 0) {
-      return NextResponse.json({ error: "Invoice total is invalid" }, { status: 400 });
-    }
+    const body = await req.json() as { timeEntryIds?: unknown; projectId?: string; dueDate?: string };
+    const timeEntryIds = entryIdsFrom(body?.timeEntryIds);
+    if (body.projectId !== undefined && (typeof body.projectId !== "string" || !body.projectId || body.projectId.length > 255)) throw new WorkflowError("Choose a valid project.", 400);
+    const dueDate = body.dueDate ? new Date(body.dueDate) : null;
+    if (body.dueDate !== undefined && (typeof body.dueDate !== "string" || !dueDate || !Number.isFinite(dueDate.getTime()))) throw new WorkflowError("Choose a valid due date.", 400);
 
     const invoice = await db.transaction(async (tx) => {
-      const invoiceId = crypto.randomUUID();
-
-      const [createdInvoice] = await tx.insert(invoicesTable).values({
-        id: invoiceId,
-        workspaceId: session.workspaceId,
-        projectId: body.projectId || null,
-        number: invoiceNumberFromId(invoiceId),
-        amount: totalAmount,
-        status: "draft",
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
-        timeEntryIds,
-      }).returning();
-
-      const updatedEntries = await tx.update(timeEntriesTable)
-        .set({ status: "invoiced" })
-        .where(and(
-          eq(timeEntriesTable.workspaceId, session.workspaceId),
-          inArray(timeEntriesTable.id, timeEntryIds),
-          eq(timeEntriesTable.status, "approved"),
-          isNotNull(timeEntriesTable.stoppedAt),
-          isNotNull(timeEntriesTable.durationSeconds),
-          isNotNull(timeEntriesTable.hourlyRate),
-          sql`${timeEntriesTable.durationSeconds} >= 0`,
-          sql`${timeEntriesTable.hourlyRate} >= 0`,
-        ))
-        .returning({ id: timeEntriesTable.id });
-
-      if (updatedEntries.length !== timeEntryIds.length) {
-        throw new Error("One or more entries are no longer invoiceable");
+      const entries = await tx.select().from(timeEntriesTable).where(and(eq(timeEntriesTable.workspaceId, session.workspaceId), inArray(timeEntriesTable.id, timeEntryIds))).orderBy(timeEntriesTable.id).for("update");
+      if (entries.length !== timeEntryIds.length) throw new WorkflowError("One or more entries were not found.", 404);
+      for (const entry of entries) {
+        if (entry.status !== "approved" || !entry.stoppedAt) throw new WorkflowError("Only completed, approved time can be invoiced.", 409);
+        if (entry.durationSeconds === null || !Number.isFinite(entry.durationSeconds) || entry.durationSeconds <= 0 || entry.hourlyRate === null || !Number.isFinite(entry.hourlyRate) || entry.hourlyRate < 0) throw new WorkflowError("Every entry needs recorded time and a valid hourly rate.", 400);
       }
-
-      return createdInvoice;
+      const projectId = body.projectId ?? (entries.every((entry) => entry.projectId === entries[0].projectId) ? entries[0].projectId : null);
+      if (body.projectId && entries.some((entry) => entry.projectId !== body.projectId)) throw new WorkflowError("Selected entries must belong to the chosen project.", 400);
+      if (projectId) {
+        const [project] = await tx.select({ id: projectsTable.id }).from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.workspaceId, session.workspaceId)));
+        if (!project) throw new WorkflowError("Project not found.", 400);
+      }
+      // Round each line in cents so the printed line items add to the stored total.
+      const totalCents = entries.reduce((sum, entry) => sum + timeEntryAmountCents(entry.durationSeconds ?? 0, entry.hourlyRate ?? 0), 0);
+      if (!Number.isSafeInteger(totalCents) || totalCents < 0) throw new WorkflowError("The invoice total is invalid.", 400);
+      const invoiceId = crypto.randomUUID();
+      const [created] = await tx.insert(invoicesTable).values({
+        id: invoiceId, workspaceId: session.workspaceId, projectId,
+        number: invoiceNumberFromId(invoiceId), amount: totalCents / 100,
+        status: "draft", dueDate, timeEntryIds,
+      }).returning();
+      await tx.update(timeEntriesTable).set({ status: "invoiced" }).where(and(eq(timeEntriesTable.workspaceId, session.workspaceId), inArray(timeEntriesTable.id, timeEntryIds), eq(timeEntriesTable.status, "approved")));
+      for (const entry of entries) await appendAuditLog({
+        workspaceId: session.workspaceId, timeEntryId: entry.id, actorUserId: session.sub, eventType: "entry_invoiced",
+        diff: { status: { before: "approved", after: "invoiced" }, invoiceId: { before: null, after: invoiceId } },
+      }, tx);
+      await appendAuditLog({
+        workspaceId: session.workspaceId, timeEntryId: created.id, actorUserId: session.sub, eventType: "invoice_created",
+        diff: { invoice: { before: null, after: created } },
+      }, tx);
+      return created;
     });
 
-    after(() => {
-      dispatchIntegrationNotification(session.workspaceId, "invoice.created", {
-        title: `Invoice ${invoice.number} created`,
-        body: `$${invoice.amount.toFixed(2)} moved into invoice-ready output with ${timeEntryIds.length} linked entries.`,
-        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/invoices`,
-      }).catch(() => {});
+    after(async () => {
+      await Promise.all([
+        dispatchWebhook(session.workspaceId, "invoice.created", { invoiceId: invoice.id, number: invoice.number, amount: invoice.amount, status: invoice.status, timeEntryIds }),
+        dispatchIntegrationNotification(session.workspaceId, "invoice.created", {
+          title: `Invoice ${invoice.number} created`,
+          body: `Draft invoice for $${invoice.amount.toFixed(2)} with ${timeEntryIds.length} time entries.`,
+          url: `${getAppOrigin()}/invoices`,
+        }),
+      ]);
     });
-
     return NextResponse.json({ ok: true, invoice });
-  } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 403 });
-  }
+  } catch (error) { return workflowErrorResponse(error, "Could not create this invoice. Please try again."); }
 }

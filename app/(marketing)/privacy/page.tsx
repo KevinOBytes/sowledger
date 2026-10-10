@@ -4,31 +4,31 @@ import { ArrowRight, Database, Mail, ShieldCheck } from "lucide-react";
 const SECTIONS: [string, string][] = [
   [
     "What we collect",
-    "Account email, display name, workspace metadata, clients, projects, time records, schedule records, billing identifiers, API key metadata, integration connection metadata, and support messages you submit. When you connect third-party services (such as Google Calendar or QuickBooks), we store encrypted OAuth tokens scoped to the permissions you grant.",
+    "We store your account email and display name, workspace settings, client and project records, time entries, scheduled work, billing identifiers, API key details, and messages you send to support. When you connect a service such as Google Calendar or QuickBooks, we also store encrypted credentials for the permissions you authorize.",
   ],
   [
     "How we use it",
-    "We use workspace data to provide scheduling, timers, completed work logging, analytics, exports, invoices, API access, support, security monitoring, and billing operations. Google Calendar data is used exclusively to sync scheduled work blocks and import busy events to prevent double-booking. QuickBooks data is used exclusively to push approved invoices. We do not use third-party integration data for advertising, profiling, or any purpose beyond delivering the features you connect.",
+    "We use workspace data to provide scheduling, timers, completed work logging, analytics, exports, invoices, API access, support, security monitoring, and billing operations. Google Calendar data is used exclusively to sync scheduled work blocks and import busy events to prevent double-booking. QuickBooks data is used exclusively to export the SOWLedger invoices you choose to send. We do not use third-party integration data for advertising, profiling, or any purpose beyond delivering the features you connect.",
   ],
   [
     "Third-party integrations",
-    "SOWLedger connects to Google Calendar, Slack, and QuickBooks when you explicitly authorize the connection. We request only the minimum OAuth scopes needed: calendar event read/write for Google Calendar, incoming webhook delivery for Slack, and invoice create/read for QuickBooks. You can disconnect any integration at any time from your workspace settings, which revokes SOWLedger's access and deletes stored tokens.",
+    "Google Calendar connections request calendar event read/write access. Slack connections use incoming webhooks. QuickBooks connections request its accounting permission for invoice sync. Owners and managers can disconnect a service from Integrations, which disables the connection and removes its stored credentials from SOWLedger. To revoke the provider's authorization as well, remove SOWLedger in that provider's account settings.",
   ],
   [
     "What we do not store",
-    "API key secrets are shown once and stored only as salted hashes. Payment card details are handled entirely by Stripe and never touch SOWLedger servers. Raw Google or QuickBooks API responses are not persisted beyond the sync operation that processes them.",
+    "API key secrets are shown once and stored only as hashes. Stripe handles payment card details. SOWLedger stores the work records and connection details needed for sync, rather than complete raw Google or QuickBooks API responses.",
   ],
   [
     "Data sharing",
-    "We do not sell, rent, or share your workspace data or integration tokens with third parties. Data is shared only with infrastructure providers (database hosting, deployment platform) strictly to operate the service, and with Stripe to process payments. No workspace data is used for training machine learning models.",
+    "We do not sell or rent your workspace data or integration credentials. Data is shared with infrastructure providers to operate SOWLedger, with Stripe for payments, and with the connected services you choose to use. No workspace data is used for training machine learning models.",
   ],
   [
     "Data security",
-    "Integration credentials are encrypted at rest using AES-256. All data in transit uses TLS 1.2 or higher. API keys are hashed with a secure one-way algorithm. Workspace data is isolated by workspace ID in every query. Access to administrative functions requires manager or owner roles.",
+    "Stored integration credentials are encrypted with AES-256-GCM, and API keys are stored as one-way hashes. Workspace membership, roles, and API permissions control access to records and actions. Sensitive settings require manager or owner access; subscription changes require an owner.",
   ],
   [
     "Data exports and portability",
-    "Workspace owners and managers can export operational data in CSV or JSON at any time. Exports exclude secrets and include SHA-256 integrity headers. You own your workspace data and can request a full export or deletion at any time.",
+    "Workspace owners and managers can export records in CSV or JSON. Exports exclude secrets and include a SHA-256 checksum. Review files before sharing them: a JSON export can include workspace records beyond a filtered set of time entries. You own your workspace data and can contact support to request a full export or deletion.",
   ],
   [
     "Your rights",
@@ -65,7 +65,7 @@ export default function PrivacyPage() {
               Trust center
             </p>
             <p className="rounded-full border border-border bg-background px-4 py-1.5 text-sm font-bold text-slate-700">
-              Last updated August 15, 2026
+              Last updated October 9, 2026
             </p>
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">
@@ -83,11 +83,11 @@ export default function PrivacyPage() {
             <Database className="h-6 w-6 text-cyan-700" />
             <h2 className="mt-4 text-2xl font-semibold">Summary</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              SOWLedger stores operational workspace data, encrypted integration
-              tokens, and hashed API keys. Payments are handled by Stripe.
-              Integration data (Google Calendar, QuickBooks) is used only to
-              deliver the features you connect and is never sold or shared. You
-              can export or delete your data at any time.
+              SOWLedger stores your work records, encrypted integration
+              credentials, and hashed API keys. Stripe handles payments.
+              Connected services exchange the data needed for the features you
+              authorize. You can export records in the app or contact support
+              to request deletion.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <span className="rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-800">
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
             <div>
               <h2 className="text-2xl font-semibold">Privacy questions</h2>
               <p className="mt-1 text-sm text-slate-300">
-                Include workspace context and account email. Do not include API
+                Include your workspace name and account email. Do not include API
                 keys or card data.
               </p>
             </div>

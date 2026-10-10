@@ -31,8 +31,8 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
       <section className="px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="common-work-heading">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-2xl">
-            <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">The real work around the deliverable</p>
-            <h2 id="common-work-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Common work to capture</h2>
+            <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">Day-to-day challenges</p>
+            <h2 id="common-work-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">The time that is easy to miss</h2>
           </div>
           <ul className="mt-8 grid gap-4 md:grid-cols-3">
             {industry.challenges.map((challenge) => (
@@ -49,7 +49,7 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">{industry.workflowHeadline}</p>
-            <h2 id="workflow-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">How the workflow fits</h2>
+            <h2 id="workflow-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">How SOWLedger fits your work</h2>
             <p className="mt-4 text-lg leading-8 text-slate-600">{industry.workflowSubhead}</p>
           </div>
           <ol className="mt-10 grid overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
@@ -67,9 +67,9 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
       <section id="proof-packs" className="px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="proof-heading">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">Invoice evidence</p>
-            <h2 id="proof-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Proof you can hand off</h2>
-            <p className="mt-4 text-lg leading-8 text-slate-600">Give the client the work context behind the number, not an unstructured timesheet dump.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">Time and invoice details</p>
+            <h2 id="proof-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">A record you can refer back to</h2>
+            <p className="mt-4 text-lg leading-8 text-slate-600">Keep the hours and work descriptions together for billing, client questions, and your own records.</p>
           </div>
           <ul className="overflow-hidden rounded-2xl border border-border bg-border">
             {industry.proofOutputs.map((output) => (
@@ -96,7 +96,7 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
 
       <section className="px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="next-audience-heading">
         <div className="mx-auto max-w-7xl">
-          <h2 id="next-audience-heading" className="text-2xl font-semibold tracking-tight">Explore another service workflow</h2>
+          <h2 id="next-audience-heading" className="text-2xl font-semibold tracking-tight">Explore related teams</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {neighboringIndustries.map((neighbor) => (
               <Link key={neighbor.slug} href={`/for/${neighbor.slug}`} className="rounded-xl border border-border bg-surface p-5 transition hover:border-cyan-300"><p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-700">{neighbor.category}</p><p className="mt-2 font-semibold text-slate-950">{neighbor.name}</p><span className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-slate-700">Explore <ArrowRight className="h-4 w-4" /></span></Link>

@@ -5,6 +5,8 @@ import { auditLogs, projects, timeEntries, invoices } from "@/lib/db/schema";
 import { eq, and, ne, desc, inArray } from "drizzle-orm";
 import { buildInvoiceProofPack } from "@/lib/invoice-proof-pack";
 import { getClientEntitledInvoiceIds, getClientEntitlementIds } from "@/lib/client-entitlements";
+import { invoiceApprovalFromDiff, type InvoiceApproval } from "@/lib/invoice-approval";
+import { workflowErrorResponse } from "@/lib/workflow-validation";
 
 export async function GET() {
   try {
@@ -24,7 +26,7 @@ export async function GET() {
     
     // Aggregate hours per project
     const allEntries = projectIds.length > 0
-      ? await db.select().from(timeEntries).where(and(eq(timeEntries.workspaceId, session.workspaceId), inArray(timeEntries.projectId, projectIds), ne(timeEntries.status, "draft")))
+      ? await db.select().from(timeEntries).where(and(eq(timeEntries.workspaceId, session.workspaceId), inArray(timeEntries.projectId, projectIds), inArray(timeEntries.status, ["approved", "invoiced"])))
       : [];
 
     const projectAggregates = workspaceProjects.map(p => {
@@ -40,7 +42,7 @@ export async function GET() {
 
     const entitledInvoiceIds = await getClientEntitledInvoiceIds(session.workspaceId, clientIds);
     const workspaceInvoices = entitledInvoiceIds.size > 0
-      ? await db.select().from(invoices).where(and(eq(invoices.workspaceId, session.workspaceId), inArray(invoices.id, [...entitledInvoiceIds]))).orderBy(desc(invoices.createdAt))
+      ? await db.select().from(invoices).where(and(eq(invoices.workspaceId, session.workspaceId), inArray(invoices.id, [...entitledInvoiceIds]), ne(invoices.status, "draft"))).orderBy(desc(invoices.createdAt))
       : [];
     const invoiceIds = workspaceInvoices.map((invoice) => invoice.id);
     const signoffs = invoiceIds.length > 0
@@ -53,26 +55,30 @@ export async function GET() {
           inArray(auditLogs.timeEntryId, invoiceIds),
         ))
       : [];
-    const latestSignoffByInvoiceId = new Map<string, string>();
+    const latestSignoffByInvoiceId = new Map<string, InvoiceApproval>();
     for (const signoff of signoffs) {
+      const approval = invoiceApprovalFromDiff(signoff.diff);
+      if (!approval) continue;
       const current = latestSignoffByInvoiceId.get(signoff.timeEntryId);
-      const next = signoff.createdAt.toISOString();
-      if (!current || next > current) latestSignoffByInvoiceId.set(signoff.timeEntryId, next);
+      if (!current || approval.signedOffAt > current.signedOffAt) latestSignoffByInvoiceId.set(signoff.timeEntryId, approval);
     }
     
     const mappedInvoices = await Promise.all(workspaceInvoices.map(async (i) => {
         const project = i.projectId ? workspaceProjects.find(p => p.id === i.projectId) : null;
         const proof = await buildInvoiceProofPack(session.workspaceId, i.id);
+        const approval = latestSignoffByInvoiceId.get(i.id);
         return {
             ...i,
             projectName: project?.name || "General Workspace",
             digest: proof?.digest ?? null,
-            signedOffAt: latestSignoffByInvoiceId.get(i.id) ?? null,
+            signedOffAt: approval?.signedOffAt ?? null,
+            approvedDigest: approval?.digest ?? null,
+            approvalCurrent: Boolean(approval && approval.digest === proof?.digest),
         };
     }));
 
     return NextResponse.json({ ok: true, projects: projectAggregates, invoices: mappedInvoices });
   } catch (error) {
-     return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+     return workflowErrorResponse(error, "Could not load your projects and invoices. Please try again.");
   }
 }

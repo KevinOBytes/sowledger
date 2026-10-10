@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkMagicLinkEligibility, createMagicLink } from "@/lib/auth";
+import { checkMagicLinkEligibility, createMagicLink, ForbiddenError, UnauthorizedError } from "@/lib/auth";
+import { getAppOrigin } from "@/lib/app-url";
 import { env } from "@/lib/env";
 import { isValidEmail } from "@/lib/validators";
 import { Resend } from "resend";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { email?: string };
-    const email = body.email?.trim().toLowerCase();
+    const body = await req.json().catch(() => null) as { email?: unknown } | null;
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
     if (!email) {
-      return NextResponse.json({ error: "email is required" }, { status: 400 });
+      return NextResponse.json({ error: "Enter your email address." }, { status: 400 });
     }
     if (!isValidEmail(email)) {
-      return NextResponse.json({ error: "email is invalid" }, { status: 400 });
+      return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
     }
 
     const eligibility = await checkMagicLinkEligibility(email);
@@ -21,17 +22,21 @@ export async function POST(req: NextRequest) {
     }
 
     const token = await createMagicLink(email);
-    const baseUrl = env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
+    const baseUrl = getAppOrigin(env.NEXT_PUBLIC_APP_URL, req.nextUrl.origin);
     const verifyUrl = `${baseUrl}/api/auth/verify?token=${encodeURIComponent(token)}`;
 
     if (env.RESEND_API_KEY) {
       const resend = new Resend(env.RESEND_API_KEY);
-      await resend.emails.send({
+      const delivery = await resend.emails.send({
         from: env.RESEND_LOGIN_FROM,
         to: email,
         subject: "Sign in to SOWLedger",
-        html: `<p>Click the link below to sign in:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
+        html: `<p>Use this link to sign in to SOWLedger. It expires in 20 minutes.</p><p><a href="${verifyUrl}">Sign in to SOWLedger</a></p><p>If you didn't request this email, you can ignore it.</p>`,
       });
+      if (delivery.error || !delivery.data?.id) {
+        console.error("Sign-in email was not accepted", { providerError: delivery.error?.name ?? "missing_message_id" });
+        return NextResponse.json({ error: "We couldn't send your sign-in email. Please try again in a few minutes." }, { status: 503 });
+      }
       return NextResponse.json({ ok: true, delivery: "configured-resend" });
     }
 
@@ -42,16 +47,18 @@ export async function POST(req: NextRequest) {
         verifyUrl,
         delivery: "dry-run",
         from: env.RESEND_LOGIN_FROM,
-        note: "Send verifyUrl with Resend from logins@kevinbytes.com in production.",
+        note: "Local development sign-in link. No email was sent.",
       });
     }
 
     return NextResponse.json({
-      error: "Email delivery is not configured. Please set RESEND_API_KEY in production.",
+      error: "Sign-in email is temporarily unavailable. Please try again later.",
     }, { status: 503 });
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 500;
-    return NextResponse.json({ error: errorMsg }, { status });
+    if (error instanceof ForbiddenError || error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error("Sign-in request failed", { errorType: error instanceof Error ? error.name : "UnknownError" });
+    return NextResponse.json({ error: "We couldn't start sign-in. Please try again in a few minutes." }, { status: 503 });
   }
 }

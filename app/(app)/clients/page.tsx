@@ -5,6 +5,7 @@ import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, desc } from "drizzle-orm";
 import { CreateClientButton } from "@/components/create-client-button";
 import { ClientsPageClient } from "@/components/clients-page-client";
+import { DataLoadNotice } from "@/components/data-load-notice";
 
 export const metadata = { title: "Clients - SOWLedger" };
 
@@ -22,8 +23,8 @@ export default async function ClientsPage() {
     projectsData = await db.select({ id: projectsTable.id, clientId: projectsTable.clientId }).from(projectsTable).where(eq(projectsTable.workspaceId, session.workspaceId));
     organizationsData = await db.select({ id: organizationsTable.id, clientId: organizationsTable.clientId }).from(organizationsTable).where(eq(organizationsTable.workspaceId, session.workspaceId));
     peopleData = await db.select({ id: workspacePeopleTable.id, organizationId: workspacePeopleTable.organizationId }).from(workspacePeopleTable).where(eq(workspacePeopleTable.workspaceId, session.workspaceId));
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : "Unable to load clients right now.";
+  } catch {
+    loadError = "We couldn't load your clients.";
   }
 
   return (
@@ -34,7 +35,7 @@ export default async function ClientsPage() {
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Manage</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Clients</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Keep client records connected to projects, billing, and export-ready time history.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Keep client contact details and their projects in one place.</p>
             </div>
             <CreateClientButton />
           </div>
@@ -42,15 +43,12 @@ export default async function ClientsPage() {
             <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold">
               <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700">{clientsData.filter((client) => client.status === "active").length} active</span>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{projectsData.length} linked projects</span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{peopleData.length} people records</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{peopleData.length} people</span>
             </div>
           )}
         </header>
         {loadError ? (
-          <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
-            <h2 className="text-lg font-semibold">Clients are temporarily unavailable</h2>
-            <p className="mt-2 text-sm">{loadError}</p>
-          </div>
+          <DataLoadNotice message={loadError} />
         ) : (
           <ClientsPageClient initialClients={clientsData} projects={projectsData} organizations={organizationsData} people={peopleData} />
         )}
