@@ -5,7 +5,7 @@ You are working in the SOWLedger application. You are expected to behave like an
 ## Non-Negotiable Setup
 - Confirm the repo root before editing: `/Users/kevo/Projects/sowledger`.
 - Check the worktree before and after edits with `git status --short`; never revert unrelated user changes.
-- This is Next.js `16.2.6`, not older Next.js. Before changing routing, server actions, metadata, proxy/middleware, caching, or build behavior, read the relevant guide in `node_modules/next/dist/docs/`.
+- This is Next.js `16.3.8`, not older Next.js. Before changing routing, server actions, metadata, proxy/middleware, caching, or build behavior, read the relevant guide in `node_modules/next/dist/docs/`.
 - Use `rg` and `rg --files` for code search.
 - Do not expose secrets. `.env*` is ignored; update `.env.example` only with non-secret names or public IDs.
 
@@ -82,3 +82,13 @@ Keep the agent guidance in sync when product architecture changes:
 - `CLAUDE.md`, `.github/copilot-instructions.md`, and `.cursor/rules/sowledger.mdc` should delegate to `AGENTS.md`.
 - Repo-local Codex skill drafts live in `.codex/skills/*/SKILL.md`.
 - Run `npm run agentic:check` after editing these files.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

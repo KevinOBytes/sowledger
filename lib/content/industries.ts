@@ -1,5 +1,6 @@
 export type IndustryWorkflow = { stage: string; detail: string };
 export type IndustryFaq = { question: string; answer: string };
+export type InvoiceExample = { title: string; work: [string, string, string] };
 
 export type IndustryContent = {
   slug: string;
@@ -14,6 +15,8 @@ export type IndustryContent = {
   workflow: IndustryWorkflow[];
   proofOutputs: string[];
   faqs: IndustryFaq[];
+  example: InvoiceExample;
+  relatedSlugs: string[];
 };
 
 type IndustrySeed = Omit<IndustryContent, "workflow" | "proofOutputs"> & {
@@ -26,6 +29,8 @@ const workflowStages = ["Plan", "Track", "Log", "Review", "Approve", "Integrate"
 const industrySeeds: IndustrySeed[] = [
   {
     slug: "freelance-developers", name: "Freelance Developers", category: "Software development",
+    example: { title: "Feature delivery", work: ["Technical discovery", "Development", "Testing and handoff"] },
+    relatedSlugs: ["web-design-studios", "it-consultants", "management-consultants"],
     heroLabel: "For freelance developers", heroHeadline: "Keep the whole job on the timesheet.",
     heroSubhead: "Discovery calls, debugging, and release follow-up are part of the job, too. Track them alongside the build so your invoice reflects the work you did.",
     workflowHeadline: "From discovery to handoff", workflowSubhead: "Set aside time for development, log the interruptions, and review each project's hours before billing.",
@@ -36,6 +41,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "marketing-agencies", name: "Marketing Agencies", category: "Campaigns and client accounts",
+    example: { title: "Campaign launch", work: ["Account planning", "Campaign production", "Reporting review"] },
+    relatedSlugs: ["pr-agencies", "copywriters", "graphic-designers"],
     heroLabel: "For marketing agencies", heroHeadline: "Know what each client account takes.",
     heroSubhead: "Keep strategy, production, account meetings, and reporting time together. Give account leads a clearer picture before the next client review.",
     workflowHeadline: "From campaign planning to billing", workflowSubhead: "Track the work across a campaign without losing the meetings and follow-up around it.",
@@ -46,6 +53,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "seo-consultants", name: "SEO Consultants", category: "Search strategy and analysis",
+    example: { title: "Search audit", work: ["Discovery call", "Technical research", "Findings review"] },
+    relatedSlugs: ["marketing-agencies", "web-design-studios", "copywriters"],
     heroLabel: "For SEO consultants", heroHeadline: "Account for the research behind the recommendations.",
     heroSubhead: "Track technical audits, keyword research, stakeholder calls, and reporting. Keep a clear record of the time that went into each client's recommendations.",
     workflowHeadline: "From audit to recommendations", workflowSubhead: "Plan the research, log analysis and follow-up, then review the engagement before invoicing.",
@@ -56,6 +65,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "graphic-designers", name: "Graphic Designers", category: "Design and creative work",
+    example: { title: "Brand design", work: ["Creative brief", "Design concepts", "Revision round"] },
+    relatedSlugs: ["web-design-studios", "marketing-agencies", "video-editors"],
     heroLabel: "For graphic designers", heroHeadline: "Keep track of the revisions, too.",
     heroSubhead: "Record concept development, production, feedback, and handoff time. See how much work went into a design before you prepare the bill.",
     workflowHeadline: "From the brief to final files", workflowSubhead: "Plan design sessions and review rounds, then keep the extra requests in the same project record.",
@@ -66,6 +77,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "legal-consultants", name: "Legal Consultants", category: "Matter-based advisory work",
+    example: { title: "Advisory engagement", work: ["Consultation", "Research and drafting", "Client review"] },
+    relatedSlugs: ["management-consultants", "accounting-firms"],
     heroLabel: "For legal consultants", heroHeadline: "Make time easier to review by matter.",
     heroSubhead: "Keep consultation, research, drafting, and coordination time organized by project. Review the entries before preparing engagement billing.",
     workflowHeadline: "From consultation to billing review", workflowSubhead: "Record the work as it happens and check descriptions carefully before sharing them.",
@@ -76,6 +89,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "accounting-firms", name: "Accounting Firms", category: "Tax, accounting, and advisory",
+    example: { title: "Client engagement", work: ["Client discussion", "Preparation work", "Review and follow-up"] },
+    relatedSlugs: ["management-consultants", "legal-consultants"],
     heroLabel: "For accounting firms", heroHeadline: "See the time behind each engagement.",
     heroSubhead: "Keep preparation, review, advisory, and client follow-up visible across your firm. Compare the work you planned with the hours it actually took.",
     workflowHeadline: "From engagement planning to review", workflowSubhead: "Give the team a shared place to log work and check hours before the engagement reaches billing.",
@@ -86,6 +101,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "video-editors", name: "Video Editors", category: "Editing and post-production",
+    example: { title: "Client video", work: ["Footage review", "Editing session", "Revisions and delivery"] },
+    relatedSlugs: ["graphic-designers", "marketing-agencies", "copywriters"],
     heroLabel: "For video editors", heroHeadline: "Know how much time went into the final cut.",
     heroSubhead: "Track editing, review rounds, revisions, and delivery preparation. Keep the client requests around the edit on the record, too.",
     workflowHeadline: "From rough cut to delivery", workflowSubhead: "Plan editing sessions, record revisions, and check the hours before billing the project.",
@@ -96,6 +113,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "copywriters", name: "Copywriters", category: "Writing and editorial work",
+    example: { title: "Client article", work: ["Source interview", "Research and drafting", "Editing round"] },
+    relatedSlugs: ["marketing-agencies", "pr-agencies", "seo-consultants"],
     heroLabel: "For copywriters", heroHeadline: "Track more than the time spent drafting.",
     heroSubhead: "Interviews, research, editing, and feedback all take time. Keep them alongside the draft in a project record you can review before billing.",
     workflowHeadline: "From research to final copy", workflowSubhead: "Plan the assignment, track focused writing, and log the conversations and revisions around it.",
@@ -106,6 +125,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "pr-agencies", name: "PR Agencies", category: "Communications and media relations",
+    example: { title: "Account outreach", work: ["Client planning", "Research and pitching", "Account reporting"] },
+    relatedSlugs: ["marketing-agencies", "copywriters", "management-consultants"],
     heroLabel: "For PR agencies", heroHeadline: "Keep the account work visible between placements.",
     heroSubhead: "Record media research, pitching, client coordination, and reporting. Give account teams a practical way to review the effort behind the results.",
     workflowHeadline: "From outreach planning to account review", workflowSubhead: "Plan client work and capture the short research, pitching, and follow-up sessions that fill the day.",
@@ -116,6 +137,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "it-consultants", name: "IT Consultants", category: "IT support and infrastructure",
+    example: { title: "Support engagement", work: ["Issue assessment", "Troubleshooting", "Documentation"] },
+    relatedSlugs: ["freelance-developers", "web-design-studios", "management-consultants"],
     heroLabel: "For IT consultants", heroHeadline: "Log the support work before the next call comes in.",
     heroSubhead: "Keep maintenance, troubleshooting, infrastructure changes, and follow-up in one time record. Review what each client needed before you bill.",
     workflowHeadline: "From planned maintenance to urgent support", workflowSubhead: "Use timers for active work and manual entries when the incident had to come first.",
@@ -126,6 +149,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "management-consultants", name: "Management Consultants", category: "Strategy and business advisory",
+    example: { title: "Strategy workshop", work: ["Discovery interview", "Analysis and preparation", "Workshop delivery"] },
+    relatedSlugs: ["legal-consultants", "accounting-firms", "marketing-agencies"],
     heroLabel: "For management consultants", heroHeadline: "Track the work around the workshop.",
     heroSubhead: "Discovery, analysis, preparation, and follow-up often take longer than the meeting itself. Keep that effort visible across the engagement.",
     workflowHeadline: "From discovery to recommendations", workflowSubhead: "Plan the engagement, record preparation and delivery, and review the hours before the client conversation.",
@@ -136,6 +161,8 @@ const industrySeeds: IndustrySeed[] = [
   },
   {
     slug: "web-design-studios", name: "Web Design Studios", category: "Website design and delivery",
+    example: { title: "Website refresh", work: ["Project kickoff", "Design and build", "QA and handoff"] },
+    relatedSlugs: ["freelance-developers", "graphic-designers", "seo-consultants"],
     heroLabel: "For web design studios", heroHeadline: "Keep design, build, and launch time together.",
     heroSubhead: "Track discovery, design, development coordination, QA, and launch support across your studio. See what each project took before preparing the bill.",
     workflowHeadline: "From kickoff through launch", workflowSubhead: "Give each discipline a place to record its work, including the feedback and handoffs between teams.",

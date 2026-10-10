@@ -14,7 +14,7 @@ interface WorkflowSectionProps {
 
 export function WorkflowSection({ headline, subhead }: WorkflowSectionProps) {
   return (
-    <section id="workflow" className="border-b border-border bg-surface px-4 py-14 sm:px-6">
+    <section id="workflow" className="scroll-mt-20 border-b border-border bg-surface px-4 py-14 sm:px-6">
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-5 lg:grid-cols-[0.75fr_1fr] lg:items-end">
           <div>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { IndustryLandingContent } from "@/components/marketing/industry-landing-content";
 import { industries } from "@/lib/content/industries";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 
 type PageProps = { params: Promise<{ industry: string }> };
 
@@ -17,11 +18,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: "Page not found | SOWLedger" };
   }
 
-  return {
-    title: `Time tracking for ${industry.name} | SOWLedger`,
-    description: industry.heroSubhead,
-    alternates: { canonical: `https://www.sowledger.com/for/${industry.slug}` },
-  };
+  return publicPageMetadata(
+    `/for/${industry.slug}`,
+    `Time tracking for ${industry.name} | SOWLedger`,
+    industry.heroSubhead,
+  );
 }
 
 export default async function IndustryMarketingPage({ params }: PageProps) {

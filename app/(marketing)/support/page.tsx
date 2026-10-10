@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 import {
   ArrowRight,
   BadgeCheck,
@@ -84,10 +85,11 @@ const HOW_TO = [
   },
 ];
 
-export const metadata = {
-  title: "Support - SOWLedger",
-  description: "Get help with SOWLedger timers, calendar planning, time entries, invoices, client review, exports, and account billing.",
-};
+export const metadata = publicPageMetadata(
+  "/support",
+  "Support - SOWLedger",
+  "Get help with SOWLedger timers, calendar planning, time entries, invoices, client review, exports, and account billing.",
+);
 
 export default function SupportPage() {
   return (

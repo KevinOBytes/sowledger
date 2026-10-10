@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 
 const marketingLinks = [
@@ -16,13 +16,25 @@ const marketingLinks = [
 
 export function MarketingHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border/80 bg-surface/90 shadow-sm shadow-stone-900/5 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex min-w-0 items-center gap-2 transition hover:opacity-80">
+        <Link href="/" className="flex shrink-0 items-center gap-2 transition hover:opacity-80">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow">
-            <Image src="/logo.png" alt="SOWLedger" width={32} height={32} unoptimized />
+            <Image src="/logo.png" alt="" width={32} height={32} unoptimized />
           </div>
           <span className="text-lg font-bold tracking-tight text-slate-950">SOWLedger</span>
         </Link>
@@ -35,18 +47,19 @@ export function MarketingHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <Link href="/support" className="hidden text-sm font-medium text-stone-600 transition hover:text-slate-950 sm:inline">
             Support
           </Link>
-          <Link href="/login" className="text-sm font-medium text-stone-600 transition hover:text-slate-950">
+          <Link href="/login" className="hidden whitespace-nowrap text-sm font-medium text-stone-600 transition hover:text-slate-950 sm:inline">
             Log in
           </Link>
-          <Link href="/login" className="rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:px-4">
+          <Link href="/login" className="whitespace-nowrap rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:px-4">
             Start free
           </Link>
           <button
             type="button"
+            ref={menuButtonRef}
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-controls="marketing-mobile-navigation"
@@ -75,6 +88,10 @@ export function MarketingHeader() {
                 {link.label}
               </Link>
             ))}
+            <div className="mt-2 flex gap-4 border-t border-border px-3 pt-3 text-sm font-semibold sm:hidden">
+              <Link href="/login" onClick={() => setMenuOpen(false)} className="py-2 text-stone-700 hover:text-cyan-800">Log in</Link>
+              <Link href="/support" onClick={() => setMenuOpen(false)} className="py-2 text-stone-700 hover:text-cyan-800">Support</Link>
+            </div>
           </div>
         </nav>
       )}

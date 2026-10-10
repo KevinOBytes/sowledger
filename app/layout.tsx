@@ -4,30 +4,30 @@ import DatadogInit from "@/components/DatadogInit";
 import { Toaster } from "sonner";
 import { CookieConsent } from "@/components/cookie-consent";
 import { AnalyticsWrapper } from "@/components/analytics-wrapper";
-import { getAppOrigin } from "@/lib/app-url";
+import { MARKETING_DESCRIPTION, MARKETING_SOCIAL_IMAGE, MARKETING_TITLE, PUBLIC_SITE_URL } from "@/lib/marketing-metadata";
 import "./globals.css";
 
-const appUrl = getAppOrigin();
 const googleAnalyticsId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-const metadataTitle = "SOWLedger | Time tracking and invoicing for client work";
-const metadataDescription = "Plan your work, track your time, and create invoices with the details behind each total. Built for freelancers, agencies, and service teams.";
+const metadataTitle = MARKETING_TITLE;
+const metadataDescription = MARKETING_DESCRIPTION;
 
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
+  metadataBase: new URL(PUBLIC_SITE_URL),
   title: metadataTitle,
   description: metadataDescription,
   manifest: "/manifest.webmanifest",
   openGraph: {
     title: metadataTitle,
     description: metadataDescription,
-    url: "/",
     siteName: "SOWLedger",
     type: "website",
+    images: [MARKETING_SOCIAL_IMAGE],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: metadataTitle,
     description: metadataDescription,
+    images: [MARKETING_SOCIAL_IMAGE],
   },
   appleWebApp: {
     capable: true,

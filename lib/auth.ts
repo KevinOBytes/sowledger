@@ -55,8 +55,13 @@ function encode(payload: SessionPayload) {
 }
 
 async function decode(token: string): Promise<SessionPayload> {
-  const [raw, mac] = token.split(".");
-  if (!raw || !mac) throw new UnauthorizedError("Malformed token");
+  const parts = token.split(".");
+  const [raw, mac] = parts;
+  // Match the rate-limit identity grammar. Buffer's hex parser alone accepts
+  // non-canonical suffixes and casing, which could select a different bucket.
+  if (token.length > 4096 || parts.length !== 2 || !raw || !/^[a-f0-9]{64}$/.test(mac ?? "")) {
+    throw new UnauthorizedError("Malformed token");
+  }
 
   const expected = sign(raw);
   const macBuf = Buffer.from(mac, "hex");
@@ -71,7 +76,8 @@ async function decode(token: string): Promise<SessionPayload> {
   } catch {
     throw new UnauthorizedError("Please sign in again.");
   }
-  if (!payload.sub || !payload.workspaceId || !payload.email || !Number.isFinite(payload.exp) || payload.exp < Date.now()) {
+  if (typeof payload.sub !== "string" || !payload.sub || typeof payload.workspaceId !== "string" || !payload.workspaceId ||
+    typeof payload.email !== "string" || !payload.email || !Number.isFinite(payload.exp) || payload.exp <= Date.now()) {
     throw new UnauthorizedError("Please sign in again.");
   }
 

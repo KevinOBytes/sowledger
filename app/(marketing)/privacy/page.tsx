@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 import { ArrowRight, Database, Mail, ShieldCheck } from "lucide-react";
 
 const SECTIONS: [string, string][] = [
@@ -48,11 +49,11 @@ const SECTIONS: [string, string][] = [
   ],
 ];
 
-export const metadata = {
-  title: "Privacy Policy - SOWLedger",
-  description:
-    "SOWLedger privacy policy covering workspace data, Google Calendar integration, QuickBooks integration, API key handling, Stripe payment boundaries, data security, user rights, exports, retention, and contact guidance.",
-};
+export const metadata = publicPageMetadata(
+  "/privacy",
+  "Privacy Policy - SOWLedger",
+  "SOWLedger privacy policy covering workspace data, Google Calendar integration, QuickBooks integration, API key handling, Stripe payment boundaries, data security, user rights, exports, retention, and contact guidance.",
+);
 
 export default function PrivacyPage() {
   return (

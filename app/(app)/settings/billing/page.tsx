@@ -181,7 +181,9 @@ export default function BillingPage() {
                   <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{limitLabel(plan.limits.members)} member{plan.limits.members === 1 ? "" : "s"}</li>
                   <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{limitLabel(plan.limits.projects)} projects</li>
                   <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{plan.features.includes("schedule") ? "Planning calendar" : "Live timers"}</li>
-                  <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />{plan.features.includes("api") ? "API keys and webhooks" : plan.features.includes("exports") ? "CSV and JSON exports" : "Manual time entries"}</li>
+                  <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />CSV and JSON exports · API keys</li>
+                  {plan.features.includes("invoicing") && <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />Invoicing</li>}
+                  {plan.features.includes("webhooks") && <li className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-500" />Webhooks</li>}
                 </ul>
                 {canUpgrade && (
                   <button onClick={() => handleUpgrade(plan.planId)} disabled={processing !== null || !plan.configured} className="mt-7 w-full rounded-2xl bg-cyan-600 py-3 text-sm font-bold text-white transition hover:bg-cyan-500 disabled:opacity-50">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/marketing-metadata";
 import { ArrowRight, Code2, CreditCard, LifeBuoy, Mail, ShieldCheck, Sparkles } from "lucide-react";
 
 const CONTACT_TASKS = [
@@ -32,10 +33,11 @@ const CONTACT_TASKS = [
   },
 ];
 
-export const metadata = {
-  title: "Contact - SOWLedger",
-  description: "Contact SOWLedger for help with your account, workspace, subscription, or integrations.",
-};
+export const metadata = publicPageMetadata(
+  "/contact",
+  "Contact - SOWLedger",
+  "Contact SOWLedger for help with your account, workspace, subscription, or integrations.",
+);
 
 export default function ContactPage() {
   return (
