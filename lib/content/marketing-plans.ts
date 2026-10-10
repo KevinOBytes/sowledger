@@ -1,10 +1,10 @@
 import { STRIPE_PLANS, type StripePlanId } from "@/lib/billing-plans";
 
 const planFeatures: Record<StripePlanId, string[]> = {
-  free: ["Live timers", "Manual time entries"],
-  pro: ["Scheduling", "Analytics", "Invoices", "CSV and JSON exports"],
-  smb: ["Client review", "Team approvals", "API keys", "Webhooks"],
-  enterprise: ["Team approvals", "API keys", "Webhooks", "More people and projects"],
+  free: ["Planning and time tracking", "Analytics and exports", "API keys", "Time review and approvals"],
+  pro: ["Shared work tools", "Invoices", "Client invoice review"],
+  smb: ["Shared work tools", "Invoices", "Client invoice review", "Webhooks"],
+  enterprise: ["Shared work tools", "Invoices", "Client invoice review", "Webhooks"],
 };
 
 // Only these public fields cross the client boundary; Stripe price IDs stay server-side.

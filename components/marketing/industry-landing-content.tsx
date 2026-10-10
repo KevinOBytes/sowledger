@@ -6,8 +6,10 @@ import { industries, type IndustryContent } from "@/lib/content/industries";
 type IndustryLandingContentProps = { industry: IndustryContent };
 
 export function IndustryLandingContent({ industry }: IndustryLandingContentProps) {
-  const index = industries.findIndex((item) => item.slug === industry.slug);
-  const neighboringIndustries = Array.from({ length: 3 }, (_, offset) => industries[(index + offset + 1) % industries.length]);
+  const neighboringIndustries = industry.relatedSlugs.flatMap((slug) => {
+    const related = industries.find((item) => item.slug === slug);
+    return related ? [related] : [];
+  });
 
   return (
     <div className="bg-background text-slate-950">
@@ -24,7 +26,16 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
             headline={industry.heroHeadline}
             subhead={industry.heroSubhead}
             primaryCtaLabel="Start free"
+            example={industry.example}
           />
+          <nav aria-label="On this page" className="mt-8 flex flex-wrap gap-2 border-t border-border pt-5 text-sm font-semibold text-slate-700">
+            {[
+              ["#common-work-heading", "Common challenges"],
+              ["#workflow-heading", "Workflow"],
+              ["#proof-packs", "Invoice details"],
+              ["#faq-heading", "Questions"],
+            ].map(([href, label]) => <a key={href} href={href} className="rounded-full border border-border bg-surface px-4 py-2 transition hover:border-cyan-300 hover:text-cyan-800">{label}</a>)}
+          </nav>
         </div>
       </section>
 
@@ -32,7 +43,7 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
         <div className="mx-auto max-w-7xl">
           <div className="max-w-2xl">
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">Day-to-day challenges</p>
-            <h2 id="common-work-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">The time that is easy to miss</h2>
+            <h2 id="common-work-heading" className="mt-3 scroll-mt-24 text-3xl font-semibold tracking-tight sm:text-4xl">The time that is easy to miss</h2>
           </div>
           <ul className="mt-8 grid gap-4 md:grid-cols-3">
             {industry.challenges.map((challenge) => (
@@ -49,7 +60,7 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">{industry.workflowHeadline}</p>
-            <h2 id="workflow-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">How SOWLedger fits your work</h2>
+            <h2 id="workflow-heading" className="mt-3 scroll-mt-24 text-3xl font-semibold tracking-tight sm:text-4xl">How SOWLedger fits your work</h2>
             <p className="mt-4 text-lg leading-8 text-slate-600">{industry.workflowSubhead}</p>
           </div>
           <ol className="mt-10 grid overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
@@ -64,7 +75,7 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
         </div>
       </section>
 
-      <section id="proof-packs" className="px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="proof-heading">
+      <section id="proof-packs" className="scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="proof-heading">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">Time and invoice details</p>
@@ -81,8 +92,8 @@ export function IndustryLandingContent({ industry }: IndustryLandingContentProps
 
       <section className="border-y border-border bg-surface-muted px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="faq-heading">
         <div className="mx-auto max-w-4xl">
-          <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-700">Answers for your workflow</p>
-          <h2 id="faq-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Frequently asked questions</h2>
+          <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-800">Answers for your workflow</p>
+          <h2 id="faq-heading" className="mt-3 scroll-mt-24 text-3xl font-semibold tracking-tight sm:text-4xl">Frequently asked questions</h2>
           <div className="mt-8 space-y-3">
             {industry.faqs.map((faq) => (
               <details key={faq.question} className="rounded-xl border border-border bg-surface px-5 py-4">
