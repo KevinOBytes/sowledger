@@ -1,349 +1,108 @@
 "use client";
 
-import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  Code2,
-  DatabaseZap,
-  FileCheck2,
-  KeyRound,
-  LockKeyhole,
-  TrendingUp,
-  Clock3,
-  Check,
-  Workflow,
-} from "lucide-react";
-import Image from "next/image";
+import { ArrowRight, BarChart3, Check, Code2, FileCheck2, KeyRound, LockKeyhole, Workflow } from "lucide-react";
 import Link from "next/link";
-import { Download } from "lucide-react";
 import { RoiCalculator } from "@/components/marketing/roi-calculator";
+import type { MarketingPlan } from "@/lib/content/marketing-plans";
 
-const PROOF_ROWS = [
-  { label: "Invoice record", value: "Issued invoices, totals, client, project, and status" },
-  { label: "Work basis", value: "Planned vs actual hours with timer, manual, and calendar source mix" },
-  { label: "Approval trail", value: "Sign-off state, audit events, and client-facing context" },
-  { label: "Integrity", value: "CSV/JSON exports with x-sowledger-export-sha256 digest headers" },
+const INVOICE_DETAILS = [
+  { label: "The work", value: "Project, time entries, and descriptions of what was done" },
+  { label: "The amount", value: "Logged hours, billing rates, and the invoice total" },
+  { label: "The review", value: "Entry status and the history of changes and approvals" },
+  { label: "The handoff", value: "Invoice details and CSV or JSON exports for your records" },
 ];
 
-const INTEGRATION_ROWS = [
-  { label: "read:proof-packs", value: "Client-ready invoice evidence" },
-  { label: "read:revenue-intelligence", value: "Retainer leak and recovery signals" },
-  { label: "export:data", value: "Digest-backed CSV and JSON exports" },
-  { label: "webhooks", value: "Project, time, invoice, and approval events" },
+const INTEGRATIONS = [
+  { label: "Calendar", value: "Plan around your availability with Google Calendar sync." },
+  { label: "Notifications", value: "Send work updates to Slack when connected." },
+  { label: "Accounting", value: "Send invoices to QuickBooks when connected." },
+  { label: "Custom tools", value: "Read and update work records through the API, or receive webhook events." },
 ];
 
-const PRODUCT_SCREENSHOTS = [
-  {
-    title: "Invoice proof pack",
-    src: "/images/marketing/invoice-proof-pack.png",
-    alt: "SOWLedger invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours.",
-    width: 1152,
-    height: 1000,
-  },
-  {
-    title: "Revenue recovery radar",
-    src: "/images/marketing/revenue-radar.png",
-    alt: "SOWLedger analytics screenshot showing Retainer Leak Radar and Missing Billable Recovery cards.",
-    width: 1152,
-    height: 1623,
-  },
-  {
-    title: "Client sign-off portal",
-    src: "/images/marketing/client-signoff-portal.png",
-    alt: "SOWLedger client sign-off portal screenshot showing active projects and approval-ready proof packets.",
-    width: 1440,
-    height: 936,
-  },
-];
-
-const MARKETING_PLANS = [
-  {
-    planId: "free",
-    name: "Free",
-    description: "Try the connected workflow on one small workspace.",
-    price: 0,
-    outcome: "Start tracking and correcting the work record.",
-    features: ["Live timers", "Manual logging", "Basic planning"],
-    limits: { members: 1, projects: 2, storageMB: 100 },
-  },
-  {
-    planId: "pro",
-    name: "Starter",
-    description: "Solo consultants who need invoices, exports, analytics, and planned work.",
-    price: 9,
-    outcome: "Turn approved time into proof-backed invoices.",
-    features: ["Invoice proof packs", "Scheduling", "Analytics", "Exports"],
-    limits: { members: 2, projects: 10, storageMB: 1000 },
-  },
-  {
-    planId: "smb",
-    name: "Studio",
-    description: "Small teams that need approvals, API keys, webhooks, and recovery queues.",
-    price: 29,
-    outcome: "Run sign-off, recovery, and agency integrations together.",
-    features: ["Client sign-off", "API keys", "Webhooks", "Revenue intelligence"],
-    limits: { members: 5, projects: 50, storageMB: 5000 },
-    recommended: true,
-  },
-  {
-    planId: "enterprise",
-    name: "Business",
-    description: "Growing firms that need more capacity, audit depth, and priority support.",
-    price: 79,
-    outcome: "Scale proof-backed billing across larger operating teams.",
-    features: ["20 members", "Advanced reports", "Audit posture", "Priority support"],
-    limits: { members: 20, projects: 500, storageMB: 50000 },
-  },
-];
-
-export function MarketingContent() {
+export function MarketingContent({ plans }: { plans: MarketingPlan[] }) {
   return (
     <>
       <section id="proof-packs" className="px-4 py-20 sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Invoice evidence</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Invoice Proof Packs</h2>
-            <p className="mt-5 text-lg leading-8 text-slate-600">
-              Every invoice can carry the billing story behind it: the planned work, completed work, source mix, approvals, and digest-backed evidence that makes the number easier to defend.
-            </p>
-            <div className="mt-8 overflow-hidden rounded-2xl border border-border bg-border">
-              {PROOF_ROWS.map((row) => (
-                <div key={row.label} className="grid gap-2 border-b border-border bg-surface p-4 last:border-b-0 sm:grid-cols-[12rem_1fr]">
-                  <p className="text-sm font-bold text-slate-950">{row.label}</p>
-                  <p className="text-sm leading-6 text-slate-600">{row.value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 flex">
-              <a
-                href="/sample-proof-pack.pdf"
-                download="sowledger-sample-proof-pack.pdf"
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition hover:border-cyan-300 hover:text-cyan-800"
-              >
-                <Download className="h-4 w-4" />
-                Download sample proof pack
-              </a>
-            </div>
+            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Invoicing</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Show the work behind the total.</h2>
+            <p className="mt-5 text-lg leading-8 text-slate-600">Create invoices from approved billable time. Keep the hours, rates, and work descriptions close at hand when a client has a question.</p>
+            <Link href="/login" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-cyan-800 transition hover:text-cyan-600">Start with your first project <ArrowRight className="h-4 w-4" /></Link>
           </div>
-
-          <motion.figure
-            initial={{ y: 18, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.42 }}
-            className="overflow-hidden rounded-2xl border border-border bg-surface shadow-lg shadow-stone-900/10"
-          >
-            <Image
-              src="/images/marketing/invoice-proof-pack.png"
-              alt="SOWLedger invoice proof pack screenshot showing issued invoices, digest, source mix, and planned vs actual hours."
-              width={1152}
-              height={1000}
-              sizes="(min-width: 1024px) 52vw, 100vw"
-              className="aspect-[1.12/1] w-full object-cover object-top"
-            />
-          </motion.figure>
+          <dl className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+            {INVOICE_DETAILS.map((row) => (
+              <div key={row.label} className="grid gap-2 border-b border-border p-6 last:border-b-0 sm:grid-cols-[9rem_1fr]"><dt className="font-semibold text-slate-950">{row.label}</dt><dd className="text-sm leading-6 text-slate-600">{row.value}</dd></div>
+            ))}
+          </dl>
         </div>
       </section>
 
       <section id="recovery" className="border-y border-border bg-surface px-4 py-20 sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-          <motion.figure
-            initial={{ y: 18, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.42 }}
-            className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm"
-          >
-            <Image
-              src="/images/marketing/revenue-radar.png"
-              alt="SOWLedger analytics screenshot showing Retainer Leak Radar and Missing Billable Recovery cards."
-              width={1152}
-              height={1623}
-              sizes="(min-width: 1024px) 52vw, 100vw"
-              className="aspect-[4/3] w-full object-cover object-top"
-            />
-          </motion.figure>
-
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Revenue intelligence</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Find leakage before the retainer meeting.</h2>
-            <p className="mt-5 text-lg leading-8 text-slate-600">
-              SOWLedger turns analytics into review queues for work that should be protected, corrected, invoiced, or explained with evidence.
-            </p>
-            <div className="mt-8 divide-y divide-border border-y border-border">
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-sm sm:p-8">
+            <BarChart3 className="h-7 w-7 text-cyan-700" aria-hidden="true" />
+            <h3 className="mt-5 text-2xl font-semibold">A useful check before billing</h3>
+            <ul className="mt-6 divide-y divide-border">
               {[
-                {
-                  title: "Retainer Leak Radar",
-                  metric: "Risk queue",
-                  label: "retainer signals",
-                  description: "Budget burn, approved unbilled time, and missing rates are grouped before they become a tense client conversation.",
-                  icon: TrendingUp,
-                },
-                {
-                  title: "Missing Billable Recovery",
-                  metric: "Gap queue",
-                  label: "time capture",
-                  description: "Scheduled work without completed entries, stale drafts, and manual gaps become a review queue instead of lost revenue.",
-                  icon: Clock3,
-                },
-              ].map((queue) => {
-                const Icon = queue.icon;
-                return (
-                  <div key={queue.title} className="grid gap-4 py-5 sm:grid-cols-[2.5rem_1fr_auto] sm:items-center">
-                    <Icon className="h-6 w-6 text-cyan-700" />
-                    <div>
-                      <h3 className="text-2xl font-semibold">{queue.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">{queue.description}</p>
-                    </div>
-                    <div className="sm:text-right">
-                      <p className="text-3xl font-semibold tracking-tight text-cyan-800">{queue.metric}</p>
-                      <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{queue.label}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                "Did the work take more or less time than you planned?",
+                "Are there completed tasks you still need to log?",
+                "Does each billable entry have the right rate?",
+                "Is approved time still waiting to be invoiced?",
+              ].map((question) => <li key={question} className="flex gap-3 py-4 text-sm leading-6 text-slate-700"><Check className="mt-1 h-4 w-4 shrink-0 text-cyan-700" aria-hidden="true" />{question}</li>)}
+            </ul>
+          </div>
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Analytics</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">See where your time went.</h2>
+            <p className="mt-5 text-lg leading-8 text-slate-600">Compare planned and actual hours, review billable time, and check work that still needs attention. Use the project and date filters to focus on the period you are billing.</p>
+            <p className="mt-5 text-base leading-7 text-slate-600">A scheduled block is a plan, not a bill. Review any gap before adding time or changing an invoice.</p>
           </div>
         </div>
       </section>
 
-      <section className="bg-white px-4 py-20 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-5xl">
-          <RoiCalculator />
-        </div>
-      </section>
+      <section className="bg-white px-4 py-20 sm:px-6 sm:py-24"><div className="mx-auto max-w-5xl"><RoiCalculator /></div></section>
 
       <section id="signoff" className="px-4 py-20 sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Client approval</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Client Sign-Off Portal</h2>
-            <p className="mt-5 text-lg leading-8 text-slate-600">
-              Clients can review proof packets, approve the work, and see billing context without gaining access to team planning, timers, API keys, or workspace controls.
-            </p>
-            <div className="mt-8 divide-y divide-border border-y border-border">
-              {["Approval-ready packets", "Client-safe access", "Faster resolution"].map((item) => (
-                <div key={item} className="flex items-center gap-3 py-4 text-sm font-semibold text-slate-700">
-                  <FileCheck2 className="h-5 w-5 text-cyan-700" />
-                  {item}
-                </div>
-              ))}
-            </div>
+            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Client review</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Give clients a clear place to review.</h2>
+            <p className="mt-5 text-lg leading-8 text-slate-600">Clients can review their issued invoices and the entries behind them, then record approval. They do not need access to your team&apos;s calendar, running timers, or workspace settings.</p>
           </div>
-
-          <motion.figure
-            initial={{ y: 18, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.42 }}
-            className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
-          >
-            <Image
-              src="/images/marketing/client-signoff-portal.png"
-              alt="SOWLedger client sign-off portal screenshot showing active projects and approval-ready proof packets."
-              width={1440}
-              height={936}
-              sizes="(min-width: 1024px) 58vw, 100vw"
-              className="aspect-[16/10] w-full object-cover object-top"
-            />
-          </motion.figure>
+          <ol className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+            {[
+              { title: "Prepare the invoice", detail: "Approve billable time and create a draft. Check the hours, rates, and descriptions." },
+              { title: "Make it available for review", detail: "Mark the invoice as sent so it appears in the client portal. Share the portal link with your client separately." },
+              { title: "Keep the approval on record", detail: "The client can approve the issued invoice. Refer back to the reviewed work when a question comes up." },
+            ].map((step, index) => (
+              <li key={step.title} className="flex gap-4 border-b border-border p-6 last:border-b-0"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-50 text-sm font-bold text-cyan-800">{index + 1}</span><div><h3 className="text-lg font-semibold">{step.title}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{step.detail}</p></div></li>
+            ))}
+          </ol>
         </div>
       </section>
 
       <section id="integrations" className="bg-slate-950 px-4 py-20 text-white sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-300">API layer</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Developer/Agency Integration Layer</h2>
-            <p className="mt-5 text-lg leading-8 text-slate-300">
-              Agency systems can fetch invoice proof, revenue intelligence, exports, and event updates through scoped keys while billing changes, invites, subscription management, and workspace administration stay inside SOWLedger.
-            </p>
+            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-300">Integrations</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Keep your other tools in the loop.</h2>
+            <p className="mt-5 text-lg leading-8 text-slate-300">Export records for a spreadsheet, connect an available integration, or use the API for your own workflow. Choose what each API key can access and revoke it when it is no longer needed.</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/support/api" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-50">
-                Read API docs <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="/login" className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-6 py-3 text-sm font-bold text-white transition hover:border-cyan-300 hover:text-cyan-100">
-                Create workspace
-              </Link>
+              <Link href="/support/api" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-50">Read API docs <ArrowRight className="h-4 w-4" /></Link>
+              <Link href="/support" className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-6 py-3 text-sm font-bold text-white transition hover:border-cyan-300 hover:text-cyan-100">Get setup help</Link>
             </div>
           </div>
-
-          <motion.div
-            initial={{ y: 18, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.42 }}
-            className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] shadow-2xl shadow-black/20"
-          >
-            <div className="flex items-center gap-3 border-b border-white/10 p-5">
-              <div className="rounded-lg bg-cyan-400/15 p-3 text-cyan-200">
-                <Code2 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-bold">Scoped integration contract</p>
-                <p className="text-xs text-slate-400">Keys are hashed, expirable, revocable, and usage-tracked.</p>
-              </div>
-            </div>
-            <div className="divide-y divide-white/10">
-              {INTEGRATION_ROWS.map((row) => (
-                <div key={row.label} className="grid gap-2 p-4 sm:grid-cols-[16rem_1fr] sm:items-center">
-                  <span className="font-mono text-sm text-cyan-200">{row.label}</span>
-                  <span className="text-sm text-slate-300">{row.value}</span>
-                </div>
-              ))}
-            </div>
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] shadow-xl shadow-black/10">
+            <div className="flex items-center gap-3 border-b border-white/10 p-5"><Code2 className="h-6 w-6 text-cyan-200" aria-hidden="true" /><h3 className="font-semibold">Ways to connect</h3></div>
+            <dl className="divide-y divide-white/10">{INTEGRATIONS.map((row) => <div key={row.label} className="grid gap-2 p-5 sm:grid-cols-[8rem_1fr]"><dt className="text-sm font-semibold text-cyan-200">{row.label}</dt><dd className="text-sm leading-6 text-slate-300">{row.value}</dd></div>)}</dl>
+            <p className="border-t border-white/10 p-5 text-xs leading-5 text-slate-400">Provider setup and an authorized workspace connection are required. Check Integrations in your workspace for availability.</p>
             <div className="grid border-t border-white/10 sm:grid-cols-3">
-              {[
-                { icon: KeyRound, label: "Show once" },
-                { icon: LockKeyhole, label: "Hashed storage" },
-                { icon: DatabaseZap, label: "Usage tracked" },
-              ].map((item) => {
+              {[{ icon: KeyRound, label: "Choose permissions" }, { icon: LockKeyhole, label: "Revoke access" }, { icon: FileCheck2, label: "Review key usage" }].map((item) => {
                 const Icon = item.icon;
-                return (
-                  <div key={item.label} className="border-b border-white/10 p-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-                    <Icon className="h-5 w-5 text-cyan-200" />
-                    <p className="mt-3 text-sm font-bold">{item.label}</p>
-                  </div>
-                );
+                return <div key={item.label} className="border-b border-white/10 p-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><Icon className="h-5 w-5 text-cyan-200" aria-hidden="true" /><p className="mt-3 text-sm font-semibold">{item.label}</p></div>;
               })}
             </div>
-          </motion.div>
-        </div>
-      </section>
-
-      <section className="px-4 py-20 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-10 max-w-3xl">
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Product proof</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">Real screens for the work customers pay for.</h2>
-            <p className="mt-4 text-lg leading-8 text-slate-600">
-              The page sells the actual proof, recovery, sign-off, and integration surfaces a paying customer will use.
-            </p>
-          </div>
-          <div className="grid gap-5 lg:grid-cols-3">
-            {PRODUCT_SCREENSHOTS.map((screenshot, index) => (
-              <motion.figure
-                key={screenshot.src}
-                initial={{ y: 18, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                viewport={{ once: true, amount: 0.25 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
-                className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
-              >
-                <Image
-                  src={screenshot.src}
-                  alt={screenshot.alt}
-                  width={screenshot.width}
-                  height={screenshot.height}
-                  sizes="(min-width: 1024px) 31vw, 100vw"
-                  className="aspect-[16/11] w-full border-b border-border object-cover object-top"
-                />
-                <figcaption className="p-5">
-                  <h3 className="text-xl font-semibold">{screenshot.title}</h3>
-                </figcaption>
-              </motion.figure>
-            ))}
           </div>
         </div>
       </section>
@@ -352,55 +111,27 @@ export function MarketingContent() {
         <div className="mx-auto max-w-7xl">
           <div className="mb-10 max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Pricing</p>
-            <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">Flat workspace pricing for proof-backed billing.</h2>
-            <p className="mt-4 max-w-2xl text-lg text-slate-600">Start free, then move to fixed monthly workspace plans as recovery, sign-off, analytics, and integration needs grow.</p>
+            <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">One monthly price for your workspace.</h2>
+            <p className="mt-4 max-w-2xl text-lg text-slate-600">Start with free time tracking. Add invoicing, team approvals, and integrations as you need them. Each plan includes the people and projects listed below.</p>
           </div>
           <div className="overflow-hidden rounded-2xl border border-border bg-border">
-            {MARKETING_PLANS.map((plan) => (
-              <div key={plan.planId} className={`grid gap-5 border-b border-border p-5 last:border-b-0 lg:grid-cols-[13rem_1fr_11rem_9rem] lg:items-center ${plan.recommended ? "bg-cyan-50/70" : "bg-surface"}`}>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-2xl font-semibold">{plan.name}</h3>
-                    {plan.recommended && <span className="rounded-full bg-cyan-700 px-3 py-1 text-xs font-bold text-white">Studio</span>}
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">{plan.planId}</p>
-                </div>
-                <div>
-                  <p className="text-sm leading-6 text-slate-600">{plan.description}</p>
-                  <p className="mt-2 text-sm font-bold text-slate-800">{plan.outcome}</p>
-                  <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-700" />{feature}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <span className="text-4xl font-semibold tracking-tight">${plan.price}</span>
-                  <span className="text-sm font-semibold text-slate-500">/workspace/mo</span>
-                  <p className="mt-1 text-xs text-slate-500">{plan.limits.members} member{plan.limits.members === 1 ? "" : "s"} · {plan.limits.projects} projects</p>
-                </div>
-                <Link href="/login" className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
-                  Get started
-                </Link>
+            {plans.map((plan) => (
+              <div key={plan.planId} data-testid="pricing-plan" className={`grid gap-5 border-b border-border p-5 last:border-b-0 lg:grid-cols-[13rem_1fr_11rem_9rem] lg:items-center ${plan.recommended ? "bg-cyan-50/70" : "bg-surface"}`}>
+                <div><h3 className="text-2xl font-semibold">{plan.name}</h3>{plan.recommended && <p className="mt-2 text-sm font-medium text-cyan-800">For small teams</p>}</div>
+                <div><p className="text-sm leading-6 text-slate-600">{plan.description}</p><ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">{plan.features.map((feature) => <li key={feature} className="flex items-center gap-2"><Check className="h-4 w-4 text-cyan-700" aria-hidden="true" />{feature}</li>)}</ul></div>
+                <div><span className="text-4xl font-semibold tracking-tight">${plan.price}</span><span className="text-sm font-semibold text-slate-500"> / month</span><p className="mt-1 text-xs text-slate-500">Per workspace · {plan.limits.members} {plan.limits.members === 1 ? "person" : "people"} · {plan.limits.projects} projects</p></div>
+                <Link href="/login" className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">{plan.price === 0 ? "Start free" : `Choose ${plan.name}`}</Link>
               </div>
             ))}
           </div>
+          <p className="mt-5 text-sm text-slate-600">Prices are in USD. <Link href="/billing-policy" className="font-semibold text-cyan-800 underline underline-offset-4">Read the billing policy</Link> for subscription and cancellation details.</p>
         </div>
       </section>
 
       <section className="px-4 py-20 sm:px-6 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-6 py-10 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">
-              <Workflow className="h-4 w-4" />
-              Ready to charge for proof
-            </p>
-            <h2 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight sm:text-5xl">Replace fragile timesheets with evidence clients can sign.</h2>
-            <p className="mt-3 max-w-2xl text-slate-600">Create a workspace, capture planned and completed work, recover missed billables, and turn approved time into proof-backed invoices.</p>
-          </div>
-          <Link href="/login" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-cyan-700 px-6 py-4 text-sm font-bold text-white transition hover:bg-cyan-600">
-            Start free <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div><p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-800"><Workflow className="h-4 w-4" />Get started</p><h2 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight sm:text-5xl">Start with the work you are doing today.</h2><p className="mt-3 max-w-2xl text-slate-600">Create a workspace, add a project, and log your first time entry. You can build the rest of your workflow from there.</p></div>
+          <Link href="/login" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-cyan-700 px-6 py-4 text-sm font-bold text-white transition hover:bg-cyan-600">Start free <ArrowRight className="h-4 w-4" /></Link>
         </div>
       </section>
     </>

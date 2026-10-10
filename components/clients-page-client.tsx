@@ -117,10 +117,10 @@ export function ClientsPageClient({
           </span>
         </div>
         <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-5 text-sm">
-          <span className="font-semibold text-slate-500">Projects, contacts, and billing stay tied to this client record.</span>
+          <span className="font-semibold text-slate-500">View this client’s projects or update their contacts.</span>
           <div className="flex items-center gap-3">
             <Link href={`/people?client=${client.id}`} className="font-bold text-slate-500 hover:text-slate-700">Manage contacts</Link>
-            <Link href={`/projects?client=${client.id}`} className="font-bold text-cyan-700 hover:text-cyan-600">View pipeline</Link>
+            <Link href={`/projects?client=${client.id}`} className="font-bold text-cyan-700 hover:text-cyan-600">View projects</Link>
           </div>
         </div>
       </article>
@@ -132,7 +132,7 @@ export function ClientsPageClient({
       <div className="rounded-[32px] border border-dashed border-slate-300 bg-white p-16 text-center shadow-sm">
         <Building2Icon className="mx-auto mb-4 h-14 w-14 text-slate-300" />
         <h3 className="text-xl font-semibold text-slate-950">No clients yet</h3>
-        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Add clients to group projects, invoices, time history, and exports by customer.</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Add your first client to keep their projects and billing details together.</p>
       </div>
     );
   }

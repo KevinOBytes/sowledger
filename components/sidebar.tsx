@@ -28,8 +28,8 @@ import {
   X,
 } from "lucide-react";
 
-import { SOWLEDGER_WORKFLOW_STAGES } from "@/components/app-page-shell";
 import { ManualTimeDialog } from "@/components/manual-time-dialog";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 type NavItem = {
   name: string;
@@ -58,18 +58,16 @@ function navItemLabel(item: NavItem, unreadCount: number) {
   return item.showBadge && unreadCount > 0 ? `${item.name}, ${unreadCount} unread` : item.name;
 }
 
-const workflowSteps = SOWLEDGER_WORKFLOW_STAGES.map((stage) => stage.label);
-
 const navSections: NavSection[] = [
   {
     label: "Plan",
-    summary: "Shape work before time is captured.",
+    summary: "Organize the work ahead.",
     items: [
       { name: "Dashboard", description: "Today, focus timer, quick log", href: "/dashboard", icon: Clock },
       { name: "Calendar", description: "Schedule work and calendar time", href: "/calendar", icon: CalendarDays },
       { name: "Planner", description: "Capacity and work allocation", href: "/planner", icon: Users },
       { name: "Projects", description: "Tasks, boards, billing context", href: "/projects", icon: FolderKanban },
-      { name: "Clients", description: "Client records and billing proof", href: "/clients", icon: Building2 },
+      { name: "Clients", description: "Contacts and billing details", href: "/clients", icon: Building2 },
     ],
   },
   {
@@ -82,19 +80,19 @@ const navSections: NavSection[] = [
   },
   {
     label: "Review",
-    summary: "Turn time into operational signal.",
+    summary: "See where your time went.",
     items: [
-      { name: "Analytics", description: "Plan vs actual, utilization, output", href: "/reports", icon: BarChart3 },
-      { name: "Notifications", description: "Unread review queue", href: "/notifications", icon: Bell, showBadge: true },
+      { name: "Analytics", description: "Time, capacity, and billable work", href: "/reports", icon: BarChart3 },
+      { name: "Notifications", description: "Updates and reminders", href: "/notifications", icon: Bell, showBadge: true },
     ],
   },
   {
     label: "Approve and bill",
-    summary: "Move proof into invoice-ready output.",
+    summary: "Review time and prepare invoices.",
     items: [
       { name: "Approvals", description: "Approve or reject time", href: "/approvals", icon: CheckSquare },
-      { name: "Invoices", description: "Proof packs and billing records", href: "/invoices", icon: Receipt },
-      { name: "Exports", description: "CSV and JSON with digest", href: "/exports", icon: FileDown },
+      { name: "Invoices", description: "Invoices and supporting time", href: "/invoices", icon: Receipt },
+      { name: "Exports", description: "Download CSV or JSON", href: "/exports", icon: FileDown },
     ],
   },
   {
@@ -108,7 +106,7 @@ const navSections: NavSection[] = [
   },
   {
     label: "Workspace",
-    summary: "Operate the workspace and plan.",
+    summary: "Manage your team and settings.",
     items: [
       { name: "People", description: "Members and client contacts", href: "/people", icon: UserRound },
       { name: "Workspace", description: "Profile and workspace defaults", href: "/settings", icon: Settings, exact: true },
@@ -130,9 +128,10 @@ const mobileMoreItems: NavItem[] = [
   { name: "Clients", description: "Client records", href: "/clients", icon: Building2 },
   { name: "Planner", description: "Capacity and allocation", href: "/planner", icon: Users },
   { name: "Approvals", description: "Approve or reject time", href: "/approvals", icon: CheckSquare },
-  { name: "Invoices", description: "Proof packs and billing", href: "/invoices", icon: Receipt },
+  { name: "Invoices", description: "Invoices and supporting time", href: "/invoices", icon: Receipt },
   { name: "Exports", description: "CSV and JSON output", href: "/exports", icon: FileDown },
   { name: "People", description: "Members and contacts", href: "/people", icon: UserRound },
+  { name: "Notifications", description: "Updates and reminders", href: "/notifications", icon: Bell, showBadge: true },
   { name: "Integrations", description: "Calendar, Slack, accounting", href: "/integrations", icon: Plug },
   { name: "Developers", description: "API keys and docs", href: "/settings/developers", icon: Code2 },
   { name: "Billing", description: "Plan and subscription", href: "/settings/billing", icon: Receipt },
@@ -171,22 +170,13 @@ export function Sidebar() {
             <Image src="/logo.png" alt="SOWLedger" width={30} height={30} className="mr-3 rounded-lg" unoptimized />
             <div>
               <p className="text-lg font-semibold tracking-tight text-[#17211d]">SOWLedger</p>
-              <p className="text-xs font-medium text-stone-500">Proof-backed billing workspace</p>
+              <p className="text-xs font-medium text-stone-500">Time tracking and invoicing</p>
             </div>
           </Link>
-          <div className="mt-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-800">Workflow</p>
-            <ol className="mt-2 grid grid-cols-2 gap-1.5" aria-label={workflowSteps.join(", ")}>
-              {workflowSteps.map((step) => (
-                <li key={step} className="rounded-xl bg-white/80 px-2 py-1 text-center text-[10px] font-bold leading-tight text-teal-900 shadow-sm shadow-teal-950/5">
-                  {step}
-                </li>
-              ))}
-            </ol>
-          </div>
+          <div className="mt-4"><WorkspaceSwitcher /></div>
         </div>
 
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Internal application navigation">
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4" aria-label="Application navigation">
           {navSections.map((section) => (
             <section key={section.label} className="mb-5">
               <div className="px-2 pb-2">
@@ -309,26 +299,27 @@ export function Sidebar() {
       </nav>
 
       {mobileMoreOpen && (
-        <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm md:hidden" role="presentation" onClick={() => setMobileMoreOpen(false)}>
+        <div className="fixed inset-0 z-[110] bg-slate-950/40 backdrop-blur-sm md:hidden" role="presentation" onClick={() => setMobileMoreOpen(false)}>
           <section
             id="mobile-more-hub"
             role="dialog"
             aria-modal="true"
             aria-label="More SOWLedger navigation"
-            className="absolute inset-x-3 bottom-24 max-h-[72vh] overflow-hidden rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow-2xl shadow-stone-950/20"
+            className="absolute inset-x-3 bottom-24 flex max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow-2xl shadow-stone-950/20"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-stone-200/80 px-5 py-4">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-stone-200/80 px-5 py-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-700">More</p>
-                <h2 className="mt-1 text-lg font-semibold">Workflow surfaces</h2>
-                <p className="mt-1 text-xs text-stone-500">Jump to billing, integration, and workspace controls without leaving mobile.</p>
+                <h2 className="mt-1 text-lg font-semibold">Your workspace</h2>
+                <p className="mt-1 text-xs text-stone-500">Projects, billing, notifications, and settings.</p>
               </div>
               <button type="button" onClick={() => setMobileMoreOpen(false)} className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700" aria-label="Close more navigation">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="grid max-h-[calc(72vh-5.5rem)] grid-cols-2 gap-2 overflow-y-auto p-3">
+            <div className="shrink-0 border-b border-stone-200 px-4 py-3"><WorkspaceSwitcher /></div>
+            <div className="grid min-h-0 grid-cols-2 gap-2 overflow-y-auto p-3">
               {mobileMoreItems.map((item) => {
                 const isActive = routeIsActive(pathname, item);
                 const Icon = item.icon;
@@ -336,17 +327,21 @@ export function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-label={navItemLabel(item, unreadCount)}
                     aria-current={isActive ? "page" : undefined}
                     onClick={() => setMobileMoreOpen(false)}
                     className={`rounded-2xl border p-3 transition ${isActive ? "border-teal-200 bg-teal-50 text-teal-950" : "border-stone-200 bg-white text-stone-700 hover:border-teal-200 hover:text-teal-800"}`}
                   >
                     <Icon className="h-5 w-5" aria-hidden="true" />
-                    <span className="mt-2 block text-sm font-bold">{item.name}</span>
+                    <span className="mt-2 block text-sm font-bold">{item.name}{item.showBadge && unreadCount > 0 ? ` (${unreadCount})` : ""}</span>
                     <span className="mt-1 block text-[11px] leading-4 text-stone-500">{item.description}</span>
                   </Link>
                 );
               })}
             </div>
+            <a href="/api/auth/logout" className="flex shrink-0 items-center gap-2 border-t border-stone-200 px-5 py-4 text-sm font-semibold text-stone-700 hover:bg-rose-50 hover:text-rose-700">
+              <LogOut className="h-4 w-4" /> Sign out
+            </a>
           </section>
         </div>
       )}

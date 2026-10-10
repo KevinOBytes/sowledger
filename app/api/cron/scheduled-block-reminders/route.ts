@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAppOrigin } from "@/lib/app-url";
 import { and, eq, gte, isNull, lte } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
       await dispatchIntegrationNotification(block.workspaceId, "scheduled_block.reminder", {
         title: `Starting soon: ${block.title}`,
         body: `${new Date(block.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${new Date(block.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Open SOWLedger to start the timer, log it manually, reschedule, or skip.`,
-        url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/calendar`,
+        url: `${getAppOrigin()}/calendar`,
       });
       await db
         .update(scheduledWorkBlocks)

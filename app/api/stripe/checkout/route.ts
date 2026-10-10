@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAppOrigin } from "@/lib/app-url";
 import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workspaces } from "@/lib/db/schema";
@@ -25,10 +26,6 @@ export async function POST(req: Request) {
     if (!plan) {
       return NextResponse.json({ error: "Unknown billing plan" }, { status: 400 });
     }
-    if (!plan.priceId || plan.priceId.startsWith("price_dummy")) {
-      return NextResponse.json({ error: "Stripe price is not configured for this plan" }, { status: 500 });
-    }
-
     const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, session.workspaceId));
     if (!ws) throw new Error("Workspace not found");
 
@@ -36,7 +33,7 @@ export async function POST(req: Request) {
       if (ws.stripeCustomerId) {
         const portalSession = await stripe.billingPortal.sessions.create({
           customer: ws.stripeCustomerId,
-          return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/settings/billing`,
+          return_url: `${getAppOrigin()}/settings/billing`,
         });
         return NextResponse.json({
           error: "Workspace billing is already active. Use the billing portal to manage the subscription.",
@@ -51,12 +48,16 @@ export async function POST(req: Request) {
       }, { status: 409 });
     }
 
+    if (!plan.priceId || plan.priceId.startsWith("price_dummy")) {
+      return NextResponse.json({ error: "Stripe price is not configured for this plan" }, { status: 500 });
+    }
+
     const checkoutParams = buildStripeCheckoutParams({
       workspaceId: ws.id,
       plan,
       customerEmail: session.email,
       stripeCustomerId: ws.stripeCustomerId,
-      appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      appUrl: getAppOrigin(),
     });
 
     const checkoutSession = await stripe.checkout.sessions.create(checkoutParams);

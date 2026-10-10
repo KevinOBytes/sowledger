@@ -1,14 +1,18 @@
 import { Sidebar } from "@/components/sidebar";
-import { requireSession } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { requireSession, UnauthorizedError } from "@/lib/auth";
+import { WorkspaceLoadError } from "@/components/workspace-load-error";
+import { redirect, unstable_rethrow } from "next/navigation";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   let session: Awaited<ReturnType<typeof requireSession>>;
 
   try {
     session = await requireSession();
-  } catch {
-    redirect("/login");
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof UnauthorizedError) redirect("/login");
+    console.error("Workspace session could not be loaded", { errorType: error instanceof Error ? error.name : "UnknownError" });
+    return <WorkspaceLoadError />;
   }
 
   if (session.role === "client") {

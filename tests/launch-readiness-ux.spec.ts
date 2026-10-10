@@ -12,7 +12,8 @@ import { gotoApp, requestGetApp } from './helpers/navigation';
 const unique = () => Date.now().toString(36);
 
 test.describe('Launch readiness UX fixes', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'sowledger-cookie-consent', value: 'false', url: 'http://localhost:3008' }]);
     const workspace = `launch-ux-${unique()}`;
     const res = await requestGetApp(page, `/api/test/login?plan=smb&workspace=${workspace}&clean=true`);
     expect(res.ok()).toBeTruthy();
@@ -43,9 +44,8 @@ test.describe('Launch readiness UX fixes', () => {
     const submittedCreated = await submittedCreate.json();
     expect(submittedCreated.entry.id).toBeTruthy();
 
-    await db.update(timeEntries)
-      .set({ status: 'submitted' })
-      .where(and(eq(timeEntries.id, submittedCreated.entry.id), eq(timeEntries.workspaceId, submittedCreated.entry.workspaceId)));
+    const submit = await page.request.post('/api/timer/submit', { data: { entryIds: [submittedCreated.entry.id] } });
+    expect(submit.ok()).toBeTruthy();
 
     for (const [description, status] of [[approvedTitle, 'approved'], [invoicedTitle, 'invoiced']] as const) {
       const createLocked = await page.request.post('/api/timer/manual', {
@@ -108,7 +108,7 @@ test.describe('Launch readiness UX fixes', () => {
     await ensureMembership(owner.id, blockedWorkspace.id, 'owner');
 
     env.ALLOW_SELF_REGISTRATION = false;
-    env.ALLOW_BOOTSTRAP_OWNER = true;
+    env.ALLOW_BOOTSTRAP_OWNER = false;
     env.RESEND_API_KEY = undefined;
 
     try {

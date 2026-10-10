@@ -6,9 +6,9 @@ import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
 const marketingLinks = [
-  { href: "/#proof-packs", label: "Proof" },
-  { href: "/#recovery", label: "Recovery" },
-  { href: "/#signoff", label: "Sign-off" },
+  { href: "/#workflow", label: "How it works" },
+  { href: "/#proof-packs", label: "Invoicing" },
+  { href: "/#integrations", label: "Integrations" },
   { href: "/support/api", label: "API" },
   { href: "/#pricing", label: "Pricing" },
   { href: "/for", label: "Built for" },
@@ -43,7 +43,7 @@ export function MarketingHeader() {
             Log in
           </Link>
           <Link href="/login" className="rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:px-4">
-            Sign up
+            Start free
           </Link>
           <button
             type="button"

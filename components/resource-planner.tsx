@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { DataLoadNotice } from "@/components/data-load-notice";
 import { ProjectTask } from "@/lib/store";
 import { AlertTriangle, ArrowRight, Building2, Clock, UserPlus, Users } from "lucide-react";
 
@@ -34,25 +35,32 @@ export function ResourcePlanner() {
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [goals, setGoals] = useState<WorkspaceGoal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     async function fetchPlanner() {
-      const res = await fetch("/api/planner");
-      if (res.ok) {
+      try {
+        const res = await fetch("/api/planner");
+        if (!res.ok) throw new Error("Planner unavailable");
         const data = await res.json();
         setPeople(data.people || []);
         setOrganizations(data.organizations || []);
         setTasks(data.tasks || []);
         setGoals(data.goals || []);
+      } catch {
+        setLoadError(true);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchPlanner();
   }, []);
 
   if (loading) {
-    return <div className="p-8 text-slate-500 animate-pulse">Loading capacities...</div>;
+    return <div className="p-8 text-slate-500 animate-pulse">Loading assignments...</div>;
   }
+
+  if (loadError) return <DataLoadNotice message="We couldn't load your assignments and goals." />;
 
   const organizationMap = new Map(organizations.map((organization) => [organization.id, organization]));
   const assignablePeople = people.filter((person) => person.status !== "archived");
@@ -79,7 +87,7 @@ export function ResourcePlanner() {
                <Users className="h-5 w-5" />
              </div>
              <div>
-               <p className="text-sm font-medium text-stone-500">Total team</p>
+               <p className="text-sm font-medium text-stone-500">Active people</p>
                <h3 className="text-2xl font-bold text-[#17211d]">{assignablePeople.length}</h3>
              </div>
            </div>
@@ -90,7 +98,7 @@ export function ResourcePlanner() {
                <Clock className="h-5 w-5" />
              </div>
              <div>
-               <p className="text-sm font-medium text-stone-500">Total Backlog Output</p>
+               <p className="text-sm font-medium text-stone-500">Estimated hours</p>
                <h3 className="text-2xl font-bold text-[#17211d]">
                   {memberBuckets.reduce((sum, b) => sum + b.totalHours, 0) + unassignedHours} hrs
                </h3>
@@ -126,19 +134,19 @@ export function ResourcePlanner() {
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">Action</p>
           <div className="mt-2 flex items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-slate-950">Add people or send invites</h3>
-              <p className="mt-1 text-sm text-slate-600">Make assignment and capacity planning map to real organizations.</p>
+              <h3 className="text-lg font-semibold text-slate-950">Add people or invite members</h3>
+              <p className="mt-1 text-sm text-slate-600">Add your team and contacts before assigning tasks.</p>
             </div>
             <ArrowRight className="h-4 w-4 text-cyan-700" />
           </div>
         </Link>
         <div className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-400">Planner features</p>
-          <p className="mt-2 text-sm text-stone-600">Goals and task effort roll into the same workload view, so backlog triage and staffing happen in one place.</p>
+          <p className="mt-2 text-sm text-stone-600">Hours combine task estimates and assigned hourly goals. They are not a weekly availability or utilization measure.</p>
         </div>
         <div className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-400">Recommended cleanup</p>
-          <p className="mt-2 text-sm text-stone-600">Unassigned work and pending invites are the fastest way to spot capacity drift before it reaches the board.</p>
+          <p className="mt-2 text-sm text-stone-600">Assign work to an owner and check pending invitations. A warning marks more than 40 estimated hours, regardless of dates.</p>
         </div>
       </div>
 
@@ -157,7 +165,7 @@ export function ResourcePlanner() {
                     </div>
                     <div className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${isOverloaded ? 'bg-rose-50 text-rose-700' : 'bg-teal-50 text-teal-700'}`}>
                         {isOverloaded && <AlertTriangle className="h-3 w-3" />}
-                        {bucket.totalHours} hrs {bucket.assignedTasks.length > 0 && ` / ${bucket.assignedTasks.length} act`} {bucket.assignedGoals.length > 0 && ` / ${bucket.assignedGoals.length} goals`}
+                        {bucket.totalHours} hrs {bucket.assignedTasks.length > 0 && ` / ${bucket.assignedTasks.length} tasks`} {bucket.assignedGoals.length > 0 && ` / ${bucket.assignedGoals.length} goals`}
                     </div>
                  </div>
                  <div className="p-4 space-y-3">
@@ -226,7 +234,7 @@ export function ResourcePlanner() {
              </div>
              <div className="p-4 space-y-3">
                  {unassignedTasks.length === 0 && goals.filter(g => !g.assignedUserId).length === 0 && (
-                     <div className="py-4 text-center text-sm italic text-stone-500">Backlog is completely empty!</div>
+                     <div className="py-4 text-center text-sm italic text-stone-500">No unassigned tasks or goals.</div>
                  )}
 
                  {/* Unassigned Goals */}

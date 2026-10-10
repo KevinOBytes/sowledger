@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAppOrigin } from "@/lib/app-url";
 
 import { requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
 import { getIntegrationConnection } from "@/lib/integrations/connections";
@@ -7,7 +8,7 @@ import { exchangeGoogleAuthorizationCode, storeGoogleCalendarConnection } from "
 import { verifyIntegrationOAuthState } from "@/lib/integrations/oauth-state";
 
 function redirectTo(req: NextRequest, status: "connected" | "error", message?: string) {
-  const base = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+  const base = getAppOrigin(undefined, req.nextUrl.origin);
   const url = new URL("/integrations", base);
   url.searchParams.set(status, "google_calendar");
   if (message) url.searchParams.set("message", message.slice(0, 180));
@@ -15,7 +16,7 @@ function redirectTo(req: NextRequest, status: "connected" | "error", message?: s
 }
 
 function redirectToLogin(req: NextRequest, message?: string) {
-  const base = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+  const base = getAppOrigin(undefined, req.nextUrl.origin);
   const url = new URL("/login", base);
   if (message) url.searchParams.set("error", message.slice(0, 180));
   return NextResponse.redirect(url);

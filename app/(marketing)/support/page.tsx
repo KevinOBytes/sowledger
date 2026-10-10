@@ -17,47 +17,47 @@ import {
 
 const WORKFLOW = [
   "Plan work",
-  "Track live timers",
-  "Log manual/calendar time",
-  "Review analytics",
-  "Approve/invoice/export",
-  "Integrate by API",
+  "Track your time",
+  "Add completed work",
+  "Review your hours",
+  "Approve and invoice",
+  "Export or connect tools",
 ];
 
 const SUPPORT_TILES = [
   {
-    title: "Proof Packs",
-    description: "Understand the invoice evidence bundle: work basis, source mix, approvals, invoice state, and digest-backed exports.",
+    title: "Invoices",
+    description: "Create an invoice from approved time and review the hours, rates, and entries behind the total.",
     href: "#proof-packs",
     icon: FileCheck2,
   },
   {
-    title: "Recovery Radar",
-    description: "Find planned work without completed time, approved unbilled work, stale drafts, and retainer pressure.",
+    title: "Analytics and time review",
+    description: "Compare planned and logged hours, check missing rates, and find approved time that has not been invoiced.",
     href: "#recovery-radar",
     icon: BarChart3,
   },
   {
-    title: "Sign-Off",
-    description: "Route corrected work into client-facing approval without exposing team timers, API keys, or workspace settings.",
+    title: "Client review",
+    description: "Let clients review their issued invoices and work details, then record approval in the client portal.",
     href: "#sign-off",
     icon: BadgeCheck,
   },
   {
     title: "API",
-    description: "Use scoped keys for clients, projects, tags, tasks, schedule, time, analytics, invoices, proof packs, and exports.",
+    description: "Create an API key, choose its permissions, and connect work records to your own tools.",
     href: "/support/api",
     icon: Code2,
   },
   {
     title: "Billing",
-    description: "Compare flat workspace plans and understand subscription, cancellation, receipt, and refund handling.",
+    description: "Find your workspace plan, subscription settings, and cancellation information.",
     href: "#billing",
     icon: CreditCard,
   },
   {
     title: "Security",
-    description: "Review workspace boundaries, API key lifecycle, checkout boundaries, export integrity, and report guidance.",
+    description: "Learn how access and API keys work, or report a security concern.",
     href: "/security",
     icon: LockKeyhole,
   },
@@ -68,25 +68,25 @@ const HOW_TO = [
     id: "planning",
     title: "Plan work",
     icon: CalendarClock,
-    body: "Use Dashboard for today's plan and Calendar for future scheduling. Planned blocks can be started as timers, logged as completed work, rescheduled, skipped, or reviewed later.",
+    body: "Open Calendar to set aside time for a project. When the work starts, start a timer from the block. When it is done, you can log the completed time. Move or cancel blocks when your plans change.",
   },
   {
     id: "tracking",
     title: "Track and log work",
     icon: TimerReset,
-    body: "Run concurrent timers while keeping one focused timer visually primary. Add completed work from Dashboard, Activity, Calendar, or analytics empty states when work happened outside the timer.",
+    body: "Start a timer on the Dashboard and stop it when you finish. Use Log time to add work you have already done. In Activity, check the project, description, and duration before submitting entries for approval.",
   },
   {
     id: "exports",
     title: "Export workspace data",
     icon: FileDown,
-    body: "Workspace managers can export complete JSON backups or filtered CSV files by project, user, status, source, and date range. Export responses avoid secrets and include x-sowledger-export-sha256 where supported.",
+    body: "Owners and managers can open Exports for a full JSON workspace export or a filtered time-entry CSV. Filter time by project, person, date, status, or source. Review downloaded files before sharing: JSON exports can contain other workspace records as well as filtered time entries.",
   },
 ];
 
 export const metadata = {
   title: "Support - SOWLedger",
-  description: "Support for SOWLedger proof-backed billing operations, from planning and timers through approvals, exports, billing, security, and API integrations.",
+  description: "Get help with SOWLedger timers, calendar planning, time entries, invoices, client review, exports, and account billing.",
 };
 
 export default function SupportPage() {
@@ -97,21 +97,21 @@ export default function SupportPage() {
           <div className="max-w-3xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-surface px-4 py-1.5 text-sm font-bold text-cyan-800 shadow-sm">
               <LifeBuoy className="h-4 w-4" />
-              Proof-backed billing support
+              Support
             </p>
             <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-6xl">
-              Get help moving work into invoice proof.
+              How can we help?
             </h1>
             <p className="mt-5 text-lg leading-8 text-slate-700">
-              SOWLedger support follows the operational workflow: plan the work, capture it, correct it, review the billing record, approve or export it, then integrate it by API.
+              Find the next step for planning work, logging time, reviewing entries, or preparing an invoice. If something is not working, contact us with the page and what happened.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link href="/support/api" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800">
-                Open API guide
+              <Link href="/contact" className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800">
+                Contact support
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/contact" className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface px-6 py-3 text-sm font-bold text-slate-800 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">
-                Contact support
+              <Link href="/support/api" className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface px-6 py-3 text-sm font-bold text-slate-800 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">
+                Read API docs
               </Link>
             </div>
           </div>
@@ -119,7 +119,7 @@ export default function SupportPage() {
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-xl shadow-stone-900/10">
             <div className="flex items-center gap-2 border-b border-border pb-3 text-sm font-bold text-slate-700">
               <Workflow className="h-4 w-4 text-cyan-700" />
-              Workflow map
+              Getting started
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {WORKFLOW.map((step, index) => (
@@ -174,17 +174,17 @@ export default function SupportPage() {
         <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-2xl border border-border bg-slate-950 p-7 text-white shadow-sm">
             <BookOpen className="h-6 w-6 text-cyan-300" />
-            <h2 className="mt-4 text-3xl font-semibold">Support by billing outcome</h2>
+            <h2 className="mt-4 text-3xl font-semibold">Before you send the bill</h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              These guides keep the product story connected to the invoice record instead of treating timers, exports, approvals, and APIs as separate tools.
+              Check the work, confirm the rates, and approve the entries. Then create the invoice and let the client review its details.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {[
-              ["proof-packs", "Proof Packs", "Use planned vs actual hours, source mix, invoice status, and export digest evidence to explain a bill."],
-              ["recovery-radar", "Recovery Radar", "Review gaps before billing: scheduled work without time, approved unbilled entries, missing rates, and stale invoices."],
-              ["sign-off", "Sign-Off", "Send client-facing proof packets for approval while keeping team workspace controls private."],
-              ["billing", "Billing", "Plans are flat per workspace: Free, Starter ($9/month), Studio ($29/month), and Business ($79/month)."],
+              ["proof-packs", "Create an invoice", "In Invoices, select approved billable entries to create a draft. Review its details, then mark it as sent to make it available in the client portal. This changes its status; it does not send an email. Share the portal link with the client separately."],
+              ["recovery-radar", "Check your time", "In Analytics, compare planned and actual hours. Review any unlogged work, missing rates, or approved time waiting for an invoice. A calendar gap does not necessarily mean billable work occurred."],
+              ["sign-off", "Ask for client review", "Clients can review issued invoices linked to their client account and record approval. Review the entry descriptions first, because work details may be visible to the client."],
+              ["billing", "Manage your subscription", "Owners can manage the workspace subscription in Settings → Billing. Plans are priced per workspace, with different member and project limits. See Pricing and the billing policy for details."],
             ].map(([id, title, body]) => (
               <section key={id} id={id} className="rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5">
                 <h3 className="text-xl font-semibold">{title}</h3>
@@ -198,9 +198,9 @@ export default function SupportPage() {
       <section className="px-4 pb-20 pt-8 sm:px-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-sm shadow-stone-900/5 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold">Need a human review?</h2>
+            <h2 className="text-2xl font-semibold">Still need help?</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Send the workspace name, account email, relevant page or endpoint, timestamps, and safe reproduction details. Do not send secrets.
+              Tell us which workspace and page you were using, what you expected, and what happened instead. Please leave out passwords, API keys, and private client information.
             </p>
           </div>
           <Link href="/contact" className="inline-flex items-center justify-center gap-2 rounded-full bg-cyan-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-500">

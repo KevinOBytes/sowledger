@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DataLoadNotice } from "@/components/data-load-notice";
 
 import { AppEmptyState, AppMetricCard, AppPageHeader, AppPageShell, AppWorkflowRail } from "@/components/app-page-shell";
 
@@ -53,7 +54,7 @@ const SCOPE_GROUPS: Array<{ title: string; scopes: ApiScope[] }> = [
     scopes: ["read:schedule", "write:schedule", "read:time", "write:time"],
   },
   {
-    title: "Proof, analytics, and export",
+    title: "Invoices, analytics, and exports",
     scopes: ["read:analytics", "read:invoices", "read:proof-packs", "read:revenue-intelligence", "export:data"],
   },
 ];
@@ -143,7 +144,8 @@ export default function DevelopersPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [usage, setUsage] = useState<Usage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("Agency billing integration");
+  const [loadError, setLoadError] = useState(false);
+  const [name, setName] = useState("Reporting integration");
   const [expiresAt, setExpiresAt] = useState(defaultExpiry());
   const [selectedScopes, setSelectedScopes] = useState<ApiScope[]>(DEFAULT_SCOPES);
   const [rawKey, setRawKey] = useState<string | null>(null);
@@ -160,7 +162,9 @@ export default function DevelopersPage() {
       if (!response.ok) throw new Error(data.error || "Unable to load API keys");
       setKeys(data.keys ?? []);
       setUsage(data.usage ?? []);
+      setLoadError(false);
     } catch (error) {
+      setLoadError(true);
       toast.error("Developer settings unavailable", { description: error instanceof Error ? error.message : "Unknown error" });
     } finally {
       setLoading(false);
@@ -233,7 +237,7 @@ export default function DevelopersPage() {
       const data = (await response.json()) as ApiKeysResponse;
       if (!response.ok) throw new Error(data.error || "Unable to create key");
       setRawKey(data.rawKey ?? null);
-      setName("Agency billing integration");
+      setName("Reporting integration");
       await refresh();
       toast.success("API key created");
     } catch (error) {
@@ -291,20 +295,24 @@ export default function DevelopersPage() {
     }
   }
 
+  if (loadError && !rawKey) {
+    return <AppPageShell><AppPageHeader title="Developers" description="Manage API keys and review recent requests." icon={Code2} /><DataLoadNotice message="We couldn't load your API keys and request history." onRetry={() => void refresh()} /></AppPageShell>;
+  }
+
   return (
     <AppPageShell contentClassName="space-y-5">
       <AppPageHeader
         eyebrow="Developers"
-        title="Agency integrations, API keys, usage, and docs"
-        description="Create scoped workspace keys for agency systems, then review request-level usage while keeping billing and workspace administration in the app."
+        title="Developers"
+        description="Create API keys for your tools, choose what they can access, and review recent requests."
         icon={Code2}
         metadata={[
           { label: "Scoped keys", tone: "cyan", icon: KeyRound },
-          { label: "Usage tracked per request", tone: "slate", icon: Activity },
+          { label: "Recent request history", tone: "slate", icon: Activity },
         ]}
         primaryAction={(
           <Link href="/support/api" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 sm:w-auto">
-            API usage guide
+            API documentation
             <ExternalLink className="h-4 w-4" />
           </Link>
         )}
@@ -339,9 +347,9 @@ export default function DevelopersPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AppMetricCard label="Active keys" value={activeKeys.length} detail="Not revoked or expired." accent="cyan" icon={KeyRound} />
-        <AppMetricCard label="Revoked keys" value={revokedKeys.length} detail="Retained as workspace key metadata." accent={revokedKeys.length > 0 ? "rose" : "slate"} icon={Trash2} />
-        <AppMetricCard label="Recent requests" value={usage.length} detail="Records returned by usage tracking." accent={usage.length > 0 ? "emerald" : "slate"} icon={Activity} />
-        <AppMetricCard label="Selected scopes" value={`${selectedScopes.length}/${API_SCOPES.length}`} detail="Applied to the next generated key." accent={selectedScopes.length > 0 ? "cyan" : "amber"} icon={ShieldCheck} />
+        <AppMetricCard label="Revoked keys" value={revokedKeys.length} detail="No longer able to access the API." accent={revokedKeys.length > 0 ? "rose" : "slate"} icon={Trash2} />
+        <AppMetricCard label="Recent requests" value={usage.length} detail="The latest recorded API requests." accent={usage.length > 0 ? "emerald" : "slate"} icon={Activity} />
+        <AppMetricCard label="Selected scopes" value={`${selectedScopes.length}/${API_SCOPES.length}`} detail="Permissions for the key you are creating." accent={selectedScopes.length > 0 ? "cyan" : "amber"} icon={ShieldCheck} />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
@@ -351,7 +359,7 @@ export default function DevelopersPage() {
               <KeyRound className="h-5 w-5 text-cyan-700" />
               <div>
                 <h2 id="create-api-key-heading" className="text-xl font-semibold">Create API key</h2>
-                <p className="mt-1 text-sm text-slate-500">Name the integration, choose scopes, and set an expiry.</p>
+                <p className="mt-1 text-sm text-slate-500">Name the key, choose its permissions, and set an expiry date.</p>
               </div>
             </div>
             <form
@@ -448,36 +456,16 @@ export default function DevelopersPage() {
             <div className="flex items-start gap-3">
               <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-cyan-700" />
               <div>
-                <h2 id="developer-security-boundary" className="text-base font-semibold">Security boundary</h2>
+                <h2 id="developer-security-boundary" className="text-base font-semibold">Protect your API keys</h2>
                 <ul className="mt-3 space-y-2 text-sm leading-6">
-                  <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />Secrets are shown once, then stored only as hashes.</li>
-                  <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />Keys stay scoped, revocable, expirable, and usage-tracked.</li>
+                  <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />Copy a new key when it is shown. Only its hash is stored.</li>
+                  <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />Choose permissions and an expiry. Revoke a key when you no longer need it.</li>
                   <li className="flex gap-2"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-cyan-700" />The API does not expose billing, invite, or workspace administration changes.</li>
                 </ul>
               </div>
             </div>
           </section>
 
-          <section className="rounded-[32px] border border-stone-200 bg-stone-50 p-5 text-stone-900 shadow-sm" aria-labelledby="developer-mcp-server">
-            <div className="flex items-start gap-3">
-              <Code2 className="mt-0.5 h-5 w-5 shrink-0 text-cyan-700" />
-              <div className="min-w-0 flex-1">
-                <h2 id="developer-mcp-server" className="text-base font-semibold">AI Agents via MCP</h2>
-                <p className="mt-2 text-sm leading-6 text-stone-600">Connect Claude Desktop, Cursor, or other AI agents natively using our Model Context Protocol (MCP) server. Provide the key above to authenticate.</p>
-                <pre className="mt-3 min-w-0 max-w-full overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs text-cyan-100 font-mono"><code>{`{
-  "mcpServers": {
-    "sowledger": {
-      "command": "npx",
-      "args": ["-y", "@sowledger/mcp"],
-      "env": {
-        "SOWLEDGER_API_KEY": "YOUR_API_KEY"
-      }
-    }
-  }
-}`}</code></pre>
-              </div>
-            </div>
-          </section>
         </div>
 
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="workspace-keys-heading">
@@ -495,7 +483,7 @@ export default function DevelopersPage() {
             <AppEmptyState
               icon={KeyRound}
               title="No API keys created yet."
-              description="Create a scoped key for a reporting integration, agency data sync, or trusted automation."
+              description="Create a key for a tool you want to connect. Give it only the permissions it needs."
               className="border-slate-200 bg-slate-50 shadow-none"
             />
           ) : (
@@ -592,7 +580,7 @@ export default function DevelopersPage() {
               })}
               {!loading && usage.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-slate-500">No public API traffic recorded yet.</td>
+                  <td colSpan={5} className="px-6 py-10 text-center text-slate-500">No requests yet. Requests made with your workspace keys will appear here.</td>
                 </tr>
               )}
             </tbody>

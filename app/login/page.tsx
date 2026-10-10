@@ -2,26 +2,26 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { Mail } from "lucide-react";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const linkError = params.get("error");
     if (!linkError) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setError(linkError === "missing_link" ? "Sign-in link is missing. Enter your email to request a fresh secure link." : `Sign-in link could not be used: ${linkError}. Request a fresh link below.`);
+    setError(linkError === "service_unavailable"
+      ? "We couldn't finish signing you in. Try the link in your email again in a moment."
+      : linkError.includes("invitation") || linkError.includes("invited")
+        ? "This invitation is no longer available. Ask your workspace owner for a new one."
+        : "This sign-in link is missing, expired, or already used. Enter your email for a new one.");
     window.history.replaceState(null, "", window.location.pathname);
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -48,7 +48,7 @@ export default function LoginPage() {
         }
       }
     } catch {
-      setError("Network error. Please try again.");
+      setError("We couldn't connect. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -56,60 +56,43 @@ export default function LoginPage() {
 
   return (
     <div className="app-shell-bg flex min-h-screen flex-col items-center justify-center px-4 py-10">
-      <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-        {/* Logo / branding */}
-        <div className="text-center lg:text-left">
-          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm shadow-stone-900/10">
-            <Image src="/logo.png" alt="SOWLedger Logo" width={56} height={56} unoptimized />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#17211d]">SOWLedger</h1>
-          <p className="mt-1 text-sm text-stone-500">Schedule work. Track cleanly. Invoice with proof.</p>
-          <div className="mt-8 rounded-[28px] border border-stone-200 bg-[#fffdf8]/85 p-5 text-left shadow-sm shadow-stone-900/10">
-            <p className="text-sm font-bold uppercase tracking-[0.22em] text-teal-700">What happens next</p>
-            <div className="mt-4 space-y-4 text-sm text-stone-600">
-              <p><span className="font-semibold text-[#17211d]">New workspace:</span> if signup is open, your email can create a workspace.</p>
-              <p><span className="font-semibold text-[#17211d]">Invited workspace:</span> use the exact email your workspace owner invited. Other emails can request access.</p>
-              <p><span className="font-semibold text-[#17211d]">Existing workspace:</span> the same secure link signs you back in without a password.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-stone-200 bg-[#fffdf8] p-6 shadow-sm shadow-stone-900/10">
-          <h2 className="mb-1 text-lg font-semibold text-[#17211d]">Continue to your workspace</h2>
-          <p className="mb-6 text-sm text-stone-500">
-            Enter your email to receive a secure link. New users can create a workspace when signup is available; invited users should use the email their owner or manager invited.
-          </p>
+      <div className="w-full max-w-md">
+        <Link href="/" className="mb-8 flex items-center justify-center gap-3 text-xl font-semibold tracking-tight text-slate-900">
+          <Image src="/logo.png" alt="" width={40} height={40} className="rounded-xl" unoptimized />
+          SOWLedger
+        </Link>
+        <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm shadow-stone-900/5 sm:p-8">
+          <h1 className="mb-2 text-2xl font-semibold tracking-tight text-slate-900">Sign in to SOWLedger</h1>
+          <p className="mb-6 text-sm leading-6 text-stone-600">Enter your email and we&apos;ll send you a sign-in link. No password needed.</p>
 
           {success ? (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-4 h-12 w-12 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              <h3 className="mb-2 text-lg font-semibold text-emerald-800">Open your secure link</h3>
+            <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
+              <Mail className="mx-auto mb-4 h-10 w-10 text-emerald-600" aria-hidden="true" />
+              <h2 className="mb-2 text-lg font-semibold text-emerald-800">Check your email</h2>
               <p className="text-sm text-emerald-700">
-                We&apos;ve sent a secure sign-in link to <strong>{email}</strong>. Please check your spam folder if you don&apos;t see it.
+                Your sign-in link is on its way to <strong>{email}</strong>. It works once and expires in 20 minutes. Check your spam folder if it doesn&apos;t arrive.
               </p>
               <button
                 type="button"
                 className="mt-6 text-sm font-medium text-teal-700 hover:text-teal-600"
                 onClick={() => { setSuccess(false); setEmail(""); }}
               >
-                ← Use a different email
+                Use a different email
               </button>
             </div>
           ) : verifyUrl ? (
             <div className="space-y-4">
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-sm font-medium text-emerald-800">Secure link created</p>
+                <p className="text-sm font-medium text-emerald-800">Local sign-in link ready</p>
                 <p className="mt-1 text-xs text-stone-500">
-                  Development shortcut only. In production, this link is delivered by email:
+                  Email is off in this development environment. Use the link below to sign in.
                 </p>
               </div>
               <a
                 href={verifyUrl}
-                className="block w-full rounded-2xl bg-[#163c36] py-2.5 text-center text-sm font-semibold text-white transition hover:bg-[#23544b] focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="block w-full rounded-xl bg-cyan-700 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-cyan-800 focus:outline-none focus:ring-2 focus:ring-cyan-600"
               >
-                Click here to sign in →
+                Sign in
               </a>
               <button
                 type="button"
@@ -128,17 +111,18 @@ export default function LoginPage() {
                 <input
                   id="email"
                   type="email"
+                  inputMode="email"
                   required
                   autoComplete="email"
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-2xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-[#17211d] placeholder-stone-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-base text-slate-900 placeholder-stone-400 focus:border-cyan-600 focus:outline-none focus:ring-1 focus:ring-cyan-600"
                 />
               </div>
 
               {error && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
                   {error}
                 </div>
               )}
@@ -146,20 +130,16 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-2xl bg-[#163c36] py-2.5 text-sm font-semibold text-white transition hover:bg-[#23544b] focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50"
+                className="w-full rounded-xl bg-cyan-700 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-800 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:opacity-50"
               >
-                {loading ? "Sending…" : "Continue with email"}
+                {loading ? "Sending…" : "Email me a sign-in link"}
               </button>
             </form>
           )}
-          <div className="mt-5 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-500">
-            By continuing, you can create or join a workspace when signup is available or your email has a pending invitation. Workspace owners can invite teammates later from People.
-          </div>
+          <p className="mt-5 text-xs leading-5 text-stone-500">Joining a team? Use the email address they invited. New here? The same link lets you get started.</p>
         </div>
 
-        <p className="text-center text-xs text-stone-500 lg:col-span-2">
-          Secure passwordless authentication · SOWLedger &copy; {mounted ? new Date().getFullYear() : ""}
-        </p>
+        <p className="mt-6 text-center text-xs text-stone-500">Need a hand? <Link href="/support" className="font-medium text-cyan-700 underline">Get help</Link></p>
       </div>
     </div>
   );

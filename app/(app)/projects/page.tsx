@@ -6,6 +6,7 @@ import { and, desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { Archive, FolderKanban, LayoutList, ArrowRight } from "lucide-react";
 import { CreateProjectButton } from "@/components/create-project-button";
+import { DataLoadNotice } from "@/components/data-load-notice";
 
 export const metadata = { title: "Projects - SOWLedger" };
 
@@ -44,8 +45,8 @@ export default async function ProjectsPage({
     }));
     const rawTasks = await db.select().from(tasksTable).where(eq(tasksTable.workspaceId, session.workspaceId));
     tasks = rawTasks.map((task) => ({ id: task.id, projectId: task.projectId, status: task.status, parentId: task.parentId }));
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : "Unable to load projects right now.";
+  } catch {
+    loadError = "We couldn't load your projects.";
   }
 
   const activeCount = projects.filter((project) => project.status === "active").length;
@@ -60,7 +61,7 @@ export default async function ProjectsPage({
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Manage</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Projects</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Organize client work, tasks, budgets, and logged time into clear delivery pipelines.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Keep each project’s tasks, budget, and time together.</p>
             </div>
             <CreateProjectButton canCreate={canManageProjects} />
           </div>
@@ -75,15 +76,12 @@ export default async function ProjectsPage({
         </header>
 
         {loadError ? (
-          <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
-            <h2 className="text-lg font-semibold">Projects are temporarily unavailable</h2>
-            <p className="mt-2 text-sm">{loadError}</p>
-          </div>
+          <DataLoadNotice message={loadError} />
         ) : projects.length === 0 ? (
           <div className="rounded-[32px] border border-dashed border-slate-300 bg-white p-16 text-center shadow-sm">
             <FolderKanban className="mx-auto mb-4 h-14 w-14 text-slate-300" />
-            <h3 className="text-xl font-semibold text-slate-950">No active projects</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Create your first project to connect schedules, timers, manual logs, analytics, and exports.</p>
+            <h3 className="text-xl font-semibold text-slate-950">{clientFilter ? "No projects for this client" : "No projects yet"}</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Create a project to organize the work and start tracking time.</p>
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -101,16 +99,16 @@ export default async function ProjectsPage({
                         </Link>
                         {project.status === "archived" && <Archive className="h-4 w-4 text-slate-400" />}
                       </div>
-                      <p className="mt-2 text-sm text-slate-500">{projectTasks.length} task{projectTasks.length === 1 ? "" : "s"} ready across board and list views.</p>
+                      <p className="mt-2 text-sm text-slate-500">{projectTasks.length} task{projectTasks.length === 1 ? "" : "s"}</p>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{project.billingModel}</span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">{project.billingModel === "hourly" ? "Hourly" : project.billingModel === "fixed_fee" ? "Fixed fee" : "Hybrid"}</span>
                   </div>
                   <div className="mt-8">
                     <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-500"><span>Progress</span><span>{progress}%</span></div>
                     <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-600" style={{ width: `${progress}%` }} /></div>
                   </div>
                   <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Choose a workspace view</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">View project</p>
                     <div className="flex flex-wrap gap-2">
                       <Link href={`/projects/${project.id}?tab=board`} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-800">
                         <FolderKanban className="h-4 w-4" />
@@ -121,7 +119,7 @@ export default async function ProjectsPage({
                         Task list
                       </Link>
                       <Link href={`/projects/${project.id}`} className="inline-flex items-center gap-1 text-sm font-bold text-slate-500 transition hover:text-cyan-700">
-                        Open workspace
+                        Open project
                         <ArrowRight className="h-4 w-4" />
                       </Link>
                     </div>

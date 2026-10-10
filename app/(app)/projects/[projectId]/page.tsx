@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ projectId
   const session = await requireSession();
   const { projectId } = await params;
   const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.workspaceId, session.workspaceId)));
-  return { title: project ? `${project.name} Workspace – SOWLedger` : "Workspace – SOWLedger" };
+  return { title: project ? `${project.name} – SOWLedger` : "Project – SOWLedger" };
 }
 
 export default async function ProjectBoardPage({ 
@@ -43,7 +43,7 @@ export default async function ProjectBoardPage({
         <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Project workspace</p>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Project</p>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{project.name}</h1>
                 {project.status === "archived" && (
@@ -53,17 +53,17 @@ export default async function ProjectBoardPage({
                    </span>
                 )}
               </div>
-              <p className="mt-2 max-w-2xl text-sm text-slate-500">Manage tasks, budget risk, project assets, and chronological activity in one focused workspace.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">Organize tasks, check logged time against the budget, and review project activity.</p>
             </div>
             <div className="flex items-center gap-3">
                 <div className="hidden rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-bold text-slate-600 sm:block">
-                    {project.billingModel === "hourly" ? "Hourly Billing" : "Fixed Fee"}
+                    {project.billingModel === "hourly" ? "Hourly" : project.billingModel === "fixed_fee" ? "Fixed fee" : "Hybrid"}
                 </div>
                 <ProjectActions projectId={project.id} status={project.status} />
             </div>
           </div>
         
-          <ProjectFinancials projectId={project.id} />
+          <ProjectFinancials projectId={project.id} workspaceId={session.workspaceId} />
 
           <div className="mt-8 flex items-center gap-3 border-t border-slate-100 pt-4">
             <Link 
@@ -82,7 +82,7 @@ export default async function ProjectBoardPage({
                 href={`?tab=activity`} 
                 className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-colors ${tab === "activity" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-950"}`}
             >
-                <Activity className="h-4 w-4" /> Activity Feed
+                <Activity className="h-4 w-4" /> Activity
             </Link>
           </div>
         </header>
