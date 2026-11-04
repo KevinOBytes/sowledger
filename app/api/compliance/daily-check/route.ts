@@ -1,5 +1,6 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
-import { ForbiddenError, requireSession, requireRole, UnauthorizedError } from "@/lib/auth";
+import { requireSession, requireRole } from "@/lib/auth";
 import { enforceAuthKey, appendAuditLog } from "@/lib/security";
 
 export async function POST(req: NextRequest) {
@@ -8,7 +9,8 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     requireRole("member", session.role);
 
-    const body = await req.json() as { businessDate?: string; submitted?: boolean };
+    const body = await readRequestJson(req) as { businessDate?: string; submitted?: boolean };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     const businessDate = body.businessDate ? new Date(body.businessDate) : new Date();
 
     // Replaced in-memory store dailySubmissions tracking with an audit log
@@ -25,7 +27,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, businessDate: businessDate.toISOString(), submitted: body.submitted ?? true });
   } catch (error) {
-    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't confirm the daily check was recorded. Check your daily check before trying again.", { route: "/api/compliance/daily-check", method: "POST" });
   }
 }

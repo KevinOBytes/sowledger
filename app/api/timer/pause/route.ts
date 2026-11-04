@@ -1,33 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession, requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { timeEntries } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { requireSession, requireRole, UnauthorizedError, ForbiddenError } from "@/lib/auth";
+import { transitionTimer, timerTransitionEntryId, TimerTransitionError } from "@/lib/timer-transition";
 
 export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
 
-    const body = await req.json() as { entryId?: string };
-    if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
-
-    const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, body.entryId));
-    if (!entry || entry.workspaceId !== session.workspaceId || entry.userId !== session.sub || entry.stoppedAt) {
-      return NextResponse.json({ error: "No active timer found for entry" }, { status: 404 });
-    }
-
-    if (entry.isPaused) {
-      return NextResponse.json({ ok: true, message: "Timer is already paused" });
-    }
-
-    await db.update(timeEntries).set({
-      isPaused: true,
-      pausedAt: new Date(),
-    }).where(eq(timeEntries.id, body.entryId));
-
-    return NextResponse.json({ ok: true });
+    let body: unknown;
+    try { body = await req.json(); }
+    catch { return NextResponse.json({ error: "Send a valid JSON request." }, { status: 400 }); }
+    const entryId = timerTransitionEntryId(body);
+    return NextResponse.json(await transitionTimer({ workspaceId: session.workspaceId, userId: session.sub, entryId, action: "pause" }));
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 403 });
+    if (error instanceof UnauthorizedError) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
+    if (error instanceof ForbiddenError) return NextResponse.json({ error: "Your workspace role cannot perform this action." }, { status: 403 });
+    if (error instanceof TimerTransitionError) return NextResponse.json({ error: error.message }, { status: error.status });
+    return NextResponse.json({ error: "Could not pause this timer. Please try again." }, { status: 500 });
   }
 }

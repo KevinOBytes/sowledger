@@ -146,7 +146,7 @@ curl "https://your-domain.com/api/v1/revenue-intelligence" \
           <div className="mt-4 flex flex-wrap gap-2">
             {SCOPES.map((scope) => <span key={scope} className="rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-800">{scope}</span>)}
           </div>
-          <p className="mt-4 text-sm leading-6 text-slate-600">Creating schedule blocks or time entries for someone other than the key&apos;s creator also requires <code>impersonate:user</code>. Grant this only when your integration needs to act for other workspace members.</p>
+          <p className="mt-4 text-sm leading-6 text-slate-600">Creating or changing another member&apos;s time entries, or creating, changing, reassigning, or canceling their schedule blocks, also requires <code>impersonate:user</code>. Grant this only when your integration needs to act for other workspace members.</p>
         </div>
       </section>
 

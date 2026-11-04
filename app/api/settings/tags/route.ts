@@ -1,17 +1,11 @@
+import { readRequestJson, workflowErrorResponse } from "@/lib/workflow-validation";
+import { createWorkspaceTag, updateWorkspaceTag, deleteWorkspaceTag } from "@/lib/tag-mutations";
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workspaceTags } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { eq, and } from "drizzle-orm";
-
-function getErrorStatus(error: unknown, fallback = 500): number {
-  const err = error as Record<string, unknown> | null;
-  if (!err) return fallback;
-  if (err.code === "FORBIDDEN" || err.status === 403 || err.message === "Forbidden") return 403;
-  if (err.code === "UNAUTHORIZED" || err.status === 401) return 401;
-  return fallback;
-}
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -21,7 +15,7 @@ export async function GET() {
     const data = await db.select().from(workspaceTags).where(eq(workspaceTags.workspaceId, session.workspaceId));
     return NextResponse.json({ ok: true, tags: data });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't load your tag settings. Please try again.", { route: "/api/settings/tags", method: "GET" });
   }
 }
 
@@ -31,34 +25,11 @@ export async function POST(req: NextRequest) {
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as {
-      name?: string;
-      color?: string;
-      projectId?: string;
-      isSOWLedgerDefault?: boolean;
-    };
-    if (!body.name || typeof body.name !== "string") return NextResponse.json({ error: "Invalid name" }, { status: 400 });
-
-    // Check if tag exists (globally or for this project)
-    const existing = await db.select().from(workspaceTags)
-      .where(and(eq(workspaceTags.workspaceId, session.workspaceId), eq(workspaceTags.name, body.name.trim().toLowerCase())));
-
-    if (existing.length > 0) {
-      return NextResponse.json({ error: "Tag with this name already exists" }, { status: 400 });
-    }
-
-    const [tag] = await db.insert(workspaceTags).values({
-      id: crypto.randomUUID(),
-      workspaceId: session.workspaceId,
-      name: body.name.trim().toLowerCase(),
-      color: body.color || "#3b82f6",
-      projectId: body.projectId || null,
-      isSOWLedgerDefault: body.isSOWLedgerDefault ?? false,
-    }).returning();
+    const tag = await createWorkspaceTag(session.workspaceId, await readRequestJson(req), true);
 
     return NextResponse.json({ ok: true, tag });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the tag was created. Check your tag list before trying again.", { route: "/api/settings/tags", method: "POST" });
   }
 }
 
@@ -68,33 +39,10 @@ export async function PATCH(req: NextRequest) {
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as {
-      tagId?: string;
-      name?: string;
-      color?: string;
-      projectId?: string | null;
-      isSOWLedgerDefault?: boolean;
-      status?: "active" | "archived";
-    };
-
-    if (!body.tagId) return NextResponse.json({ error: "tagId is required" }, { status: 400 });
-
-    const [existing] = await db.select().from(workspaceTags).where(and(eq(workspaceTags.id, body.tagId), eq(workspaceTags.workspaceId, session.workspaceId)));
-    if (!existing) {
-      return NextResponse.json({ error: "Tag not found" }, { status: 404 });
-    }
-
-    const updates: Partial<typeof workspaceTags.$inferInsert> = {};
-    if (body.name !== undefined) updates.name = body.name.trim().toLowerCase();
-    if (body.color !== undefined) updates.color = body.color;
-    if (body.projectId !== undefined) updates.projectId = body.projectId;
-    if (body.isSOWLedgerDefault !== undefined) updates.isSOWLedgerDefault = body.isSOWLedgerDefault;
-    if (body.status !== undefined) updates.status = body.status;
-
-    const [tag] = await db.update(workspaceTags).set(updates).where(and(eq(workspaceTags.id, body.tagId), eq(workspaceTags.workspaceId, session.workspaceId))).returning();
+    const tag = await updateWorkspaceTag(session.workspaceId, await readRequestJson(req), "native");
     return NextResponse.json({ ok: true, tag });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the tag was updated. Check your tag list before trying again.", { route: "/api/settings/tags", method: "PATCH" });
   }
 }
 
@@ -103,17 +51,9 @@ export async function DELETE(req: NextRequest) {
     const session = await requireSession();
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
-    const id = req.nextUrl.searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
-
-    const [existing] = await db.select().from(workspaceTags).where(and(eq(workspaceTags.id, id), eq(workspaceTags.workspaceId, session.workspaceId)));
-    if (!existing) {
-      return NextResponse.json({ error: "Tag metadata not found" }, { status: 404 });
-    }
-
-    await db.delete(workspaceTags).where(and(eq(workspaceTags.id, id), eq(workspaceTags.workspaceId, session.workspaceId)));
+    await deleteWorkspaceTag(session.workspaceId, req.nextUrl.searchParams.get("id"));
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the tag was deleted. Check your tag list before trying again.", { route: "/api/settings/tags", method: "DELETE" });
   }
 }

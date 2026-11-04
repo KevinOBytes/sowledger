@@ -1,3 +1,4 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
@@ -8,14 +9,6 @@ import { onboardingProgress } from "@/lib/db/schema";
 
 const SETUP_STEPS = ["workspace", "project", "schedule", "track", "log", "review", "output", "invite", "integrate"] as const;
 type SetupStep = (typeof SETUP_STEPS)[number];
-
-function getErrorStatus(error: unknown, fallback = 500) {
-  const err = error as { status?: number; statusCode?: number; code?: string };
-  if (err.status || err.statusCode) return err.status ?? err.statusCode ?? fallback;
-  if (err.code === "FORBIDDEN") return 403;
-  if (err.code === "UNAUTHORIZED") return 401;
-  return fallback;
-}
 
 function progressId(workspaceId: string, userId: string) {
   return `${workspaceId}:${userId}`;
@@ -48,7 +41,7 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, onboarding: serializeProgress(progress ?? null) });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't load your setup progress. Please try again.", { route: "/api/onboarding", method: "GET" });
   }
 }
 
@@ -58,13 +51,14 @@ export async function PATCH(req: NextRequest) {
     requireRole("member", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as {
+    const body = await readRequestJson(req) as {
       completedSteps?: unknown;
       step?: unknown;
       skipped?: boolean;
       completed?: boolean;
       reset?: boolean;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     const id = progressId(session.workspaceId, session.sub);
     const now = new Date();
 
@@ -103,6 +97,6 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, onboarding: serializeProgress(progress ?? null) });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't confirm your setup progress was saved. Check your setup progress before trying again.", { route: "/api/onboarding", method: "PATCH" });
   }
 }

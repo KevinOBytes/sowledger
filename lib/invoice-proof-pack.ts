@@ -6,6 +6,7 @@ import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { auditLogs, invoices, projects, scheduledWorkBlocks, timeEntries, users } from "@/lib/db/schema";
 import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
 import { timeEntryAmountCents } from "@/lib/invoice-amount";
+import { WorkflowError } from "@/lib/workflow-validation";
 
 type JsonValue = null | string | number | boolean | JsonValue[] | { [key: string]: JsonValue };
 
@@ -109,6 +110,7 @@ export async function buildInvoiceProofPack(workspaceId: string, invoiceId: stri
     .where(and(eq(invoices.workspaceId, workspaceId), eq(invoices.id, invoiceId)));
 
   if (!invoice) return null;
+  if (invoice.status === "void") throw new WorkflowError("This invoice was voided. Its current linked time cannot be exported as invoice proof.", 409);
 
   const entryIds = Array.isArray(invoice.timeEntryIds) ? invoice.timeEntryIds : [];
   const linkedEntries = entryIds.length > 0
@@ -125,14 +127,17 @@ export async function buildInvoiceProofPack(workspaceId: string, invoiceId: stri
   const userIds = [...new Set(linkedEntries.map((entry) => entry.userId))];
   const scheduledBlockIds = [...new Set(linkedEntries.map((entry) => entry.scheduledBlockId).filter((value): value is string => Boolean(value)))];
 
-  const [workspaceProjects, workspaceUsers, workspaceBlocks, workspaceAuditLogs] = await Promise.all([
-    projectIds.length > 0 ? client.select().from(projects).where(and(eq(projects.workspaceId, workspaceId), inArray(projects.id, projectIds))) : Promise.resolve([]),
-    userIds.length > 0 ? client.select().from(users).where(inArray(users.id, userIds)) : Promise.resolve([]),
-    scheduledBlockIds.length > 0 ? client.select().from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.workspaceId, workspaceId), inArray(scheduledWorkBlocks.id, scheduledBlockIds))).orderBy(asc(scheduledWorkBlocks.id)) : Promise.resolve([]),
-    entryIds.length > 0
-      ? client.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, workspaceId), inArray(auditLogs.timeEntryId, [...entryIds, invoiceId]), ne(auditLogs.eventType, "client_invoice_signed_off"))).orderBy(asc(auditLogs.createdAt), asc(auditLogs.id))
-      : client.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, workspaceId), eq(auditLogs.timeEntryId, invoiceId), ne(auditLogs.eventType, "client_invoice_signed_off"))).orderBy(asc(auditLogs.createdAt), asc(auditLogs.id)),
-  ]);
+  // A supplied callback transaction owns one pg client. Keep its reads serial
+  // without changing the caller's snapshot or moving work to the pool.
+  const workspaceProjects = projectIds.length > 0
+    ? await client.select().from(projects).where(and(eq(projects.workspaceId, workspaceId), inArray(projects.id, projectIds))) : [];
+  const workspaceUsers = userIds.length > 0
+    ? await client.select().from(users).where(inArray(users.id, userIds)) : [];
+  const workspaceBlocks = scheduledBlockIds.length > 0
+    ? await client.select().from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.workspaceId, workspaceId), inArray(scheduledWorkBlocks.id, scheduledBlockIds))).orderBy(asc(scheduledWorkBlocks.id)) : [];
+  const workspaceAuditLogs = entryIds.length > 0
+    ? await client.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, workspaceId), inArray(auditLogs.timeEntryId, [...entryIds, invoiceId]), ne(auditLogs.eventType, "client_invoice_signed_off"))).orderBy(asc(auditLogs.createdAt), asc(auditLogs.id))
+    : await client.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, workspaceId), eq(auditLogs.timeEntryId, invoiceId), ne(auditLogs.eventType, "client_invoice_signed_off"))).orderBy(asc(auditLogs.createdAt), asc(auditLogs.id));
 
   const projectsById = new Map(workspaceProjects.map((project) => [project.id, project]));
   const usersById = new Map(workspaceUsers.map((user) => [user.id, user]));
@@ -169,7 +174,7 @@ export async function buildInvoiceProofPack(workspaceId: string, invoiceId: stri
       actualHours: hours(actualSeconds),
       plannedSeconds,
       plannedHours: hours(plannedSeconds),
-      auditEventCount: workspaceAuditLogs.length,
+      auditEventCount: workspaceAuditLogs.filter(event => event.eventType !== "invoice_financial_exposed" && event.eventType !== "time_financial_exported").length,
     },
     sourceMix: [...sourceStats.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([source, value]) => ({
       source,
@@ -212,7 +217,7 @@ export async function buildInvoiceProofPack(workspaceId: string, invoiceId: stri
         status: block.status,
       };
     }),
-    auditEvents: workspaceAuditLogs.map((event) => ({
+    auditEvents: workspaceAuditLogs.filter(event => event.eventType !== "invoice_financial_exposed" && event.eventType !== "time_financial_exported").map((event) => ({
       id: event.id,
       timeEntryId: event.timeEntryId,
       actorUserId: event.actorUserId,

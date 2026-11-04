@@ -1,3 +1,4 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -6,11 +7,6 @@ import { generateApiKeyMaterial, normalizeScopes, toPublicApiKey } from "@/lib/a
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { apiKeyRequests, apiKeys } from "@/lib/db/schema";
-
-function statusFrom(error: unknown) {
-  const err = error as { status?: number; statusCode?: number };
-  return err.status ?? err.statusCode ?? 500;
-}
 
 export async function GET() {
   try {
@@ -28,7 +24,7 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, keys: keys.map(toPublicApiKey), usage });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: statusFrom(error) });
+    return workflowErrorResponse(error, "We couldn't load your API keys. Please try again.", { route: "/api/settings/api-keys", method: "GET" });
   }
 }
 
@@ -38,7 +34,8 @@ export async function POST(req: NextRequest) {
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as { name?: string; scopes?: string[]; expiresAt?: string | null };
+    const body = await readRequestJson(req) as { name?: string; scopes?: string[]; expiresAt?: string | null };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     const name = body.name?.trim();
     if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
     const scopes = normalizeScopes(body.scopes);
@@ -60,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, key: toPublicApiKey(key), rawKey: material.rawKey });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: statusFrom(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the API key was created. Check your API key list before trying again.", { route: "/api/settings/api-keys", method: "POST" });
   }
 }
 
@@ -70,7 +67,8 @@ export async function PATCH(req: NextRequest) {
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as { keyId?: string; name?: string; scopes?: string[]; expiresAt?: string | null; rotate?: boolean };
+    const body = await readRequestJson(req) as { keyId?: string; name?: string; scopes?: string[]; expiresAt?: string | null; rotate?: boolean };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     if (!body.keyId) return NextResponse.json({ error: "keyId is required" }, { status: 400 });
 
     const [existing] = await db.select().from(apiKeys).where(and(eq(apiKeys.id, body.keyId), eq(apiKeys.workspaceId, session.workspaceId)));
@@ -96,7 +94,7 @@ export async function PATCH(req: NextRequest) {
       .returning();
     return NextResponse.json({ ok: true, key: toPublicApiKey(key), rawKey });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: statusFrom(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the API key was changed. Check your API key list before trying again.", { route: "/api/settings/api-keys", method: "PATCH" });
   }
 }
 
@@ -117,6 +115,6 @@ export async function DELETE(req: NextRequest) {
     if (!key) return NextResponse.json({ error: "API key not found" }, { status: 404 });
     return NextResponse.json({ ok: true, key: toPublicApiKey(key) });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: statusFrom(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the API key was revoked. Check your API key list before trying again.", { route: "/api/settings/api-keys", method: "DELETE" });
   }
 }

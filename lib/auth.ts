@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypt
 import { cookies } from "next/headers";
 import { env } from "./env";
 import { isAdminEmail } from "./admin";
+import { checkWorkspaceLimits } from "./billing";
 import {
   createInvitation,
   getMembership,
@@ -27,6 +28,22 @@ export class ForbiddenError extends Error {
   }
 }
 
+export class WorkspaceCapacityError extends Error {
+  readonly status = 402;
+  constructor() {
+    super("This workspace is at its member limit. Ask the workspace owner to choose a larger plan, then try the same invitation again.");
+    this.name = "WorkspaceCapacityError";
+  }
+}
+
+type AuthTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Call while holding the workspace row lock, immediately before adding a member. */
+export async function assertWorkspaceMembershipCapacity(workspaceId: string, tx: AuthTransaction) {
+  const limits = await checkWorkspaceLimits(workspaceId, "members", tx);
+  if (!limits.allowed) throw new WorkspaceCapacityError();
+}
+
 const AUTH_COOKIE_NAME = "sowledger_session";
 
 type SessionPayload = {
@@ -38,6 +55,10 @@ type SessionPayload = {
 };
 
 const roleWeights: Record<WorkspaceRole, number> = { client: 0, member: 1, manager: 2, owner: 3 };
+
+export function isWorkspaceRole(value: unknown): value is WorkspaceRole {
+  return typeof value === "string" && Object.hasOwn(roleWeights, value);
+}
 
 function secret() {
   const value = env.AUTH_COOKIE_SECRET;
@@ -103,6 +124,8 @@ async function updateMembershipRole(userId: string, workspaceId: string, role: W
 }
 
 async function repairSetupRole(email: string, membership: typeof memberships.$inferSelect) {
+  // Reject malformed persisted roles before any admin/bootstrap promotion.
+  if (!isWorkspaceRole(membership.role)) throw new UnauthorizedError("Please sign in again.");
   if (isAdminEmail(email) && membership.role !== "owner") {
     return await updateMembershipRole(membership.userId, membership.workspaceId, "owner") ?? membership;
   }
@@ -218,6 +241,7 @@ export async function createMagicLink(email: string) {
 }
 
 export async function inviteUser(input: { email: string; workspaceId: string; role: WorkspaceRole; invitedByUserId: string }) {
+  if (!isWorkspaceRole(input.role)) throw new ForbiddenError("Choose a valid workspace role.");
   return createInvitation({
     email: input.email.trim().toLowerCase(),
     workspaceId: input.workspaceId,
@@ -266,6 +290,10 @@ export async function consumeMagicLink(token: string) {
       gt(invitations.expiresAt, Date.now()), isNull(invitations.acceptedAt),
     )).orderBy(desc(invitations.expiresAt)).limit(1).for("update");
 
+    // Do not turn malformed stored roles into valid privileges, including for
+    // administrators. A refusal rolls back setup and leaves the link unused.
+    if (existing && !isWorkspaceRole(existing.role)) throw new UnauthorizedError("Please sign in again.");
+    if (invite && !isWorkspaceRole(invite.role)) throw new ForbiddenError("This invitation is no longer available.");
     let role: WorkspaceRole;
     if (existing) {
       role = existing.role;
@@ -284,6 +312,7 @@ export async function consumeMagicLink(token: string) {
     // Ordinary sign-in must not write back a stale role over a manager's change.
     let membership = existing;
     if (!membership) {
+      await assertWorkspaceMembershipCapacity(workspace.id, tx);
       [membership] = await tx.insert(memberships).values({ userId: user.id, workspaceId: workspace.id, role }).returning();
     } else if (membership.role !== role) {
       [membership] = await tx.update(memberships).set({ role })
@@ -297,6 +326,7 @@ export async function consumeMagicLink(token: string) {
 }
 
 export async function createSessionToken(payload: { sub: string; email: string; workspaceId: string; role: WorkspaceRole }) {
+  if (!isWorkspaceRole(payload.role)) throw new UnauthorizedError("Please sign in again.");
   return encode({ ...payload, exp: Date.now() + 1000 * 60 * 60 * 24 * 7 });
 }
 
@@ -327,5 +357,7 @@ export async function requireSession() {
 export { isAdminEmail } from "./admin";
 
 export function requireRole(role: WorkspaceRole, actualRole: WorkspaceRole) {
-  if (roleWeights[actualRole] < roleWeights[role]) throw new ForbiddenError(`Requires ${role} role`);
+  if (!isWorkspaceRole(role) || !isWorkspaceRole(actualRole) || roleWeights[actualRole] < roleWeights[role]) {
+    throw new ForbiddenError(`Requires ${role} role`);
+  }
 }

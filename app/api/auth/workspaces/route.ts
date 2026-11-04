@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, asc, desc, eq, gt, isNull } from "drizzle-orm";
-import { ForbiddenError, requireSession, setSessionCookie, UnauthorizedError } from "@/lib/auth";
+import { assertWorkspaceMembershipCapacity, ForbiddenError, isWorkspaceRole, requireSession, setSessionCookie, UnauthorizedError, WorkspaceCapacityError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { invitations, memberships, users, workspaces } from "@/lib/db/schema";
-import type { WorkspaceRole } from "@/lib/store";
-
-const roleWeight: Record<WorkspaceRole, number> = { client: 0, member: 1, manager: 2, owner: 3 };
-
 function failure(error: unknown) {
   if (error instanceof UnauthorizedError) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
+  if (error instanceof WorkspaceCapacityError) return NextResponse.json({ error: error.message }, { status: 402 });
   if (error instanceof ForbiddenError) return NextResponse.json({ error: error.message }, { status: 403 });
   console.error("Workspace selection failed", { errorType: error instanceof Error ? error.name : "UnknownError" });
   return NextResponse.json({ error: "We couldn't load your workspaces. Please try again." }, { status: 503 });
@@ -40,18 +37,26 @@ export async function POST(req: NextRequest) {
     }
     const workspaceId = body.workspaceId;
     const membership = await db.transaction(async (tx) => {
-      // Serialize acceptance for this account; never infer membership from a slug.
+      // Match magic-link acceptance's lock order and serialize the last seat
+      // across different accounts, not only concurrent requests by one user.
+      const [workspace] = await tx.select({ id: workspaces.id }).from(workspaces)
+        .where(eq(workspaces.id, workspaceId)).for("update");
+      if (!workspace) throw new ForbiddenError("You need an invitation to join this workspace.");
       const [user] = await tx.select().from(users).where(eq(users.id, session.sub)).for("update");
       if (!user || user.email !== session.email) throw new UnauthorizedError("Please sign in again.");
       const [existing] = await tx.select().from(memberships)
         .where(and(eq(memberships.userId, session.sub), eq(memberships.workspaceId, workspaceId))).for("update");
-      if (existing) return existing;
+      if (existing) {
+        if (!isWorkspaceRole(existing.role)) throw new UnauthorizedError("Please sign in again.");
+        return existing;
+      }
       const [invite] = await tx.select().from(invitations).where(and(
         eq(invitations.workspaceId, workspaceId), eq(invitations.email, user.email),
         isNull(invitations.acceptedAt), gt(invitations.expiresAt, Date.now()),
       )).orderBy(desc(invitations.expiresAt)).limit(1).for("update");
       if (!invite) throw new ForbiddenError("You need an invitation to join this workspace.");
-      if (!(invite.role in roleWeight)) throw new ForbiddenError("This invitation is no longer available.");
+      if (!isWorkspaceRole(invite.role)) throw new ForbiddenError("This invitation is no longer available.");
+      await assertWorkspaceMembershipCapacity(workspaceId, tx);
       const [accepted] = await tx.insert(memberships).values({ workspaceId, userId: user.id, role: invite.role }).returning();
       await tx.update(invitations).set({ acceptedAt: Date.now() }).where(and(eq(invitations.id, invite.id), eq(invitations.workspaceId, workspaceId)));
       return accepted;

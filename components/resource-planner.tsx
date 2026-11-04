@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { DataLoadNotice } from "@/components/data-load-notice";
 import { ProjectTask } from "@/lib/store";
 import { AlertTriangle, ArrowRight, Building2, Clock, UserPlus, Users } from "lucide-react";
+import { formatDueDate } from "@/lib/date-input";
 
 type Person = {
   id: string;
@@ -27,6 +28,7 @@ type WorkspaceGoal = {
   targetAmount: number | null;
   recurrence: string;
   dueDate: string | null;
+  projectId?: string | null;
 };
 
 export function ResourcePlanner() {
@@ -36,9 +38,11 @@ export function ResourcePlanner() {
   const [goals, setGoals] = useState<WorkspaceGoal[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [showAllBacklog, setShowAllBacklog] = useState(false);
 
-  useEffect(() => {
-    async function fetchPlanner() {
+  const fetchPlanner = useCallback(async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
         const res = await fetch("/api/planner");
         if (!res.ok) throw new Error("Planner unavailable");
@@ -52,15 +56,17 @@ export function ResourcePlanner() {
       } finally {
         setLoading(false);
       }
-    }
-    fetchPlanner();
   }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchPlanner();
+  }, [fetchPlanner]);
 
   if (loading) {
     return <div className="p-8 text-slate-500 animate-pulse">Loading assignments...</div>;
   }
 
-  if (loadError) return <DataLoadNotice message="We couldn't load your assignments and goals." />;
+  if (loadError) return <DataLoadNotice message="We couldn't load your assignments and goals." onRetry={() => void fetchPlanner()} />;
 
   const organizationMap = new Map(organizations.map((organization) => [organization.id, organization]));
   const assignablePeople = people.filter((person) => person.status !== "archived");
@@ -73,8 +79,14 @@ export function ResourcePlanner() {
     return { ...person, assignedTasks, assignedGoals, totalHours };
   });
 
-  const unassignedTasks = tasks.filter((t) => !t.assigneeId);
-  const unassignedHours = unassignedTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+  const activeOwnerIds = new Set(assignablePeople.flatMap(person => [person.id, ...(person.linkedUserId ? [person.linkedUserId] : [])]));
+  // Archived or missing assignees still own real work. Keep it visible for reassignment.
+  const unassignedTasks = tasks.filter((task) => !task.assigneeId || !activeOwnerIds.has(task.assigneeId));
+  const unassignedGoals = goals.filter((goal) => !goal.assignedUserId || !activeOwnerIds.has(goal.assignedUserId));
+  const unassignedHours = unassignedTasks.reduce((sum, task) => sum + (task.estimatedHours || 0), 0)
+    + unassignedGoals.reduce((sum, goal) => sum + (goal.targetType === "hours" ? goal.targetHours || 0 : 0), 0);
+  const totalEstimatedHours = tasks.reduce((sum, task) => sum + (task.estimatedHours || 0), 0)
+    + goals.reduce((sum, goal) => sum + (goal.targetType === "hours" ? goal.targetHours || 0 : 0), 0);
   const pendingInvites = assignablePeople.filter((person) => person.invitationStatus === "pending").length;
 
   return (
@@ -100,7 +112,7 @@ export function ResourcePlanner() {
              <div>
                <p className="text-sm font-medium text-stone-500">Estimated hours</p>
                <h3 className="text-2xl font-bold text-[#17211d]">
-                  {memberBuckets.reduce((sum, b) => sum + b.totalHours, 0) + unassignedHours} hrs
+                  {totalEstimatedHours} hrs
                </h3>
              </div>
            </div>
@@ -131,8 +143,7 @@ export function ResourcePlanner() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Link href="/people" className="rounded-[28px] border border-cyan-200 bg-cyan-50 p-5 shadow-sm transition hover:bg-cyan-100">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">Action</p>
-          <div className="mt-2 flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-semibold text-slate-950">Add people or invite members</h3>
               <p className="mt-1 text-sm text-slate-600">Add your team and contacts before assigning tasks.</p>
@@ -141,12 +152,10 @@ export function ResourcePlanner() {
           </div>
         </Link>
         <div className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-400">Planner features</p>
-          <p className="mt-2 text-sm text-stone-600">Hours combine task estimates and assigned hourly goals. They are not a weekly availability or utilization measure.</p>
+          <p className="text-sm text-stone-600">Hours combine all outstanding task estimates and hourly goals, including work needing an owner. They are not a weekly availability or utilization measure.</p>
         </div>
         <div className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-stone-400">Recommended cleanup</p>
-          <p className="mt-2 text-sm text-stone-600">Assign work to an owner and check pending invitations. A warning marks more than 40 estimated hours, regardless of dates.</p>
+          <p className="text-sm text-stone-600">Assign work to an owner and check pending invitations. A warning marks more than 40 estimated hours, regardless of dates.</p>
         </div>
       </div>
 
@@ -181,10 +190,10 @@ export function ResourcePlanner() {
                                  {bucket.assignedGoals.map((g: WorkspaceGoal) => (
                                      <div key={g.id} className="flex items-start justify-between gap-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-2.5 shadow-sm">
                                          <div>
-                                            <p className="line-clamp-2 text-sm font-medium text-teal-900">{g.name}</p>
+                                            <p className="line-clamp-2 text-sm font-medium text-teal-900">{g.projectId ? <Link href={`/projects/${g.projectId}`} className="underline underline-offset-2">{g.name}</Link> : g.name}</p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 {g.recurrence !== 'none' && <span className="flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-teal-700">{g.recurrence}</span>}
-                                                {g.dueDate && <span className="text-[10px] font-medium text-stone-500">Due: {new Date(g.dueDate).toLocaleDateString()}</span>}
+                                                {g.dueDate && <span className="text-[10px] font-medium text-stone-500">Due: {formatDueDate(g.dueDate)}</span>}
                                             </div>
                                          </div>
                                          <span className="shrink-0 font-mono text-xs font-bold text-teal-700">{g.targetType === 'hours' ? `${g.targetHours || 0}h` : `$${g.targetAmount || 0}`}</span>
@@ -202,14 +211,14 @@ export function ResourcePlanner() {
                      {bucket.assignedTasks.map((t) => (
                          <div key={t.id} className="flex flex-col gap-1 rounded-2xl border border-stone-200 bg-stone-50 p-3 shadow-sm">
                              <div className="flex justify-between items-start gap-4">
-                               <p className="line-clamp-2 text-sm font-medium text-[#17211d]">{t.title}</p>
+                               <Link href={`/projects/${t.projectId}`} className="line-clamp-2 text-sm font-medium text-[#17211d] underline underline-offset-2">{t.title}</Link>
                                <span className="shrink-0 font-mono text-xs text-stone-500">{t.estimatedHours || 0}h</span>
                              </div>
                              <div className="flex items-center gap-2 mt-2">
                                 <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-stone-600">
                                     {t.status.replace("_", " ")}
                                 </span>
-                                {t.dueDate && <span className="text-[10px] font-medium text-stone-500">Due: {String(t.dueDate)}</span>}
+                                {t.dueDate && <span className="text-[10px] font-medium text-stone-500">Due: {formatDueDate(t.dueDate)}</span>}
                              </div>
                          </div>
                      ))}
@@ -226,36 +235,40 @@ export function ResourcePlanner() {
              <div className="flex items-center justify-between border-b border-stone-200 p-4">
                 <div>
                     <h4 className="font-semibold text-[#17211d]">Unassigned backlog</h4>
-                    <p className="text-xs text-stone-500">Tasks needing owners</p>
+                    <p className="text-xs text-stone-500">Tasks and goals needing an active owner</p>
                 </div>
                 <div className="rounded-full bg-stone-100 px-3 py-1 text-sm font-bold text-stone-600">
                     {unassignedHours} hrs
                 </div>
              </div>
              <div className="p-4 space-y-3">
-                 {unassignedTasks.length === 0 && goals.filter(g => !g.assignedUserId).length === 0 && (
+                 {unassignedTasks.length === 0 && unassignedGoals.length === 0 && (
                      <div className="py-4 text-center text-sm italic text-stone-500">No unassigned tasks or goals.</div>
                  )}
 
                  {/* Unassigned Goals */}
-                 {goals.filter(g => !g.assignedUserId).map(g => (
+                 {unassignedGoals.map(g => (
                      <div key={g.id} className="flex items-start justify-between gap-4 rounded-2xl border border-teal-100 bg-teal-50/50 p-3 shadow-sm">
                          <div>
-                             <p className="line-clamp-2 text-sm font-medium text-teal-900">{g.name}</p>
-                             <p className="mt-1 text-[10px] uppercase tracking-widest text-stone-500">Goal</p>
+                             <p className="line-clamp-2 text-sm font-medium text-teal-900">{g.projectId ? <Link href={`/projects/${g.projectId}`} className="underline underline-offset-2">{g.name}</Link> : g.name}</p>
+                             <p className="mt-1 text-xs text-stone-500">{g.assignedUserId ? "Needs reassignment" : "Unassigned goal"}{g.dueDate ? ` · Due: ${formatDueDate(g.dueDate)}` : ""}</p>
                          </div>
+                         <span className="shrink-0 text-xs font-semibold text-teal-700">{g.targetType === "hours" ? `${g.targetHours || 0}h` : `$${g.targetAmount || 0}`}</span>
                      </div>
                  ))}
 
                  {/* Unassigned Tasks */}
-                 {unassignedTasks.slice(0, 10).map((t) => (
+                 {(showAllBacklog ? unassignedTasks : unassignedTasks.slice(0, 10)).map((t) => (
                      <div key={t.id} className="flex items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-3">
-                         <p className="line-clamp-1 text-sm font-medium text-stone-700">{t.title}</p>
+                         <div><Link href={`/projects/${t.projectId}`} className="line-clamp-2 text-sm font-medium text-stone-700 underline underline-offset-2">{t.title}</Link>
+                           {t.assigneeId && <p className="mt-1 text-xs text-amber-800">Needs reassignment</p>}
+                           {t.dueDate && <p className="mt-1 text-xs text-stone-500">Due: {formatDueDate(t.dueDate)}</p>}
+                         </div>
                          <span className="shrink-0 font-mono text-xs text-stone-500">{t.estimatedHours || 0}h</span>
                      </div>
                  ))}
                  {unassignedTasks.length > 10 && (
-                     <div className="pt-2 text-center text-xs font-medium text-stone-500">+ {unassignedTasks.length - 10} more unassigned tasks</div>
+                     <button type="button" aria-expanded={showAllBacklog} onClick={() => setShowAllBacklog(value => !value)} className="w-full pt-2 text-center text-sm font-semibold text-cyan-700 underline">{showAllBacklog ? "Show fewer tasks" : `Show all ${unassignedTasks.length} tasks`}</button>
                  )}
              </div>
           </div>

@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "dist/**",
     "packages/mcp/dist/**",
     "next-env.d.ts",
+    // Local agent review artifacts are not application source.
+    ".superpowers/sdd/**",
   ]),
 ]);
 

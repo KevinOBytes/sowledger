@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, exists, getTableColumns, gt, lt, sql } from "drizzle-orm";
 
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { memberships, projects, scheduledWorkBlocks, timeEntries, userActions } from "@/lib/db/schema";
+import { integrationSyncRecords, memberships, projects, scheduledWorkBlocks, timeEntries, userActions } from "@/lib/db/schema";
 import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
+import { createScheduledBatch } from "@/lib/schedule-batch";
+import { updateScheduledBlock } from "@/lib/schedule-mutations";
 import { normalizeTags } from "@/lib/validators";
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 
 type ScheduleStatus = "planned" | "in_progress" | "completed" | "skipped" | "canceled";
 
@@ -17,35 +20,30 @@ function isScheduleStatus(value: unknown): value is ScheduleStatus {
   return typeof value === "string" && SCHEDULE_STATUSES.includes(value as ScheduleStatus);
 }
 
-function statusFrom(error: unknown) {
-  const err = error as { status?: number; statusCode?: number };
-  return err.status ?? err.statusCode ?? 500;
-}
-
 function parseDate(value: unknown, label: string) {
-  if (typeof value !== "string") throw new Error(`${label} is required`);
+  if (typeof value !== "string") throw new WorkflowError(`${label} is required`, 400);
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) throw new Error(`${label} must be a valid date`);
+  if (Number.isNaN(date.getTime())) throw new WorkflowError(`${label} must be a valid date`, 400);
   return date;
 }
 
 async function validateProject(workspaceId: string, projectId?: string | null) {
   if (!projectId) return;
   const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)));
-  if (!project) throw new Error("Invalid projectId");
+  if (!project) throw new WorkflowError("Invalid projectId", 400);
 }
 
 async function validateAction(workspaceId: string, userId: string, actionId?: string | null) {
   if (!actionId) return;
   const [action] = await db.select().from(userActions).where(and(eq(userActions.id, actionId), eq(userActions.workspaceId, workspaceId), eq(userActions.userId, userId)));
-  if (!action) throw new Error("Invalid actionId");
+  if (!action) throw new WorkflowError("Invalid actionId", 400);
 }
 
 async function validateUserAccess(workspaceId: string, actorRole: string, actorUserId: string, requestedUserId?: string | null) {
   const userId = requestedUserId || actorUserId;
-  if (userId !== actorUserId && actorRole !== "manager" && actorRole !== "owner") throw new Error("Cannot schedule another user's time");
+  if (userId !== actorUserId && actorRole !== "manager" && actorRole !== "owner") throw new WorkflowError("Cannot schedule another user's time", 403);
   const [membership] = await db.select().from(memberships).where(and(eq(memberships.workspaceId, workspaceId), eq(memberships.userId, userId)));
-  if (!membership) throw new Error("User is not in this workspace");
+  if (!membership) throw new WorkflowError("User is not in this workspace", 400);
   return userId;
 }
 
@@ -59,8 +57,9 @@ export async function GET(req: NextRequest) {
     const scope = searchParams.get("scope") ?? "mine";
     const projectId = searchParams.get("projectId");
     const status = searchParams.get("status") as ScheduleStatus | null;
-    const start = searchParams.get("start");
-    const end = searchParams.get("end");
+    const start = searchParams.has("start") ? parseDate(searchParams.get("start"), "start") : null;
+    const end = searchParams.has("end") ? parseDate(searchParams.get("end"), "end") : null;
+    if (start && end && end <= start) throw new WorkflowError("end must be after start", 400);
 
     const conditions = [eq(scheduledWorkBlocks.workspaceId, session.workspaceId)];
     if (scope !== "team" || (session.role !== "manager" && session.role !== "owner")) {
@@ -68,13 +67,18 @@ export async function GET(req: NextRequest) {
     }
     if (projectId) conditions.push(eq(scheduledWorkBlocks.projectId, projectId));
     if (status && isScheduleStatus(status)) conditions.push(eq(scheduledWorkBlocks.status, status));
-    if (start) conditions.push(gte(scheduledWorkBlocks.startsAt, new Date(start)));
-    if (end) conditions.push(lte(scheduledWorkBlocks.startsAt, new Date(end)));
+    if (start) conditions.push(gt(scheduledWorkBlocks.endsAt, start));
+    if (end) conditions.push(lt(scheduledWorkBlocks.startsAt, end));
 
-    const blocks = await db.select().from(scheduledWorkBlocks).where(and(...conditions)).orderBy(desc(scheduledWorkBlocks.startsAt));
+    const blocks = await db.select({
+      ...getTableColumns(scheduledWorkBlocks),
+      // Editable status/labels can be stale; affordances also use durable links.
+      hasRecordedTime: exists(db.select({ id: timeEntries.id }).from(timeEntries).where(and(eq(timeEntries.workspaceId, scheduledWorkBlocks.workspaceId), eq(timeEntries.scheduledBlockId, scheduledWorkBlocks.id)))),
+      isImported: exists(db.select({ id: integrationSyncRecords.id }).from(integrationSyncRecords).where(and(eq(integrationSyncRecords.workspaceId, scheduledWorkBlocks.workspaceId), eq(integrationSyncRecords.provider, "google_calendar"), eq(integrationSyncRecords.resourceType, "scheduled_work_block"), eq(integrationSyncRecords.resourceId, scheduledWorkBlocks.id), sql`${integrationSyncRecords.metadata}->>'direction' = 'google_busy_to_sowledger'`))),
+    }).from(scheduledWorkBlocks).where(and(...conditions)).orderBy(desc(scheduledWorkBlocks.startsAt));
     return NextResponse.json({ ok: true, blocks });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: statusFrom(error) });
+    return workflowErrorResponse(error, "Could not load your schedule. Please try again.");
   }
 }
 
@@ -84,7 +88,10 @@ export async function POST(req: NextRequest) {
     requireRole("member", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as {
+    const body = await readRequestJson(req) as {
+      operationId?: unknown;
+      occurrences?: unknown;
+      replace?: unknown;
       title?: string;
       startsAt?: string;
       endsAt?: string;
@@ -95,9 +102,22 @@ export async function POST(req: NextRequest) {
       notes?: string;
       tags?: string[];
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a valid scheduling request.", 400);
+    if ("operationId" in body || "occurrences" in body || "replace" in body) {
+      const { createdBlocks, ...receipt } = await createScheduledBatch({ workspaceId: session.workspaceId, actorUserId: session.sub, canManageOthers: session.role === "manager" || session.role === "owner", body });
+      if (createdBlocks.length > 0) after(async () => {
+        await Promise.all(createdBlocks.map(block => dispatchIntegrationNotification(session.workspaceId, "scheduled_block.created", {
+          title: `Scheduled: ${block.title}`,
+          body: `${block.startsAt.toLocaleString()} - ${block.endsAt.toLocaleString()}`,
+          url: `${getAppOrigin()}/calendar`,
+        }).catch(() => {})));
+      });
+      return NextResponse.json({ ok: true, ...receipt });
+    }
 
-    const title = body.title?.trim();
+    const title = typeof body.title === "string" ? body.title.trim() : "";
     if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });
+    if (title.length > 255) throw new WorkflowError("Keep the title to 255 characters or fewer.", 400);
     const startsAt = parseDate(body.startsAt, "startsAt");
     const endsAt = parseDate(body.endsAt, "endsAt");
     if (endsAt <= startsAt) return NextResponse.json({ error: "endsAt must be after startsAt" }, { status: 400 });
@@ -131,9 +151,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, block });
   } catch (error) {
-    const message = (error as Error).message;
-    const status = message.includes("required") || message.includes("Invalid") || message.includes("after") ? 400 : statusFrom(error);
-    return NextResponse.json({ error: message }, { status });
+    return workflowErrorResponse(error, "Could not schedule this work. Please try again.", { route: "/api/schedule", method: "POST" });
   }
 }
 
@@ -143,7 +161,7 @@ export async function PATCH(req: NextRequest) {
     requireRole("member", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as {
+    const body = await readRequestJson(req) as {
       blockId?: string;
       title?: string;
       startsAt?: string;
@@ -157,30 +175,14 @@ export async function PATCH(req: NextRequest) {
       status?: ScheduleStatus;
       linkedTimeEntryId?: string | null;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     if (!body.blockId) return NextResponse.json({ error: "blockId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId)));
-    if (!existing) return NextResponse.json({ error: "Scheduled block not found" }, { status: 404 });
-    if (existing.userId !== session.sub && session.role !== "manager" && session.role !== "owner") return NextResponse.json({ error: "Cannot edit another user's schedule" }, { status: 403 });
-
-    const nextUserId = body.userId !== undefined ? await validateUserAccess(session.workspaceId, session.role, session.sub, body.userId) : existing.userId;
-    const nextProjectId = body.projectId !== undefined ? body.projectId : existing.projectId;
-    const nextActionId = body.actionId !== undefined ? body.actionId : existing.actionId;
-    if (body.linkedTimeEntryId) {
-      const [entry] = await db
-        .select({ id: timeEntries.id })
-        .from(timeEntries)
-        .where(and(eq(timeEntries.id, body.linkedTimeEntryId), eq(timeEntries.workspaceId, session.workspaceId)));
-      if (!entry) return NextResponse.json({ error: "Invalid linkedTimeEntryId" }, { status: 400 });
-    }
-    await validateProject(session.workspaceId, nextProjectId);
-    await validateAction(session.workspaceId, nextUserId, nextActionId);
-
-    const updates: Partial<typeof scheduledWorkBlocks.$inferInsert> = { updatedAt: new Date() };
-    if (body.title !== undefined) updates.title = body.title.trim();
+    const updates: Parameters<typeof updateScheduledBlock>[0]["updates"] = {};
+    if (body.title !== undefined) updates.title = body.title;
     if (body.startsAt !== undefined) updates.startsAt = parseDate(body.startsAt, "startsAt");
     if (body.endsAt !== undefined) updates.endsAt = parseDate(body.endsAt, "endsAt");
-    if (body.userId !== undefined) updates.userId = nextUserId;
+    if (body.userId !== undefined) updates.userId = body.userId || session.sub;
     if (body.projectId !== undefined) updates.projectId = body.projectId;
     if (body.taskId !== undefined) updates.taskId = body.taskId;
     if (body.actionId !== undefined) updates.actionId = body.actionId;
@@ -192,20 +194,10 @@ export async function PATCH(req: NextRequest) {
       updates.status = body.status;
     }
 
-    const startForCheck = updates.startsAt ?? existing.startsAt;
-    const endForCheck = updates.endsAt ?? existing.endsAt;
-    if (endForCheck <= startForCheck) return NextResponse.json({ error: "endsAt must be after startsAt" }, { status: 400 });
-
-    const [block] = await db
-      .update(scheduledWorkBlocks)
-      .set(updates)
-      .where(and(eq(scheduledWorkBlocks.id, body.blockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId)))
-      .returning();
+    const block = await updateScheduledBlock({ workspaceId: session.workspaceId, blockId: body.blockId, actorUserId: session.sub, canManageOthers: session.role === "manager" || session.role === "owner", updates });
     return NextResponse.json({ ok: true, block });
   } catch (error) {
-    const message = (error as Error).message;
-    const status = message.includes("required") || message.includes("Invalid") || message.includes("after") ? 400 : statusFrom(error);
-    return NextResponse.json({ error: message }, { status });
+    return workflowErrorResponse(error, "Could not update this scheduled work. Please try again.", { route: "/api/schedule", method: "PATCH" });
   }
 }
 
@@ -217,16 +209,9 @@ export async function DELETE(req: NextRequest) {
 
     const blockId = req.nextUrl.searchParams.get("blockId");
     if (!blockId) return NextResponse.json({ error: "blockId is required" }, { status: 400 });
-    const [existing] = await db.select().from(scheduledWorkBlocks).where(and(eq(scheduledWorkBlocks.id, blockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId)));
-    if (!existing) return NextResponse.json({ error: "Scheduled block not found" }, { status: 404 });
-    if (existing.userId !== session.sub && session.role !== "manager" && session.role !== "owner") return NextResponse.json({ error: "Cannot delete another user's schedule" }, { status: 403 });
-
-    await db
-      .update(scheduledWorkBlocks)
-      .set({ status: "canceled", updatedAt: new Date() })
-      .where(and(eq(scheduledWorkBlocks.id, blockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId)));
+    await updateScheduledBlock({ workspaceId: session.workspaceId, blockId, actorUserId: session.sub, canManageOthers: session.role === "manager" || session.role === "owner", updates: { status: "canceled" } });
     return NextResponse.json({ ok: true, blockId });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: statusFrom(error) });
+    return workflowErrorResponse(error, "Could not cancel this scheduled work. Please try again.");
   }
 }

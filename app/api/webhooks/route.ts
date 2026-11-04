@@ -1,8 +1,9 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { webhooks } from "@/lib/db/schema";
-import { validateWebhookUrl } from "@/lib/security";
+import { validateWebhookUrl, WebhookUrlValidationError } from "@/lib/security";
 import { and, eq } from "drizzle-orm";
 
 type WebhookRow = typeof webhooks.$inferSelect;
@@ -38,7 +39,7 @@ export async function GET() {
     const workspaceWebhooks = await db.select().from(webhooks).where(eq(webhooks.workspaceId, session.workspaceId));
     return NextResponse.json({ ok: true, webhooks: workspaceWebhooks.map(toPublicWebhook) });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return workflowErrorResponse(error, "We couldn't load your webhooks. Please try again.", { route: "/api/webhooks", method: "GET" });
   }
 }
 
@@ -51,7 +52,8 @@ export async function POST(req: Request) {
     const limits = await checkWorkspaceLimits(session.workspaceId, "webhooks");
     if (!limits.allowed) return NextResponse.json({ error: limits.error }, { status: 402 });
 
-    const body = await req.json() as { url: string; events: string[] };
+    const body = await readRequestJson(req) as { url: string; events: string[] };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
 
     const url = await validateWebhookUrl(body.url);
 
@@ -64,7 +66,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, webhook: toPublicWebhook(hook) });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 400 });
+    if (error instanceof WebhookUrlValidationError) return NextResponse.json({ error: error.message }, { status: 400 });
+    return workflowErrorResponse(error, "We couldn't confirm the webhook was created. Check your webhook list before trying again.", { route: "/api/webhooks", method: "POST" });
   }
 }
 
@@ -85,6 +88,6 @@ export async function DELETE(req: Request) {
     if (!deleted) return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
     return NextResponse.json({ ok: true, deletedWebhookId: deleted.id });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return workflowErrorResponse(error, "We couldn't confirm the webhook was deleted. Check your webhook list before trying again.", { route: "/api/webhooks", method: "DELETE" });
   }
 }

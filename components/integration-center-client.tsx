@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataLoadNotice } from "@/components/data-load-notice";
+import { calendarSyncFailure, calendarSyncFeedback, type CalendarSyncFeedback } from "@/lib/calendar-sync-feedback";
 
 import { AppEmptyState, AppMetricCard, AppPageHeader, AppPageShell, AppWorkflowRail } from "@/components/app-page-shell";
 
@@ -42,6 +43,7 @@ type Connection = {
 };
 
 type IntegrationsResponse = {
+  canManage?: boolean;
   connections?: Connection[];
   readiness?: {
     googleCalendarOAuth: boolean;
@@ -107,6 +109,7 @@ function configBoolean(config: Record<string, unknown>, key: string, fallback: b
 export function IntegrationCenterClient() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [readiness, setReadiness] = useState<NonNullable<IntegrationsResponse["readiness"]> | null>(null);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -117,20 +120,26 @@ export function IntegrationCenterClient() {
   const [googleCalendarId, setGoogleCalendarId] = useState("primary");
   const [googleImportBusy, setGoogleImportBusy] = useState(true);
   const [googleSyncScheduled, setGoogleSyncScheduled] = useState(true);
+  const [syncFeedback, setSyncFeedback] = useState<CalendarSyncFeedback | null>(null);
+  const refreshGeneration = useRef(0);
 
   const connectionByProvider = useMemo(() => new Map(connections.map((connection) => [connection.provider, connection])), [connections]);
   const connectedCount = connections.filter((connection) => connection.status === "connected").length;
   const errorCount = connections.filter((connection) => connection.status === "error").length;
 
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
     setLoading(true);
+    setCanManage(false);
     try {
       const response = await fetch("/api/integrations");
       const data = await response.json() as IntegrationsResponse;
+      if (generation !== refreshGeneration.current) return;
       if (!response.ok) throw new Error(data.error || "Unable to load integrations");
       const nextConnections = data.connections ?? [];
       setConnections(nextConnections);
       setReadiness(data.readiness ?? null);
+      setCanManage(data.canManage === true);
       setLoadError(false);
       const quickBooks = nextConnections.find((connection) => connection.provider === "quickbooks");
       if (quickBooks) {
@@ -144,16 +153,19 @@ export function IntegrationCenterClient() {
         setGoogleSyncScheduled(configBoolean(google.config, "syncScheduled", true));
       }
     } catch (error) {
+      if (generation !== refreshGeneration.current) return;
       setLoadError(true);
       toast.error("Integrations unavailable", { description: error instanceof Error ? error.message : "Unknown error" });
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    const generation = refreshGeneration;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
+    return () => { generation.current++; };
   }, [refresh]);
 
   useEffect(() => {
@@ -176,26 +188,41 @@ export function IntegrationCenterClient() {
   }, []);
 
   async function postAction(path: string, success: string, body?: unknown) {
+    if (!canManage || loading || busy !== null) return;
+    const calendarSync = path === "/api/integrations/google-calendar/sync";
     setBusy(path);
+    if (calendarSync) setSyncFeedback(null);
     try {
       const response = await fetch(path, {
         method: "POST",
         headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       });
-      const data = await response.json().catch(() => ({})) as { error?: string; result?: { imported?: number; exported?: number; updated?: number } };
+      const data = await response.json().catch(() => ({})) as { error?: string; result?: unknown };
       if (!response.ok) throw new Error(data.error || "Request failed");
-      const detail = data.result ? `${data.result.exported ?? 0} exported, ${data.result.imported ?? 0} imported, ${data.result.updated ?? 0} updated.` : undefined;
-      toast.success(success, { description: detail });
+      if (calendarSync) {
+        const feedback = calendarSyncFeedback(data.result);
+        setSyncFeedback(feedback);
+        toast[feedback.tone](feedback.title, { description: feedback.description });
+        window.dispatchEvent(new CustomEvent("sowledger:calendar-updated"));
+      } else {
+        toast.success(success);
+      }
       await refresh();
     } catch (error) {
-      toast.error("Integration action failed", { description: error instanceof Error ? error.message : "Unknown error" });
+      if (calendarSync) {
+        setSyncFeedback(calendarSyncFailure);
+        toast.error(calendarSyncFailure.title, { description: calendarSyncFailure.description });
+      } else {
+        toast.error("Integration action failed", { description: error instanceof Error ? error.message : "Unknown error" });
+      }
     } finally {
       setBusy(null);
     }
   }
 
   async function patchConfig(provider: Provider, body: Record<string, unknown>) {
+    if (!canManage || loading || busy !== null) return;
     setBusy(`${provider}:config`);
     try {
       const response = await fetch(`/api/integrations/${provider}/config`, {
@@ -215,6 +242,7 @@ export function IntegrationCenterClient() {
   }
 
   function connect(provider: Provider) {
+    if (!canManage || loading || busy !== null) return;
     const meta = PROVIDER_META[provider];
     const configured = readiness?.[meta.readinessKey];
     if (!configured) {
@@ -241,7 +269,7 @@ export function IntegrationCenterClient() {
           { label: "API and webhooks", tone: "emerald", icon: Webhook },
         ]}
         primaryAction={(
-          <button onClick={() => void refresh()} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 sm:w-auto">
+          <button onClick={() => void refresh()} disabled={loading || busy !== null} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:w-auto">
             <RefreshCcw className="h-4 w-4" />
             Refresh
           </button>
@@ -249,6 +277,8 @@ export function IntegrationCenterClient() {
       />
 
       <AppWorkflowRail current="integrate" />
+
+      {!loading && !canManage && <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">You can view this workspace’s connections. An owner or manager can connect, sync, or change integrations.</p>}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AppMetricCard label="Connected" value={loading ? "..." : connectedCount} detail="Active provider connections." accent="emerald" icon={CheckCircle2} />
@@ -264,9 +294,9 @@ export function IntegrationCenterClient() {
           const Icon = meta.icon;
           const configured = readiness?.[meta.readinessKey] ?? false;
           return (
-            <article key={provider} className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex min-w-0 gap-3">
+            <article key={provider} className="min-w-0 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex min-w-0 grow basis-40 gap-3">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700"><Icon className="h-5 w-5" /></span>
                   <div className="min-w-0">
                     <h2 className="text-xl font-semibold text-slate-950">{meta.title}</h2>
@@ -276,15 +306,15 @@ export function IntegrationCenterClient() {
                 <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${statusTone(connection?.status)}`}>{statusLabel(connection?.status)}</span>
               </div>
 
-              <dl className="mt-5 grid gap-3 text-sm text-slate-500">
+              <dl className="mt-5 grid min-w-0 gap-3 text-sm text-slate-500 [&_dd]:[overflow-wrap:anywhere]">
                 <div><dt className="font-bold text-slate-700">Connected account</dt><dd>{connection?.displayName || connection?.externalAccountId || "Not connected"}</dd></div>
                 <div><dt className="font-bold text-slate-700">Last sync</dt><dd>{formatDateTime(connection?.lastSyncedAt)}</dd></div>
                 {connection?.lastError && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-rose-700"><dt className="font-bold">Last error</dt><dd className="mt-1 break-words text-xs">{connection.lastError}</dd></div>}
                 {!configured && provider !== "slack" && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-800"><dt className="font-bold">Setup required</dt><dd className="mt-1 text-xs">This provider is not available yet. Contact support or your SOWLedger administrator to finish setup.</dd></div>}
               </dl>
 
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button onClick={() => connect(provider)} disabled={busy !== null || (!configured && provider !== "slack")} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#163c36] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#23544b] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
+              {canManage && <div className="mt-5 flex flex-wrap gap-2">
+                <button onClick={() => connect(provider)} disabled={busy !== null || !configured} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#163c36] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#23544b] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
                   <Plug className="h-4 w-4" />
                   {connection?.status === "connected" ? "Reconnect" : "Connect"}
                 </button>
@@ -294,13 +324,13 @@ export function IntegrationCenterClient() {
                     <button onClick={() => void postAction(`/api/integrations/${provider}/disconnect`, "Integration disconnected")} disabled={busy !== null} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50 sm:flex-none"><Unplug className="h-4 w-4" />Disconnect</button>
                   </>
                 )}
-              </div>
+              </div>}
             </article>
           );
         })}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+      {canManage && <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <article className="rounded-[32px] border border-cyan-100 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-3">
             <CalendarDays className="mt-1 h-6 w-6 text-cyan-700" />
@@ -319,10 +349,17 @@ export function IntegrationCenterClient() {
             <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={googleSyncScheduled} onChange={(event) => setGoogleSyncScheduled(event.target.checked)} className="mt-1 accent-cyan-700" />Push SOWLedger planned blocks to Google Calendar</label>
             <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={googleImportBusy} onChange={(event) => setGoogleImportBusy(event.target.checked)} className="mt-1 accent-cyan-700" />Import external busy events as unavailable blocks</label>
           </div>
+          <p className="mt-4 text-sm leading-6 text-slate-500">Sync covers the past 14 days and the next 60 days, not the dates currently shown.</p>
           <div className="mt-5 flex flex-wrap gap-2">
-            <button onClick={() => void postAction("/api/integrations/google-calendar/sync", "Google Calendar sync complete")} disabled={connectionByProvider.get("google_calendar")?.status !== "connected" || busy !== null} className="inline-flex items-center gap-2 rounded-2xl bg-cyan-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCcw className="h-4 w-4" />Sync now</button>
+            <button onClick={() => void postAction("/api/integrations/google-calendar/sync", "Google Calendar sync complete", {})} disabled={connectionByProvider.get("google_calendar")?.status !== "connected" || busy !== null} className="inline-flex items-center gap-2 rounded-2xl bg-cyan-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCcw className="h-4 w-4" />Sync now</button>
             <Link href="/calendar" className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-cyan-200 hover:text-cyan-700">Open calendar <ArrowRight className="h-4 w-4" /></Link>
           </div>
+          {syncFeedback && (
+            <div role={syncFeedback.tone === "success" ? "status" : "alert"} className={`mt-3 rounded-xl border p-3 text-sm ${syncFeedback.tone === "error" ? "border-rose-200 bg-rose-50 text-rose-800" : syncFeedback.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+              <p className="font-semibold">{syncFeedback.title}</p>
+              <p className="mt-1">{syncFeedback.description}</p>
+            </div>
+          )}
         </article>
 
         <article className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -343,10 +380,10 @@ export function IntegrationCenterClient() {
             <button onClick={() => void postAction("/api/integrations/slack/manual", "Slack connected", { webhookUrl: slackWebhookUrl, channelLabel: slackChannelLabel })} disabled={!slackWebhookUrl || busy !== null} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"><MessageSquare className="h-4 w-4" />Save Slack webhook</button>
           </div>
         </article>
-      </section>
+      </section>}
 
-      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <article className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className={`grid gap-5 ${canManage ? "xl:grid-cols-[0.95fr_1.05fr]" : ""}`}>
+        {canManage && <article className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-3">
             <Receipt className="mt-1 h-6 w-6 text-cyan-700" />
             <div>
@@ -359,7 +396,7 @@ export function IntegrationCenterClient() {
             <label className="text-sm font-bold text-slate-700">Service ItemRef ID<input value={quickBooksServiceItemRefId} onChange={(event) => setQuickBooksServiceItemRefId(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" /></label>
           </div>
           <button onClick={() => void patchConfig("quickbooks", { customerRefId: quickBooksCustomerRefId, serviceItemRefId: quickBooksServiceItemRefId })} disabled={!connectionByProvider.get("quickbooks") || busy !== null} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"><Settings2 className="h-4 w-4" />Save QuickBooks defaults</button>
-        </article>
+        </article>}
 
         <article className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-3">
@@ -370,8 +407,10 @@ export function IntegrationCenterClient() {
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <Link href="/settings/developers" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"><KeyRound className="mb-3 h-5 w-5 text-cyan-700" />Create API keys</Link>
-            <Link href="/settings/webhooks" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"><Webhook className="mb-3 h-5 w-5 text-cyan-700" />Configure event webhooks</Link>
+            {canManage && <>
+              <Link href="/settings/developers" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"><KeyRound className="mb-3 h-5 w-5 text-cyan-700" />Create API keys</Link>
+              <Link href="/settings/webhooks" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"><Webhook className="mb-3 h-5 w-5 text-cyan-700" />Configure event webhooks</Link>
+            </>}
             <Link href="/support/api" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800 sm:col-span-2"><ExternalLink className="mb-3 h-5 w-5 text-cyan-700" />Read API documentation</Link>
           </div>
         </article>
@@ -381,8 +420,8 @@ export function IntegrationCenterClient() {
         <AppEmptyState
           icon={Plug}
           title="No integrations connected"
-          description="Choose a service above and connect an account. Google Calendar is a useful place to start if you plan work around meetings."
-          action={<button onClick={() => connect("google_calendar")} className="rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">Connect Google Calendar</button>}
+          description={canManage ? "Choose a service above and connect an account. Google Calendar is a useful place to start if you plan work around meetings." : "An owner or manager can connect the services your workspace uses. Your SOWLedger calendar is still available."}
+          action={canManage ? <button onClick={() => connect("google_calendar")} disabled={!readiness?.googleCalendarOAuth || busy !== null} className="rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">Connect Google Calendar</button> : <Link href="/calendar" className="rounded-full border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700">Open calendar</Link>}
         />
       )}
     </AppPageShell>

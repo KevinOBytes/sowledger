@@ -1,3 +1,4 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -14,14 +15,15 @@ export async function GET() {
       
     return NextResponse.json({ ok: true, notifications: notifs });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return workflowErrorResponse(error, "We couldn't load your notifications. Please try again.", { route: "/api/notifications", method: "GET" });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
     const session = await requireSession();
-    const body = await req.json().catch(() => ({}));
+    const body = await readRequestJson(req);
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     const { notificationId, markAllRead } = body;
 
     if (markAllRead) {
@@ -44,6 +46,6 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return workflowErrorResponse(error, "We couldn't confirm your notifications were updated. Check your notifications before trying again.", { route: "/api/notifications", method: "PATCH" });
   }
 }

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ForbiddenError, requireSession, requireRole, UnauthorizedError } from "@/lib/auth";
+import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { isValidTimezone, normalizeTags } from "@/lib/validators";
 import { eq } from "drizzle-orm";
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 
 type CalendarPreferences = {
   visibleStartHour?: number;
@@ -13,24 +14,29 @@ type CalendarPreferences = {
 function normalizeCalendarPreferences(value: unknown): CalendarPreferences | null {
   if (value === undefined) return null;
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("calendarPreferences must be an object");
+    throw new WorkflowError("calendarPreferences must be an object", 400);
   }
 
   const raw = value as Record<string, unknown>;
-  const visibleStartHour = Number(raw.visibleStartHour);
-  const visibleEndHour = Number(raw.visibleEndHour);
+  const visibleStartHour = raw.visibleStartHour;
+  const visibleEndHour = raw.visibleEndHour;
 
   if (
+    typeof visibleStartHour !== "number" || typeof visibleEndHour !== "number" ||
     !Number.isInteger(visibleStartHour) ||
     !Number.isInteger(visibleEndHour) ||
     visibleStartHour < 0 ||
     visibleEndHour > 24 ||
     visibleEndHour <= visibleStartHour
   ) {
-    throw new Error("calendarPreferences visible hours are invalid");
+    throw new WorkflowError("calendarPreferences visible hours must be integers from 0 to 24, with the end after the start", 400);
   }
 
   return { visibleStartHour, visibleEndHour };
+}
+
+function publicProfile(user: typeof users.$inferSelect) {
+  return { id: user.id, email: user.email, displayName: user.displayName ?? "", timezone: user.timezone, preferredTags: user.preferredTags, calendarPreferences: user.calendarPreferences };
 }
 
 export async function GET() {
@@ -43,18 +49,10 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName ?? "",
-        timezone: user.timezone,
-        preferredTags: user.preferredTags,
-        calendarPreferences: user.calendarPreferences,
-      },
+      user: publicProfile(user),
     });
   } catch (error) {
-    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't load your settings. Please try again.", { route: "/api/user/settings", method: "GET" });
   }
 }
 
@@ -66,30 +64,32 @@ export async function PATCH(req: NextRequest) {
     const [user] = await db.select().from(users).where(eq(users.id, session.sub));
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    const body = await req.json() as { displayName?: string; timezone?: string; preferredTags?: string[]; calendarPreferences?: CalendarPreferences };
-
-    if (body.timezone && !isValidTimezone(body.timezone)) {
-      return NextResponse.json({ error: "Invalid IANA timezone" }, { status: 400 });
-    }
-
-    let calendarPreferences: CalendarPreferences | null = null;
-    try {
-      calendarPreferences = normalizeCalendarPreferences(body.calendarPreferences);
-    } catch (error) {
-      return NextResponse.json({ error: (error as Error).message }, { status: 400 });
-    }
+    const raw: unknown = await readRequestJson(req);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new WorkflowError("Send a settings object with the fields to update.", 400);
+    const body = raw as Record<string, unknown>;
 
     const updates: Partial<typeof users.$inferInsert> = {};
-    if (body.displayName !== undefined) updates.displayName = body.displayName;
-    if (body.timezone !== undefined) updates.timezone = body.timezone;
-    if (body.preferredTags !== undefined) updates.preferredTags = normalizeTags(body.preferredTags);
+    if (Object.hasOwn(body, "displayName")) {
+      if (typeof body.displayName !== "string" || body.displayName.trim().length > 255) throw new WorkflowError("Display name must be a string of at most 255 characters; use an empty string to clear it.", 400);
+      updates.displayName = body.displayName.trim();
+    }
+    if (Object.hasOwn(body, "timezone")) {
+      if (typeof body.timezone !== "string" || !body.timezone.trim() || body.timezone.length > 100 || /^[+-]/.test(body.timezone) || !isValidTimezone(body.timezone)) throw new WorkflowError("Use a valid IANA timezone of at most 100 characters, such as America/New_York.", 400);
+      updates.timezone = body.timezone;
+    }
+    if (Object.hasOwn(body, "preferredTags")) {
+      if (!Array.isArray(body.preferredTags) || body.preferredTags.some(tag => typeof tag !== "string")) throw new WorkflowError("preferredTags must be an array of strings.", 400);
+      updates.preferredTags = normalizeTags(body.preferredTags);
+    }
+    const calendarPreferences = normalizeCalendarPreferences(body.calendarPreferences);
     if (calendarPreferences !== null) updates.calendarPreferences = calendarPreferences;
+    if (!Object.keys(updates).length) throw new WorkflowError("Include a profile field to update.", 400);
 
     const [updatedUser] = await db.update(users).set(updates).where(eq(users.id, session.sub)).returning();
 
-    return NextResponse.json({ ok: true, user: updatedUser });
+    if (!updatedUser) throw new WorkflowError("User not found", 404);
+    return NextResponse.json({ ok: true, user: publicProfile(updatedUser) });
   } catch (error) {
-    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't save your settings. Please try again.", { route: "/api/user/settings", method: "PATCH" });
   }
 }

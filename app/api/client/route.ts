@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { auditLogs, projects, timeEntries, invoices } from "@/lib/db/schema";
-import { eq, and, ne, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { buildInvoiceProofPack } from "@/lib/invoice-proof-pack";
 import { getClientEntitledInvoiceIds, getClientEntitlementIds } from "@/lib/client-entitlements";
 import { invoiceApprovalFromDiff, type InvoiceApproval } from "@/lib/invoice-approval";
@@ -42,7 +42,7 @@ export async function GET() {
 
     const entitledInvoiceIds = await getClientEntitledInvoiceIds(session.workspaceId, clientIds);
     const workspaceInvoices = entitledInvoiceIds.size > 0
-      ? await db.select().from(invoices).where(and(eq(invoices.workspaceId, session.workspaceId), inArray(invoices.id, [...entitledInvoiceIds]), ne(invoices.status, "draft"))).orderBy(desc(invoices.createdAt))
+      ? await db.select().from(invoices).where(and(eq(invoices.workspaceId, session.workspaceId), inArray(invoices.id, [...entitledInvoiceIds]), inArray(invoices.status, ["sent", "paid"]))).orderBy(desc(invoices.createdAt))
       : [];
     const invoiceIds = workspaceInvoices.map((invoice) => invoice.id);
     const signoffs = invoiceIds.length > 0

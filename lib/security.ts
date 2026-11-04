@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
@@ -7,8 +7,8 @@ import { NextRequest, after } from "next/server";
 import { env } from "./env";
 import { UnauthorizedError } from "./auth";
 import { db } from "./db";
-import { webhooks, lockPeriods, timeEntries, auditLogs } from "./db/schema";
-import { eq, and, gte, lt, ne, sql, isNotNull } from "drizzle-orm";
+import { webhooks, lockPeriods, auditLogs } from "./db/schema";
+import { eq } from "drizzle-orm";
 
 const timerStopCounters = new Map<string, { windowStart: number; count: number }>();
 const BLOCKED_WEBHOOK_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "::"]);
@@ -69,12 +69,14 @@ function isBlockedWebhookHost(hostname: string) {
     || (ipVersion === 6 && isPrivateIPv6(host));
 }
 
+export class WebhookUrlValidationError extends Error {}
+
 export async function validateWebhookUrl(rawUrl: string) {
   let url: URL;
   try {
     url = new URL(rawUrl);
   } catch {
-    throw new Error("A valid HTTPS URL is required.");
+    throw new WebhookUrlValidationError("A valid HTTPS URL is required.");
   }
 
   const hostname = normalizeHostname(url.hostname);
@@ -83,13 +85,13 @@ export async function validateWebhookUrl(rawUrl: string) {
     || Boolean(url.username || url.password)
     || isBlockedWebhookHost(hostname)
   ) {
-    throw new Error("Webhook URL must be a public HTTPS endpoint.");
+    throw new WebhookUrlValidationError("Webhook URL must be a public HTTPS endpoint.");
   }
 
   if (!isIP(hostname)) {
     const resolved = await lookup(hostname, { all: true, verbatim: true });
     if (resolved.length === 0 || resolved.some((record) => isBlockedWebhookHost(record.address))) {
-      throw new Error("Webhook URL must resolve to a public address.");
+      throw new WebhookUrlValidationError("Webhook URL must resolve to a public address.");
     }
   }
 
@@ -187,17 +189,25 @@ export async function enforceStopRateLimit(identity: string) {
     return;
   }
 
-  if (entry.count >= 10) throw new Error("Rate limit exceeded on timer stop endpoint");
+  if (entry.count >= 10) throw new TimerStopRateLimitError();
   timerStopCounters.set(identity, { ...entry, count: entry.count + 1 });
 }
 
-export async function ensurePeriodUnlocked(workspaceId: string, startedAt: Date, stoppedAt: Date) {
-  const locks = await db.select().from(lockPeriods).where(eq(lockPeriods.workspaceId, workspaceId));
+export class TimerStopRateLimitError extends Error {
+  constructor() { super("Rate limit exceeded on timer stop endpoint"); }
+}
+
+export class PeriodLockedError extends Error {
+  constructor() { super("This entry is in a locked period."); }
+}
+
+export async function ensurePeriodUnlocked(workspaceId: string, startedAt: Date, stoppedAt: Date, client: Pick<typeof db, "select"> = db) {
+  const locks = await client.select().from(lockPeriods).where(eq(lockPeriods.workspaceId, workspaceId));
   for (const lock of locks) {
     const lockStart = new Date(lock.periodStart);
     const lockEnd = new Date(lock.periodEnd);
     if (startedAt < lockEnd && stoppedAt > lockStart) {
-      throw new Error(`Period is locked: ${lock.reason}`);
+      throw new PeriodLockedError();
     }
   }
 }
@@ -208,123 +218,43 @@ export type TimeWindowSegment = {
   durationSeconds: number;
 };
 
-function utcDayRange(businessDate: Date) {
-  const dayStart = new Date(Date.UTC(
-    businessDate.getUTCFullYear(),
-    businessDate.getUTCMonth(),
-    businessDate.getUTCDate(),
-    0,
-    0,
-    0,
-  ));
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-  return { dayStart, dayEnd };
-}
-
-function utcDayKey(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-export async function getDailyLoggedSeconds(workspaceId: string, userId: string, businessDate: Date, excludeEntryId?: string) {
-  const { dayStart, dayEnd } = utcDayRange(businessDate);
-  const filters = [
-    eq(timeEntries.workspaceId, workspaceId),
-    eq(timeEntries.userId, userId),
-    gte(timeEntries.startedAt, dayStart),
-    lt(timeEntries.startedAt, dayEnd),
-    isNotNull(timeEntries.durationSeconds),
-  ];
-  if (excludeEntryId) {
-    filters.push(ne(timeEntries.id, excludeEntryId));
-  }
-
-  const [result] = await db
-    .select({
-      totalSeconds: sql<number>`coalesce(sum(${timeEntries.durationSeconds}), 0)`,
-    })
-    .from(timeEntries)
-    .where(and(...filters));
-
-  const total = Number(result?.totalSeconds ?? 0);
-  return Number.isFinite(total) ? total : 0;
-}
-
-export async function enforceDailyHoursLimit(workspaceId: string, userId: string, businessDate: Date, nextSeconds: number, excludeEntryId?: string) {
-  const total = await getDailyLoggedSeconds(workspaceId, userId, businessDate, excludeEntryId);
-  if (total + nextSeconds > 86400) throw new Error("Impossible time: cannot exceed 24 hours in a day");
-}
-
 export function splitTimeWindowByUtcDay(startedAt: Date, stoppedAt: Date): TimeWindowSegment[] {
-  if (stoppedAt <= startedAt) {
-    return [{ startedAt, stoppedAt, durationSeconds: 1 }];
+  const startMs = startedAt.getTime();
+  const stopMs = stoppedAt.getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(stopMs) || stopMs < startMs) {
+    throw new RangeError("Time window must have valid dates in chronological order");
+  }
+  if (stopMs === startMs) {
+    return [{ startedAt, stoppedAt, durationSeconds: 0 }];
   }
 
+  // Round once for the whole window. Cumulative allocation conserves that
+  // budget without changing the real geometry of UTC-midnight fragments.
+  const budget = Math.max(1, Math.floor((stopMs - startMs) / 1000));
   const segments: TimeWindowSegment[] = [];
   let cursor = new Date(startedAt);
+  let allocatedSeconds = 0;
 
   while (cursor < stoppedAt) {
-    const nextDay = new Date(Date.UTC(
-      cursor.getUTCFullYear(),
-      cursor.getUTCMonth(),
-      cursor.getUTCDate() + 1,
-      0,
-      0,
-      0,
-    ));
+    // Date.UTC remaps numeric years 0–99 to 1900–1999. Mutating a copy
+    // preserves the actual year, including leap years and year boundaries.
+    const nextDay = new Date(cursor);
+    nextDay.setUTCHours(0, 0, 0, 0);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
     const segmentEnd = nextDay < stoppedAt ? nextDay : stoppedAt;
+    const cumulativeSeconds = segmentEnd.getTime() === stopMs
+      ? budget
+      : Math.floor((segmentEnd.getTime() - startMs) / 1000);
     segments.push({
       startedAt: new Date(cursor),
       stoppedAt: new Date(segmentEnd),
-      durationSeconds: Math.max(1, Math.floor((segmentEnd.getTime() - cursor.getTime()) / 1000)),
+      durationSeconds: cumulativeSeconds - allocatedSeconds,
     });
+    allocatedSeconds = cumulativeSeconds;
     cursor = segmentEnd;
   }
 
   return segments;
-}
-
-export async function enforceDailyHoursLimitForWindow(workspaceId: string, userId: string, startedAt: Date, stoppedAt: Date, excludeEntryId?: string) {
-  for (const segment of splitTimeWindowByUtcDay(startedAt, stoppedAt)) {
-    await enforceDailyHoursLimit(workspaceId, userId, segment.startedAt, segment.durationSeconds, excludeEntryId);
-  }
-}
-
-export async function fitTimeWindowSegmentsToDailyLimit(params: {
-  workspaceId: string;
-  userId: string;
-  segments: TimeWindowSegment[];
-  excludeEntryId?: string;
-}) {
-  const fittedSegments: TimeWindowSegment[] = [];
-  const dayTotals = new Map<string, number>();
-  let trimmedSeconds = 0;
-
-  for (const segment of params.segments) {
-    const key = utcDayKey(segment.startedAt);
-    let usedSeconds = dayTotals.get(key);
-    if (usedSeconds === undefined) {
-      usedSeconds = await getDailyLoggedSeconds(params.workspaceId, params.userId, segment.startedAt, params.excludeEntryId);
-    }
-
-    const availableSeconds = Math.max(0, Math.floor(86400 - usedSeconds));
-    const allowedSeconds = Math.min(segment.durationSeconds, availableSeconds);
-    const removedSeconds = Math.max(0, segment.durationSeconds - allowedSeconds);
-    trimmedSeconds += removedSeconds;
-
-    if (allowedSeconds > 0) {
-      fittedSegments.push({
-        startedAt: segment.startedAt,
-        stoppedAt: allowedSeconds === segment.durationSeconds
-          ? segment.stoppedAt
-          : new Date(segment.startedAt.getTime() + allowedSeconds * 1000),
-        durationSeconds: allowedSeconds,
-      });
-    }
-
-    dayTotals.set(key, usedSeconds + allowedSeconds);
-  }
-
-  return { segments: fittedSegments, trimmedSeconds };
 }
 
 function signAudit(diff: string, eventType: string) {
@@ -346,8 +276,9 @@ export async function appendAuditLog(params: {
   diff: Record<string, { before: unknown; after: unknown }>;
 }, transaction?: Pick<typeof db, "insert">) {
   const serializedDiff = JSON.stringify(params.diff);
+  const id = crypto.randomUUID();
   await (transaction ?? db).insert(auditLogs).values({
-    id: crypto.randomUUID(),
+    id,
     workspaceId: params.workspaceId,
     timeEntryId: params.timeEntryId,
     actorUserId: params.actorUserId,
@@ -363,12 +294,13 @@ export async function appendAuditLog(params: {
       await dispatchWebhook(params.workspaceId, params.eventType, params.diff);
     });
   }
+  return id;
 }
 
-export async function createTimeEntry(input: Omit<typeof timeEntries.$inferInsert, "id" | "createdAt">) {
-  const entry = { ...input, id: crypto.randomUUID() };
-  const [res] = await db.insert(timeEntries).values(entry).returning();
-  return res;
+/** The caller reconstructs the original payload; JSONB object order is not signing order. */
+export function verifyAuditSignature(eventType: string, originalDiff: Record<string, { before: unknown; after: unknown }>, signature: string) {
+  if (!/^[a-f0-9]{64}$/.test(signature)) return false;
+  return timingSafeEqual(Buffer.from(signAudit(JSON.stringify(originalDiff), eventType), "hex"), Buffer.from(signature, "hex"));
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>) {

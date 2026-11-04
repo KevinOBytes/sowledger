@@ -1,7 +1,9 @@
+import { IntegrationProviderError } from "@/lib/integrations/errors";
+import { reportUnexpectedRequestFailure } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
-import { verifyIntegrationOAuthState } from "@/lib/integrations/oauth-state";
+import { requireRole, requireSession, UnauthorizedError, ForbiddenError } from "@/lib/auth";
+import { IntegrationOAuthStateError, verifyIntegrationOAuthState } from "@/lib/integrations/oauth-state";
 import { exchangeSlackAuthorizationCode, storeSlackOAuthConnection } from "@/lib/integrations/slack";
 
 function redirectTo(req: NextRequest, status: "connected" | "error", message?: string) {
@@ -19,16 +21,15 @@ function redirectToLogin(req: NextRequest, message?: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const error = req.nextUrl.searchParams.get("error");
-    if (error) return redirectTo(req, "error", error);
+    if (req.nextUrl.searchParams.has("error")) return redirectTo(req, "error", "Slack setup was not completed. Start the connection again.");
     const code = req.nextUrl.searchParams.get("code");
     const state = req.nextUrl.searchParams.get("state");
-    if (!code || !state) return redirectTo(req, "error", "Missing Slack OAuth code or state");
+    if (!code || !state) return redirectTo(req, "error", "Slack setup was not completed. Start the connection again.");
     const payload = verifyIntegrationOAuthState(state, "slack");
     const session = await requireSession();
     requireRole("manager", session.role);
     if (session.workspaceId !== payload.workspaceId || session.sub !== payload.userId) {
-      return redirectTo(req, "error", "Slack OAuth state does not match the active session");
+      return redirectTo(req, "error", "Slack setup was not completed. Start the connection again.");
     }
     const oauth = await exchangeSlackAuthorizationCode(code);
     await storeSlackOAuthConnection({ workspaceId: session.workspaceId, userId: session.sub, oauth });
@@ -37,6 +38,9 @@ export async function GET(req: NextRequest) {
     if (error instanceof UnauthorizedError) {
       return redirectToLogin(req, "Your session expired during Slack setup. Please log in and try again.");
     }
-    return redirectTo(req, "error", error instanceof Error ? error.message : "Slack connection failed");
+    if (error instanceof ForbiddenError) return redirectTo(req, "error", "Slack setup needs workspace manager permission. Start the connection again.");
+    if (error instanceof IntegrationOAuthStateError) return redirectTo(req, "error", "Slack setup was not completed. Start the connection again.");
+    reportUnexpectedRequestFailure({ route: "/api/integrations/slack/oauth/callback", method: "GET" }, error instanceof IntegrationProviderError ? "upstream" : "unexpected");
+    return redirectTo(req, "error", "We couldn't complete Slack setup. Start the connection again.");
   }
 }

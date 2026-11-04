@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, DollarSign, Download, FileText, Receipt, RefreshCcw, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
 import type { InvoiceProofPack } from "@/lib/invoice-proof-pack";
+import { ModalDialog } from "@/components/modal-dialog";
+import { formatInvoiceCents, sumDisplayCents } from "@/lib/invoice-amount";
+import { invoiceGroupKey, invoiceHistoryCents, invoiceSelectionCents, readCreatedInvoice, readInvoiceList, reconcileInvoiceSelection, type BillableEntry, type InvoiceRecord, type InvoiceHistoryRecord } from "@/lib/invoice-client-state";
 
 import {
   AppEmptyState,
@@ -12,27 +14,6 @@ import {
   AppPageShell,
   AppWorkflowRail,
 } from "@/components/app-page-shell";
-
-type InvoiceRecord = {
-  id: string;
-  number: string;
-  projectName: string;
-  amount: number;
-  status: string;
-  dueDate?: string;
-  createdAt: string;
-};
-
-type BillableEntry = {
-  id: string;
-  userEmail: string;
-  projectName: string;
-  description: string;
-  startedAt: string;
-  durationSeconds: number;
-  hourlyRate: number;
-  amount: number;
-};
 
 type ProofPack = {
   invoice?: Partial<InvoiceRecord>;
@@ -62,6 +43,16 @@ function formatHours(seconds?: number) {
   return `${(seconds / 3600).toFixed(1)}h`;
 }
 
+// Approximate billable-line presentation only: never used for money or proof.
+function formatBillableDuration(seconds: number | null | undefined) {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0) return "Time unavailable";
+  if (seconds === 0) return "0 sec";
+  if (seconds < 1) return "<1 sec";
+  if (seconds < 60) return `${Number(seconds.toFixed(2))} sec`;
+  if (seconds < 3600) return `${Number((seconds / 60).toFixed(1))} min`;
+  return `${Number((seconds / 3600).toFixed(1))} hr`;
+}
+
 function formatSourceMix(sourceMix: ProofPack["sourceMix"]) {
   if (!sourceMix) return [];
   if (Array.isArray(sourceMix)) {
@@ -76,8 +67,22 @@ function formatSourceMix(sourceMix: ProofPack["sourceMix"]) {
   }));
 }
 
+const record = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
+
+// PATCH returns a raw saved row, without GET's derived billing audience. Confirm
+// the complete core record before retaining that audience and changing status.
+function confirmedStatus(value: unknown, invoice: InvoiceRecord, status: "sent" | "paid") {
+  if (!record(value) || value.ok !== true || !record(value.invoice)) return false;
+  const saved = value.invoice;
+  return saved.id === invoice.id && saved.workspaceId === invoice.workspaceId && saved.status === status
+    && saved.number === invoice.number && saved.amount === invoice.amount && saved.dueDate === invoice.dueDate
+    && saved.createdAt === invoice.createdAt && (saved.projectId === null || typeof saved.projectId === "string")
+    && saved.projectId === (invoice as InvoiceRecord & { projectId?: unknown }).projectId
+    && JSON.stringify(saved.timeEntryIds) === JSON.stringify(invoice.timeEntryIds);
+}
+
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceHistoryRecord[]>([]);
   const [billables, setBillables] = useState<BillableEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
@@ -89,88 +94,166 @@ export default function InvoicesPage() {
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [quickBooksConnected, setQuickBooksConnected] = useState(false);
   const [pushingInvoiceId, setPushingInvoiceId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ error: boolean; message: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
+  const [creationNotice, setCreationNotice] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [voiding, setVoiding] = useState<InvoiceHistoryRecord | null>(null);
+  const [voidConfirmed, setVoidConfirmed] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+  const [voidError, setVoidError] = useState<string | null>(null);
+  const [voidPending, setVoidPending] = useState(false);
+  const voidOpener = useRef<HTMLButtonElement | null>(null);
+  const voidCheckbox = useRef<HTMLInputElement | null>(null);
   const generatingInvoiceRef = useRef(false);
-  const billableAmount = useMemo(() => billables.reduce((sum, entry) => sum + entry.amount, 0), [billables]);
-  const selectedAmount = useMemo(
-    () => billables.reduce((sum, entry) => selectedEntries.has(entry.id) ? sum + entry.amount : sum, 0),
-    [billables, selectedEntries],
-  );
-  const invoiceAmount = useMemo(() => invoices.reduce((sum, invoice) => sum + invoice.amount, 0), [invoices]);
+  const selectedRef = useRef(new Set<string>());
+  const loadGeneration = useRef(0);
+  const refreshingRef = useRef(false);
+  const invoiceActionRef = useRef(false);
+  const selectedProofRef = useRef<string | null>(null);
+  const proofGeneration = useRef(0);
+  const canManageRef = useRef(false);
+  const currentHistory = useRef<{ workspaceId: string | null; invoices: InvoiceHistoryRecord[] }>({ workspaceId: null, invoices: [] });
+  const billableAmount = useMemo(() => sumDisplayCents(billables.filter(entry => entry.eligible).map(entry => entry.amountCents)), [billables]);
+  const selectedAmount = useMemo(() => invoiceSelectionCents(selectedEntries, billables), [billables, selectedEntries]);
+  const invoiceAmount = useMemo(() => invoiceHistoryCents(invoices), [invoices]);
+  const selectedGroup = billables.find(entry => selectedEntries.has(entry.id));
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const setSelection = useCallback((next: Set<string>) => { selectedRef.current = next; setSelectedEntries(next); }, []);
 
-  async function fetchData() {
+  const fetchData = useCallback(async (afterCreate = false) => {
+    if (invoiceActionRef.current || generatingInvoiceRef.current && !afterCreate) return false;
+    const generation = ++loadGeneration.current;
+    refreshingRef.current = true;
+    setRefreshing(true);
     setError(null);
     try {
       const res = await fetch("/api/invoices");
-      const data = await res.json().catch(() => ({}));
+      const data: unknown = await res.json();
+      if (generation !== loadGeneration.current) return false;
       if (res.ok) {
-        setInvoices(data.invoices || []);
-        setBillables(data.billableEntries || []);
-        setCanManage(Boolean(data.canManage));
+        const snapshot = readInvoiceList(data);
+        canManageRef.current = snapshot.canManage;
+        const selectedProof = selectedProofRef.current;
+        if (!snapshot.canManage || selectedProof && (currentHistory.current.workspaceId !== snapshot.workspaceId || !snapshot.invoices.some(invoice => invoice.id === selectedProof && !invoice.historyIssue && invoice.status !== "void"))) {
+          proofGeneration.current++;
+          selectedProofRef.current = null;
+          setProofPackState(null);
+        }
+        currentHistory.current = { workspaceId: snapshot.workspaceId, invoices: snapshot.invoices };
+        setInvoices(snapshot.invoices);
+        setBillables(snapshot.billableEntries);
+        setCanManage(snapshot.canManage);
+        setWorkspaceId(snapshot.workspaceId);
         setRequiresUpgrade(false);
-        setSelectedEntries((current) => new Set([...current].filter((id) => data.billableEntries?.some((entry: BillableEntry) => entry.id === id))));
-      } else if (res.status === 402) {
+        setHasLoaded(true);
+        setNeedsRefresh(false);
+        const next = reconcileInvoiceSelection(selectedRef.current, snapshot.billableEntries);
+        if (next.size !== selectedRef.current.size || [...next].some(id => !selectedRef.current.has(id))) setSelectionNotice("Your selection changed after refresh. Unavailable entries were removed and one compatible billing group was kept. Review it before creating an invoice.");
+        setSelection(next);
+      } else if (res.status === 402 && data && typeof data === "object" && "requiresUpgrade" in data && data.requiresUpgrade === true) {
         setRequiresUpgrade(true);
       } else {
-        throw new Error(data.error || "Could not load invoices. Please try again.");
+        throw new Error();
       }
-      const integrationsRes = await fetch("/api/integrations").catch(() => null);
-      if (integrationsRes?.ok) {
-        const integrations = await integrationsRes.json() as { connections?: Array<{ provider: string; status: string }> };
-        setQuickBooksConnected(Boolean(integrations.connections?.some((connection) => connection.provider === "quickbooks" && connection.status === "connected")));
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Could not load invoices. Please try again.");
+      // Integration discovery is auxiliary; it cannot turn an invoice refresh
+      // into failure or let an older response replace current invoice state.
+      void fetch("/api/integrations").then(async response => {
+        if (!response.ok) return;
+        const integrations = await response.json() as { connections?: Array<{ provider: string; status: string }> };
+        if (generation === loadGeneration.current && Array.isArray(integrations.connections)) setQuickBooksConnected(integrations.connections.some(connection => connection.provider === "quickbooks" && connection.status === "connected"));
+      }).catch(() => undefined);
+      return true;
+    } catch {
+      if (generation === loadGeneration.current) setError(afterCreate ? "Draft invoice created, but the list could not refresh. Refresh invoices before selecting more time." : "Could not load invoices. Your last list and selection have been kept. Please try again.");
+      return false;
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) { refreshingRef.current = false; setRefreshing(false); setLoading(false); }
     }
-  }
+  }, [setSelection]);
+
+  useEffect(() => {
+    const pendingReads = loadGeneration;
+    const pendingProofs = proofGeneration;
+    // Mount starts external I/O; the generation guard fences abandoned responses.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchData();
+    return () => { pendingReads.current++; pendingProofs.current++; };
+  }, [fetchData]);
 
   async function updateInvoiceStatus(invoice: InvoiceRecord, status: "sent" | "paid") {
-    const message = status === "sent" ? "Mark this invoice as sent? Send it to your client separately. This also makes it available in their client portal." : "Mark this invoice as paid? Only do this after you have received payment outside SOWLedger.";
-    if (updatingInvoiceId || !window.confirm(message)) return;
+    const current = currentHistory.current.invoices.find(item => item.id === invoice.id && item.workspaceId === invoice.workspaceId);
+    if (!current || current.historyIssue) return;
+    if (!canManage || invoiceActionRef.current || refreshingRef.current || generatingInvoiceRef.current || invoice.status !== (status === "sent" ? "draft" : "sent")) return;
+    invoiceActionRef.current = true;
+    const message = status === "sent" ? invoice.billingAudience === "internal" ? "Mark this internal invoice as sent? It is not shared in the client portal. SOWLedger does not email it; send it separately if needed." : "Mark this invoice as sent? SOWLedger does not email it; send it separately. Client portal access depends on the verified client associated with every linked entry." : "Mark this invoice as paid? Only do this after you have received payment outside SOWLedger. This records an acknowledgement; it does not process a payment.";
+    if (!window.confirm(message)) { invoiceActionRef.current = false; return; }
     setUpdatingInvoiceId(invoice.id);
+    setActionFeedback({ error: false, message: "Saving invoice status..." });
     try {
       const res = await fetch(`/api/invoices/${invoice.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Could not update invoice.");
-      setInvoices((current) => current.map((item) => item.id === invoice.id ? { ...item, status: data.invoice.status } : item));
-      if (proofPackState?.invoiceId === invoice.id) await openProofPack(invoice.id);
-      toast.success(status === "sent" ? "Invoice marked as sent" : "Payment recorded");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update invoice."); }
-    finally { setUpdatingInvoiceId(null); }
+      const data: unknown = await res.json();
+      if (!res.ok || !confirmedStatus(data, invoice, status)) throw new Error();
+      loadGeneration.current++;
+      currentHistory.current = { ...currentHistory.current, invoices: currentHistory.current.invoices.map(item => item.id === invoice.id ? { ...item, status } : item) };
+      setInvoices((current) => current.map((item) => item.id === invoice.id ? { ...item, status } : item));
+      setActionFeedback({ error: false, message: status === "sent" ? "Invoice marked as sent. SOWLedger has not emailed it." : "Invoice marked as paid. External payment acknowledged; no payment was processed." });
+      if (selectedProofRef.current === invoice.id) await openProofPack(invoice.id);
+    } catch { setActionFeedback({ error: true, message: "We could not confirm the invoice status update. Your last displayed record has been kept. Refresh invoices to check the saved status before trying again." }); }
+    finally { invoiceActionRef.current = false; setUpdatingInvoiceId(null); }
   }
 
   function toggleSelection(id: string) {
-    const updated = new Set(selectedEntries);
+    if (invoiceActionRef.current || generatingInvoiceRef.current || refreshingRef.current || !canManage) return;
+    const updated = new Set(selectedRef.current);
     if (updated.has(id)) updated.delete(id);
-    else updated.add(id);
-    setSelectedEntries(updated);
+    else {
+      const entry = billables.find(entry => entry.id === id);
+      const first = billables.find(entry => updated.has(entry.id));
+      if (!entry?.eligible || updated.size >= 100 || first && invoiceGroupKey(first) !== invoiceGroupKey(entry)) return;
+      updated.add(id);
+    }
+    setSelection(updated);
   }
 
   async function handleGenerateInvoice() {
-    if (generatingInvoiceRef.current || selectedEntries.size === 0) return;
+    const ids = [...selectedRef.current];
+    const expectedTotal = invoiceSelectionCents(selectedRef.current, billables);
+    const group = billables.find(entry => selectedRef.current.has(entry.id));
+    if (invoiceActionRef.current || generatingInvoiceRef.current || refreshingRef.current || !canManage || !workspaceId || !group || ids.length === 0 || ids.length > 100 || expectedTotal === null) return;
     generatingInvoiceRef.current = true;
+    loadGeneration.current++;
     setGeneratingInvoice(true);
+    setError(null);
+    setCreationNotice(null);
     try {
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timeEntryIds: Array.from(selectedEntries) }),
+        body: JSON.stringify({ timeEntryIds: ids }),
       });
-      if (res.ok) {
-        setSelectedEntries(new Set());
-        await fetchData();
-        toast.success("Draft invoice created");
-      } else {
-        const data = await res.json();
-        toast.error("Could not generate invoice", { description: data.error });
+      const data: unknown = await res.json();
+      if (!res.ok) {
+        if (res.status === 422 && data && typeof data === "object" && "code" in data && data.code === "INVOICE_AMOUNT_NOT_REPRESENTABLE") {
+          setError("This total cannot be stored without changing a cent. No invoice was created and your time remains approved. Choose a smaller selection or contact your workspace administrator.");
+          return;
+        }
+        throw new Error();
       }
+      const created = readCreatedInvoice(data, { workspaceId, ids, amountCents: expectedTotal, group, existingIds: invoices.map(invoice => invoice.id) });
+      currentHistory.current = { workspaceId, invoices: [created, ...currentHistory.current.invoices] };
+      setSelection(new Set());
+      setNeedsRefresh(true);
+      // Remove consumed entries immediately, even if the confirmed save's refresh fails.
+      setBillables(current => current.filter(entry => !ids.includes(entry.id)));
+      setInvoices(current => [created, ...current]);
+      setCreationNotice(created.billingAudience === "internal" ? "Draft invoice created. Internal — not shared in the client portal." : "Draft invoice created. Review the draft before sending it.");
+      await fetchData(true);
     } catch {
-      toast.error("Could not generate invoice");
+      setError("We could not confirm the invoice was saved. Your selection has been kept. Refresh invoices and check the history before trying again.");
     } finally {
       generatingInvoiceRef.current = false;
       setGeneratingInvoice(false);
@@ -178,11 +261,18 @@ export default function InvoicesPage() {
   }
 
   async function openProofPack(invoiceId: string) {
+    // Read the latest accepted capability even for a stale click handler.
+    if (!canManageRef.current) return;
+    const invoice = currentHistory.current.invoices.find(item => item.id === invoiceId);
+    if (!invoice || invoice.historyIssue || invoice.status === "void") return;
+    const generation = ++proofGeneration.current;
+    selectedProofRef.current = invoiceId;
     setProofPackState({ invoiceId, loading: true });
     try {
-      const res = await fetch(`/api/invoices/${invoiceId}/proof-pack`);
+      const res = await fetch(`/api/invoices/${invoiceId}/${invoice.status === "draft" ? "preview" : "proof-pack"}`);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load proof pack");
+      if (!canManageRef.current || generation !== proofGeneration.current) return;
+      if (!res.ok || data.ok !== true || data.proofPack?.invoice?.id !== invoiceId || typeof data.digest !== "string" || !/^[a-f0-9]{64}$/.test(data.digest)) throw new Error("Could not confirm the invoice details. Please try again.");
       setProofPackState({
         invoiceId,
         loading: false,
@@ -191,6 +281,7 @@ export default function InvoicesPage() {
         approval: data.approval ?? null,
       });
     } catch (error) {
+      if (!canManageRef.current || generation !== proofGeneration.current) return;
       setProofPackState({
         invoiceId,
         loading: false,
@@ -199,22 +290,50 @@ export default function InvoicesPage() {
     }
   }
 
+  async function confirmVoid() {
+    if (!voiding || !voidConfirmed || invoiceActionRef.current || refreshingRef.current || generatingInvoiceRef.current || !canManageRef.current) return;
+    const current = currentHistory.current.invoices.find(row => row.id === voiding.id && row.workspaceId === voiding.workspaceId);
+    if (!current || current.status !== "draft" || current.voidEligibility?.eligible !== true) return;
+    invoiceActionRef.current = true;
+    setVoidPending(true); setVoidError(null);
+    try {
+      const response = await fetch(`/api/invoices/${current.id}/void`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmNotBilledElsewhere: true, reason: voidReason }) });
+      const data: unknown = await response.json();
+      if (!response.ok) throw new Error(record(data) && typeof data.error === "string" ? data.error : "Could not confirm the correction. Refresh invoices before trying again.");
+      if (!record(data) || data.ok !== true || !record(data.invoice) || data.invoice.id !== current.id || data.invoice.workspaceId !== current.workspaceId || data.invoice.status !== "void") throw new Error("Could not confirm the correction. Refresh invoices before trying again.");
+      proofGeneration.current++; selectedProofRef.current = null; setProofPackState(null);
+      loadGeneration.current++;
+      setNeedsRefresh(true);
+      setVoiding(null);
+      invoiceActionRef.current = false;
+      const refreshed = await fetchData();
+      setActionFeedback({ error: !refreshed, message: refreshed ? "Invoice voided. Its time is Approved again; invoice history was preserved. Nothing was canceled in QuickBooks." : "Invoice voided, but the list could not refresh. Refresh invoices before selecting more time." });
+    } catch (error) {
+      setVoidError(error instanceof Error ? error.message : "Could not confirm the correction. Refresh invoices before trying again.");
+    } finally { invoiceActionRef.current = false; setVoidPending(false); }
+  }
+
   async function pushToQuickBooks(invoiceId: string) {
+    const invoice = currentHistory.current.invoices.find(item => item.id === invoiceId);
+    if (invoice?.historyIssue) return;
+    if (!canManage || !quickBooksConnected || !invoice || (invoice.status !== "sent" && invoice.status !== "paid") || invoiceActionRef.current || refreshingRef.current || generatingInvoiceRef.current) return;
+    invoiceActionRef.current = true;
+    if (!window.confirm("Push this invoice to QuickBooks? This may create an external invoice. If the result cannot be confirmed, check QuickBooks before retrying to avoid a duplicate.")) { invoiceActionRef.current = false; return; }
     setPushingInvoiceId(invoiceId);
+    setActionFeedback({ error: false, message: "Waiting for QuickBooks confirmation..." });
     try {
       const res = await fetch("/api/integrations/quickbooks/push-invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ invoiceId }),
       });
-      const data = await res.json().catch(() => ({})) as { error?: string; result?: { externalId?: string; reused?: boolean } };
-      if (!res.ok) throw new Error(data.error || "Could not push invoice");
-      toast.success(data.result?.reused ? "Invoice already linked to QuickBooks" : "Invoice pushed to QuickBooks", {
-        description: data.result?.externalId ? `QuickBooks invoice ID: ${data.result.externalId}` : undefined,
-      });
-    } catch (error) {
-      toast.error("QuickBooks push failed", { description: error instanceof Error ? error.message : "Unknown error" });
+      const data: unknown = await res.json();
+      if (!res.ok || !record(data) || data.ok !== true || !record(data.result) || typeof data.result.externalId !== "string" || !data.result.externalId.trim() || typeof data.result.reused !== "boolean") throw new Error();
+      setActionFeedback({ error: false, message: `${data.result.reused ? "Invoice already linked to QuickBooks" : "Invoice linked to QuickBooks"}. QuickBooks invoice ID: ${data.result.externalId}` });
+    } catch {
+      setActionFeedback({ error: true, message: "We could not confirm the QuickBooks push. An external invoice may have been created. Check QuickBooks before retrying to avoid a duplicate; no automatic retry was made." });
     } finally {
+      invoiceActionRef.current = false;
       setPushingInvoiceId(null);
     }
   }
@@ -255,6 +374,8 @@ export default function InvoicesPage() {
     );
   }
 
+  if (!hasLoaded) return <AppPageShell><AppPageHeader eyebrow="Output" title="Invoicing" description="Review approved time and invoice history." icon={Receipt} /><div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error ?? "Could not load invoices."}<button disabled={refreshing} onClick={() => void fetchData()} className="ml-3 font-bold underline">Retry loading invoices</button></div></AppPageShell>;
+
   return (
     <AppPageShell>
       <AppPageHeader
@@ -264,12 +385,12 @@ export default function InvoicesPage() {
         icon={Receipt}
         metadata={[
           { label: `${billables.length} billable`, tone: "cyan", icon: DollarSign },
-          { label: `${invoices.length} invoices`, tone: "slate", icon: FileText },
+          { label: `${invoices.length} ${invoices.length === 1 ? "invoice" : "invoices"}`, tone: "slate", icon: FileText },
         ]}
         primaryAction={(
           <button
             onClick={handleGenerateInvoice}
-            disabled={!canManage || generatingInvoice || selectedEntries.size === 0}
+            disabled={!canManage || Boolean(updatingInvoiceId || pushingInvoiceId) || generatingInvoice || refreshing || needsRefresh || selectedEntries.size === 0 || selectedAmount === null}
             className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             <Receipt className="h-4 w-4" />
@@ -279,22 +400,30 @@ export default function InvoicesPage() {
       />
 
       <AppWorkflowRail current="approve" />
-      {error && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error} <button onClick={() => void fetchData()} className="ml-3 font-bold underline">Try again</button></div>}
+      {error && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
+      {creationNotice && <p role="status" className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900">{creationNotice}</p>}
+      {selectionNotice && <p role="status" className="rounded-2xl bg-cyan-50 p-4 text-sm text-cyan-900">{selectionNotice}</p>}
+      <button disabled={Boolean(updatingInvoiceId || pushingInvoiceId) || generatingInvoice || refreshing} onClick={() => void fetchData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50"><RefreshCcw className="h-4 w-4" />{refreshing ? "Refreshing invoices..." : "Refresh invoices"}</button>
+      {actionFeedback && <div role={actionFeedback.error ? "alert" : "status"} className={`break-words rounded-2xl border p-4 text-sm ${actionFeedback.error ? "border-rose-200 bg-rose-50 text-rose-800" : "border-cyan-200 bg-cyan-50 text-cyan-900"}`}>{actionFeedback.message}</div>}
       <p className="text-sm text-slate-500">SOWLedger does not email invoices or process payments. Send the printed invoice yourself, then update its status.{!canManage && " A manager or owner must create invoices and update their status."}</p>
+      {!canManage && <p className="text-sm text-slate-500">Full invoice proof packs and printouts are available to workspace owners and managers.</p>}
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <AppMetricCard label="Approved billables" value={billables.length} detail={`$${billableAmount.toFixed(2)} awaiting invoice.`} accent="emerald" icon={DollarSign} />
-        <AppMetricCard label="Selected for invoice" value={selectedEntries.size} detail={`$${selectedAmount.toFixed(2)} selected.`} accent={selectedEntries.size > 0 ? "cyan" : "slate"} icon={Receipt} />
-        <AppMetricCard label="Invoices" value={invoices.length} detail={`$${invoiceAmount.toFixed(2)} across drafts, sent and paid invoices.`} accent="slate" icon={FileText} />
+        <AppMetricCard label="Approved billables" value={billables.filter(entry => entry.eligible).length} detail={`${formatInvoiceCents(billableAmount)} awaiting invoice.`} accent="emerald" icon={DollarSign} />
+        <AppMetricCard label="Selected for invoice" value={selectedEntries.size} detail={`${formatInvoiceCents(selectedAmount)} selected.`} accent={selectedEntries.size > 0 ? "cyan" : "slate"} icon={Receipt} />
+        <AppMetricCard label="Active invoices" value={invoices.filter(invoice => invoice.status !== "void").length} detail={`${formatInvoiceCents(invoiceAmount)} across active invoices.`} accent="slate" icon={FileText} />
       </section>
 
-        <section className="grid gap-6 lg:grid-cols-2">
+        <section className="grid items-start gap-6 lg:grid-cols-2">
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="flex items-center gap-2 text-xl font-semibold">
               <DollarSign className="h-5 w-5 text-emerald-600" />
               Approved billable time
             </h2>
-            <p className="mt-2 text-sm text-slate-500">Select approved entries to create the next invoice.</p>
+            <p className="mt-2 text-sm text-slate-500">Select up to 100 approved entries for one client, or select entirely internal time. Different clients and internal time cannot share an invoice.</p>
+            {selectedGroup && <p className="mt-2 text-sm font-semibold text-cyan-800">{selectedGroup.billingAudience === "internal" ? "Internal — not shared in the client portal" : `Client: ${selectedGroup.clientName}`}</p>}
+            {selectedEntries.size === 100 && <p role="status" className="mt-2 text-sm text-amber-800">100-entry limit reached. Deselect an entry to choose another.</p>}
+            {selectedAmount === null && <p role="alert" className="mt-2 text-sm text-rose-800">Selected amount unavailable. Choose fewer entries or refresh the list.</p>}
             <div className="mt-5 space-y-3">
               {billables.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
@@ -307,19 +436,21 @@ export default function InvoicesPage() {
                   type="button"
                   key={entry.id}
                   onClick={() => toggleSelection(entry.id)}
-                  disabled={!canManage}
+                  disabled={!canManage || Boolean(updatingInvoiceId || pushingInvoiceId) || generatingInvoice || refreshing || needsRefresh || !selectedEntries.has(entry.id) && (!entry.eligible || selectedEntries.size >= 100 || Boolean(selectedGroup && invoiceGroupKey(selectedGroup) !== invoiceGroupKey(entry)))}
                   aria-pressed={selectedEntries.has(entry.id)}
-                  className={`w-full rounded-3xl border p-4 text-left transition ${selectedEntries.has(entry.id) ? "border-cyan-300 bg-cyan-50" : "border-slate-200 bg-slate-50 hover:border-cyan-200 hover:bg-cyan-50/50"}`}
+                  className={`w-full min-w-0 rounded-3xl border p-4 text-left transition disabled:cursor-not-allowed ${selectedEntries.has(entry.id) ? "border-cyan-300 bg-cyan-50" : "border-slate-200 bg-slate-50 hover:border-cyan-200 hover:bg-cyan-50/50"}`}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <p className="truncate font-bold text-slate-950">{entry.projectName}</p>
-                      <p className="mt-1 text-xs text-slate-500">{entry.description || "No description provided"}</p>
-                      <p className="mt-2 text-xs text-slate-400">{entry.userEmail}</p>
+                      <p className="mt-1 break-words text-xs text-slate-500">{entry.description || "No description provided"}</p>
+                      <p className="mt-2 break-all text-xs text-slate-400">{entry.userEmail}</p>
+                      <p className="mt-2 break-words text-xs text-slate-700">{entry.eligible ? entry.billingAudience === "internal" ? "Internal — not shared in the client portal" : `Client: ${entry.clientName} · Eligible` : `Not eligible: ${entry.ineligibleReason}`}</p>
+                      {entry.eligible && !selectedEntries.has(entry.id) && selectedGroup && invoiceGroupKey(selectedGroup) !== invoiceGroupKey(entry) && <p className="mt-1 text-xs text-amber-800">Deselect the current billing group to choose this time.</p>}
                     </div>
                     <div className="shrink-0 sm:text-right">
-                      <p className="font-bold text-emerald-700">${entry.amount.toFixed(2)}</p>
-                      <p className="text-xs text-slate-500">{(entry.durationSeconds / 3600).toFixed(1)} hrs x ${entry.hourlyRate}/hr</p>
+                      <p className="break-all font-bold text-emerald-700">{formatInvoiceCents(entry.amountCents)}</p>
+                      <p className="break-words text-xs text-slate-500">{formatBillableDuration(entry.durationSeconds)} × {entry.hourlyRate === null ? "Rate unavailable" : `$${entry.hourlyRate}/hr`}</p>
                     </div>
                   </div>
                 </button>
@@ -332,7 +463,8 @@ export default function InvoicesPage() {
               <FileText className="h-5 w-5 text-cyan-700" />
               Invoice history
             </h2>
-            <p className="mt-2 text-sm text-slate-500">Review the time and rates behind each total. Drafts stay private until marked as sent.</p>
+            <p className="mt-2 text-sm text-slate-500">Review the time and rates behind each saved total. Clients see their own sent or paid invoices in the portal. Internal invoices are not shared there.</p>
+            {invoices.some(invoice => invoice.historyIssue) && <p className="mt-2 text-sm text-amber-800">Saved totals include invoices that need review.</p>}
             <div className="mt-5 space-y-3">
               {invoices.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
@@ -342,35 +474,43 @@ export default function InvoicesPage() {
                 </div>
               ) : invoices.map((invoice) => (
                 <article key={invoice.id} className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
+                  <div className="min-w-0 break-words">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold text-slate-950">{invoice.number}</span>
                       <span className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-500">{invoice.status}</span>
                     </div>
                     <p className="mt-1 text-sm text-slate-500">Total: <span className="font-semibold text-slate-950">${invoice.amount.toFixed(2)}</span></p>
+                    <p className="mt-1 text-xs text-slate-500">{invoice.billingAudience === "internal" ? "Internal — not shared in the client portal" : invoice.billingAudience === "client" ? `Client: ${invoice.clientName}` : "Client portal access requires verified linked time."}</p>
+                    {invoice.historyIssue ? <div className="mt-3 space-y-2 text-sm text-amber-900">
+                      <p>This saved invoice needs review. Some time entries are listed more than once. We haven&apos;t changed the invoice.</p>
+                      <p>Actions are unavailable for this record here. Ask a workspace manager to review the saved time entries.</p>
+                      <details className="break-all"><summary className="cursor-pointer font-semibold">Saved record details</summary><p className="mt-2">Invoice ID: <span>{invoice.id}</span></p><p>Original time entry IDs, in saved order:</p><ol className="list-inside list-decimal">{invoice.timeEntryIds.map((id, index) => <li key={index}>{id}</li>)}</ol></details>
+                    </div> : canManage && invoice.status === "draft" && <p className="mt-1 text-xs text-slate-500">Review the draft before printing or marking it as sent. SOWLedger does not email the invoice.</p>}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  {canManage && invoice.status === "draft" && invoice.voidEligibility?.eligible === false && <p className="text-xs text-amber-800">{invoice.voidEligibility.reason}</p>}
+                  {canManage && !invoice.historyIssue && invoice.status !== "void" && <div className="flex flex-wrap gap-2">
                     <button onClick={() => openProofPack(invoice.id)} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800">
                       <ShieldCheck className="h-4 w-4" />
-                      Open proof pack
+                      {invoice.status === "draft" ? "Review draft" : "Open proof pack"}
                     </button>
                     <a href={`/api/invoices/${invoice.id}/print`} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-cyan-200 hover:text-cyan-700">
                       <Download className="h-4 w-4" />
                       Print
                     </a>
-                    {canManage && invoice.status !== "paid" && <button disabled={Boolean(updatingInvoiceId)} onClick={() => void updateInvoiceStatus(invoice, invoice.status === "draft" ? "sent" : "paid")} className="inline-flex h-10 items-center justify-center rounded-2xl border border-cyan-200 bg-white px-4 text-sm font-bold text-cyan-800 disabled:opacity-50">{updatingInvoiceId === invoice.id ? "Saving..." : invoice.status === "draft" ? "Mark as sent" : "Mark as paid"}</button>}
-                    {canManage && quickBooksConnected ? (
-                      <button onClick={() => void pushToQuickBooks(invoice.id)} disabled={pushingInvoiceId === invoice.id} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50">
+                    {invoice.status === "draft" && invoice.voidEligibility?.eligible === true && <button disabled={Boolean(updatingInvoiceId || pushingInvoiceId) || generatingInvoice || refreshing || voidPending} onClick={event => { if (invoiceActionRef.current || refreshingRef.current || generatingInvoiceRef.current) return; voidOpener.current = event.currentTarget; setVoiding(invoice); setVoidConfirmed(false); setVoidReason(""); setVoidError(null); }} className="inline-flex h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 disabled:opacity-50">Void draft</button>}
+                    {canManage && (invoice.status === "draft" || invoice.status === "sent") && <button disabled={Boolean(updatingInvoiceId || pushingInvoiceId) || generatingInvoice || refreshing} onClick={() => void updateInvoiceStatus(invoice, invoice.status === "draft" ? "sent" : "paid")} className="inline-flex h-10 items-center justify-center rounded-2xl border border-cyan-200 bg-white px-4 text-sm font-bold text-cyan-800 disabled:opacity-50">{updatingInvoiceId === invoice.id ? "Saving..." : invoice.status === "draft" ? "Mark as sent" : "Mark as paid"}</button>}
+                    {canManage && quickBooksConnected && (invoice.status === "sent" || invoice.status === "paid") ? (
+                      <button onClick={() => void pushToQuickBooks(invoice.id)} disabled={Boolean(updatingInvoiceId || pushingInvoiceId) || generatingInvoice || refreshing} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50">
                         <RefreshCcw className={`h-4 w-4 ${pushingInvoiceId === invoice.id ? "animate-spin" : ""}`} />
                         {pushingInvoiceId === invoice.id ? "Pushing..." : "Push QuickBooks"}
                       </button>
                     ) : null}
-                  </div>
+                  </div>}
                 </article>
               ))}
             </div>
 
-            <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            {canManage && <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5">
               {!proofPackState ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-slate-500">
                   <ShieldCheck className="mb-3 h-8 w-8 text-slate-400" />
@@ -393,9 +533,19 @@ export default function InvoicesPage() {
               ) : (
                 <ProofPackSummary state={proofPackState} />
               )}
-            </div>
+            </div>}
           </div>
         </section>
+      {voiding && <ModalDialog label="Void draft invoice" className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl" onClose={() => { if (!invoiceActionRef.current) setVoiding(null); }} initialFocusRef={voidCheckbox} returnFocusRef={voidOpener}>
+        <form className="space-y-4 overflow-y-auto p-6" onSubmit={event => { event.preventDefault(); void confirmVoid(); }}>
+          <h2 className="text-xl font-semibold">Void draft invoice</h2>
+          <p className="text-sm text-slate-600">{voiding.number}: this returns the time to Approved so you can correct it or create a new invoice. We&apos;ll keep this invoice and its history. This does not cancel anything in QuickBooks or elsewhere.</p>
+          <label className="flex gap-3 text-sm font-medium"><input ref={voidCheckbox} type="checkbox" checked={voidConfirmed} disabled={voidPending} onChange={event => setVoidConfirmed(event.target.checked)} />I confirm this invoice has not been billed elsewhere.</label>
+          <label className="block text-sm font-medium">Reason (optional)<textarea value={voidReason} onChange={event => setVoidReason(event.target.value)} maxLength={500} disabled={voidPending} className="mt-2 w-full rounded-xl border border-slate-200 p-3" /></label>
+          {voidError && <p role="alert" className="text-sm text-rose-800">{voidError}</p>}
+          <div className="flex justify-end gap-3"><button type="button" disabled={voidPending} onClick={() => setVoiding(null)} className="rounded-xl border border-slate-200 px-4 py-2 disabled:opacity-50">Cancel</button><button type="submit" disabled={!voidConfirmed || voidPending} className="rounded-xl bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-50">{voidPending ? "Voiding..." : "Void invoice"}</button></div>
+        </form>
+      </ModalDialog>}
     </AppPageShell>
   );
 }

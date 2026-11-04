@@ -1,3 +1,4 @@
+import { workflowErrorResponse } from "@/lib/workflow-validation";
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -37,14 +38,6 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, activeEntries });
   } catch (error) {
-    const err: unknown = error;
-    const status =
-      typeof (err as Record<string, unknown>)?.status === "number"
-        ? Number((err as Record<string, unknown>).status)
-        : typeof (err as Record<string, unknown>)?.statusCode === "number"
-        ? Number((err as Record<string, unknown>).statusCode)
-        : 500;
-    const message = (err as Error)?.message || "Internal Server Error";
-    return NextResponse.json({ error: message }, { status });
+    return workflowErrorResponse(error, "We couldn't load your active timers. Please try again.", { route: "/api/timer/active", method: "GET" });
   }
 }

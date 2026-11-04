@@ -1,4 +1,4 @@
-import { requireSession } from "@/lib/auth";
+import { requireTeamPageSession } from "@/lib/team-page-session";
 import { db } from "@/lib/db";
 import { workspaceTags, projects as projectsTable } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
@@ -9,7 +9,7 @@ import { DataLoadNotice } from "@/components/data-load-notice";
 export const metadata = { title: "Tags - SOWLedger" };
 
 export default async function TagsSettingsPage() {
-  const session = await requireSession();
+  const session = await requireTeamPageSession();
   let tags: Array<{ id: string; name: string; color: string; projectId: string | null; isSOWLedgerDefault: boolean; status: "active" | "archived" }> = [];
   let projects: Array<{ id: string; name: string }> = [];
   let loadError: string | null = null;
@@ -30,7 +30,7 @@ export default async function TagsSettingsPage() {
         <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Settings</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Tags</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">Use tags to organize time entries by work type or project. Choose colors and billing defaults for your workspace.</p>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">Manage your workspace&apos;s tag names and colors. Project and billing labels are for reference; they don&apos;t restrict tag use or change invoices.</p>
           {!loadError && (
             <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold">
               <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700">{tags.filter((tag) => tag.status === "active").length} active tags</span>
@@ -42,7 +42,7 @@ export default async function TagsSettingsPage() {
         {loadError ? (
           <DataLoadNotice message={loadError} />
         ) : (
-          <TagsDataTable initialTags={tags} projects={projects} />
+          <TagsDataTable key={session.workspaceId} initialTags={tags} projects={projects} workspaceId={session.workspaceId} canManageTags={session.role === "owner" || session.role === "manager"} />
         )}
       </div>
     </main>

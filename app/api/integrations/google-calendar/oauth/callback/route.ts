@@ -1,11 +1,11 @@
+import { IntegrationProviderError } from "@/lib/integrations/errors";
+import { reportUnexpectedRequestFailure } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 
-import { requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
-import { getIntegrationConnection } from "@/lib/integrations/connections";
-import { decryptSecret } from "@/lib/integrations/crypto";
+import { requireRole, requireSession, UnauthorizedError, ForbiddenError } from "@/lib/auth";
 import { exchangeGoogleAuthorizationCode, storeGoogleCalendarConnection } from "@/lib/integrations/google-calendar";
-import { verifyIntegrationOAuthState } from "@/lib/integrations/oauth-state";
+import { IntegrationOAuthStateError, verifyIntegrationOAuthState } from "@/lib/integrations/oauth-state";
 
 function redirectTo(req: NextRequest, status: "connected" | "error", message?: string) {
   const base = getAppOrigin(undefined, req.nextUrl.origin);
@@ -24,30 +24,26 @@ function redirectToLogin(req: NextRequest, message?: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const error = req.nextUrl.searchParams.get("error");
-    if (error) return redirectTo(req, "error", error);
+    if (req.nextUrl.searchParams.has("error")) return redirectTo(req, "error", "Google Calendar setup was not completed. Start the connection again.");
     const code = req.nextUrl.searchParams.get("code");
     const state = req.nextUrl.searchParams.get("state");
-    if (!code || !state) return redirectTo(req, "error", "Missing Google OAuth code or state");
+    if (!code || !state) return redirectTo(req, "error", "Google Calendar setup was not completed. Start the connection again.");
     const payload = verifyIntegrationOAuthState(state, "google_calendar");
     const session = await requireSession();
     requireRole("manager", session.role);
     if (session.workspaceId !== payload.workspaceId || session.sub !== payload.userId) {
-      return redirectTo(req, "error", "Google OAuth state does not match the active session");
+      return redirectTo(req, "error", "Google Calendar setup was not completed. Start the connection again.");
     }
-    const existing = await getIntegrationConnection(session.workspaceId, "google_calendar");
     const token = await exchangeGoogleAuthorizationCode(code);
-    if (!token.access_token) {
-      return redirectTo(req, "error", "Google did not return an access token");
-    }
-    const existingRefreshToken = existing ? decryptSecret(existing.credentials.refreshToken) : null;
-    await storeGoogleCalendarConnection({ workspaceId: session.workspaceId, userId: session.sub, token, existingRefreshToken });
+    await storeGoogleCalendarConnection({ workspaceId: session.workspaceId, userId: session.sub, token });
     return redirectTo(req, "connected");
   } catch (error) {
-    console.error("[google-calendar-callback]", error);
     if (error instanceof UnauthorizedError) {
       return redirectToLogin(req, "Your session expired during the Google Calendar setup. Please log in and try again.");
     }
-    return redirectTo(req, "error", error instanceof Error ? error.message : "Google Calendar connection failed");
+    if (error instanceof ForbiddenError) return redirectTo(req, "error", "Google Calendar setup needs workspace manager permission. Start the connection again.");
+    if (error instanceof IntegrationOAuthStateError) return redirectTo(req, "error", "Google Calendar setup was not completed. Start the connection again.");
+    reportUnexpectedRequestFailure({ route: "/api/integrations/google-calendar/oauth/callback", method: "GET" }, error instanceof IntegrationProviderError ? "upstream" : "unexpected");
+    return redirectTo(req, "error", "We couldn't complete Google Calendar setup. Start the connection again.");
   }
 }

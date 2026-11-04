@@ -1,22 +1,21 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
-import { inviteUser, requireRole, requireSession } from "@/lib/auth";
+import { inviteUser, isWorkspaceRole, requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { memberships, organizations, workspacePeople } from "@/lib/db/schema";
 import { createOrganization, listWorkspacePeopleDirectory } from "@/lib/people-directory";
 import { isValidEmail } from "@/lib/validators";
 
-function getErrorStatus(error: unknown, fallback = 500): number {
-  const err = error as Record<string, unknown>;
-  if (err.code === "FORBIDDEN" || err.status === 403 || err.message === "Forbidden") return 403;
-  if (err.code === "UNAUTHORIZED" || err.status === 401) return 401;
-  return fallback;
-}
-
 function isElevatedRole(role: string | null | undefined) {
   return role === "manager" || role === "owner";
+}
+
+function readRole(value: unknown) {
+  if (!isWorkspaceRole(value)) throw new WorkflowError("Choose a valid workspace role.", 400);
+  return value;
 }
 
 export async function GET() {
@@ -28,7 +27,7 @@ export async function GET() {
     const directory = await listWorkspacePeopleDirectory(session.workspaceId);
     return NextResponse.json({ ok: true, ...directory });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't load your people. Please try again.", { route: "/api/people", method: "GET" });
   }
 }
 
@@ -38,7 +37,7 @@ export async function POST(req: NextRequest) {
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
 
-    const body = (await req.json()) as {
+    const body = (await readRequestJson(req)) as {
       organizationId?: string;
       organizationName?: string;
       organizationType?: "internal" | "client" | "vendor" | "partner" | "other";
@@ -47,8 +46,15 @@ export async function POST(req: NextRequest) {
       title?: string;
       personType?: "member" | "client" | "contractor" | "contact";
       invite?: boolean;
-      inviteRole?: "client" | "member" | "manager";
+      inviteRole?: unknown;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
+
+    const personType = body.personType ?? "contact";
+    const inviteRole = body.inviteRole === undefined ? (personType === "client" ? "client" : "member") : readRole(body.inviteRole);
+    if (body.invite && isElevatedRole(inviteRole) && session.role !== "owner") {
+      return NextResponse.json({ error: "Only owners can invite elevated roles" }, { status: 403 });
+    }
 
     let organizationId = body.organizationId?.trim() || "";
     if (!organizationId) {
@@ -78,15 +84,8 @@ export async function POST(req: NextRequest) {
     }
 
     const displayName = body.displayName?.trim() || normalizedEmail?.split("@")[0] || "New person";
-    const personType = body.personType ?? "contact";
-    const inviteRole = body.inviteRole ?? (personType === "client" ? "client" : "member");
-
     if (body.invite && !normalizedEmail) {
       return NextResponse.json({ error: "email is required to send an invite" }, { status: 400 });
-    }
-
-    if (body.invite && inviteRole === "manager" && session.role !== "owner") {
-      return NextResponse.json({ error: "Only owners can invite managers" }, { status: 403 });
     }
 
     let invitationStatus: "none" | "pending" | "accepted" = "none";
@@ -118,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, person });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the person or invitation was saved. Check your people list before trying again.", { route: "/api/people", method: "POST" });
   }
 }
 
@@ -128,7 +127,7 @@ export async function PATCH(req: NextRequest) {
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
 
-    const body = (await req.json()) as {
+    const body = (await readRequestJson(req)) as {
       personId?: string;
       organizationId?: string;
       displayName?: string;
@@ -136,10 +135,13 @@ export async function PATCH(req: NextRequest) {
       title?: string | null;
       personType?: "member" | "client" | "contractor" | "contact";
       status?: "active" | "archived";
-      inviteRole?: "client" | "member" | "manager" | "owner";
+      inviteRole?: unknown;
       resendInvite?: boolean;
-      workspaceRole?: "client" | "member" | "manager" | "owner";
+      workspaceRole?: unknown;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
+    const inviteRole = body.inviteRole === undefined ? undefined : readRole(body.inviteRole);
+    const workspaceRole = body.workspaceRole === undefined ? undefined : readRole(body.workspaceRole);
 
     if (!body.personId) {
       return NextResponse.json({ error: "personId is required" }, { status: 400 });
@@ -152,6 +154,12 @@ export async function PATCH(req: NextRequest) {
 
     if (!existing) {
       return NextResponse.json({ error: "Person not found" }, { status: 404 });
+    }
+
+    // Check resend policy before a requested membership update can write.
+    const resendRole = body.resendInvite ? readRole(inviteRole ?? existing.inviteRole ?? "member") : undefined;
+    if (resendRole && isElevatedRole(resendRole) && session.role !== "owner") {
+      return NextResponse.json({ error: "Only owners can resend elevated invites" }, { status: 403 });
     }
 
     const updates: Partial<typeof workspacePeople.$inferInsert> = {};
@@ -176,18 +184,18 @@ export async function PATCH(req: NextRequest) {
     if (body.title !== undefined) updates.title = body.title?.trim() || null;
     if (body.personType !== undefined) updates.personType = body.personType;
     if (body.status !== undefined) updates.status = body.status;
-    if (body.inviteRole !== undefined) {
-      if (isElevatedRole(body.inviteRole) && session.role !== "owner") {
+    if (inviteRole !== undefined) {
+      if (isElevatedRole(inviteRole) && session.role !== "owner") {
         return NextResponse.json({ error: "Only owners can assign elevated invites" }, { status: 403 });
       }
       if (isElevatedRole(existing.inviteRole) && session.role !== "owner") {
         return NextResponse.json({ error: "Only owners can change elevated invites" }, { status: 403 });
       }
-      updates.inviteRole = body.inviteRole;
+      updates.inviteRole = inviteRole;
     }
 
-    if (body.workspaceRole !== undefined) {
-      if (isElevatedRole(body.workspaceRole) && session.role !== "owner") {
+    if (workspaceRole !== undefined) {
+      if (isElevatedRole(workspaceRole) && session.role !== "owner") {
         return NextResponse.json({ error: "Only owners can promote elevated roles" }, { status: 403 });
       }
       if (!existing.linkedUserId) {
@@ -200,11 +208,14 @@ export async function PATCH(req: NextRequest) {
       if (!currentMembership) {
         return NextResponse.json({ error: "Membership not found" }, { status: 404 });
       }
+      if (!isWorkspaceRole(currentMembership.role)) {
+        return NextResponse.json({ error: "This membership's role is not valid. Contact support before changing it." }, { status: 403 });
+      }
       if (isElevatedRole(currentMembership.role) && session.role !== "owner") {
         return NextResponse.json({ error: "Only owners can change elevated roles" }, { status: 403 });
       }
       
-      if (currentMembership.role === "owner" && body.workspaceRole !== "owner") {
+      if (currentMembership.role === "owner" && workspaceRole !== "owner") {
         const owners = await db
           .select({ userId: memberships.userId })
           .from(memberships)
@@ -215,9 +226,9 @@ export async function PATCH(req: NextRequest) {
       }
       await db
         .update(memberships)
-        .set({ role: body.workspaceRole })
+        .set({ role: workspaceRole })
         .where(and(eq(memberships.workspaceId, session.workspaceId), eq(memberships.userId, existing.linkedUserId)));
-      updates.inviteRole = body.workspaceRole;
+      updates.inviteRole = workspaceRole;
       updates.invitationStatus = "accepted";
     }
 
@@ -229,10 +240,7 @@ export async function PATCH(req: NextRequest) {
       if (!isValidEmail(email)) {
         return NextResponse.json({ error: "email is invalid" }, { status: 400 });
       }
-      const role = body.inviteRole ?? existing.inviteRole ?? "member";
-      if ((role === "manager" || role === "owner") && session.role !== "owner") {
-        return NextResponse.json({ error: "Only owners can resend elevated invites" }, { status: 403 });
-      }
+      const role = resendRole!;
       await inviteUser({
         email,
         workspaceId: session.workspaceId,
@@ -252,6 +260,6 @@ export async function PATCH(req: NextRequest) {
       .returning();
     return NextResponse.json({ ok: true, person });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the person's changes were saved. Check your people list before trying again.", { route: "/api/people", method: "PATCH" });
   }
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BuildingIcon, ClockIcon, DollarSignIcon, PlusIcon, XIcon, Sparkles } from "lucide-react";
+import { ModalDialog } from "@/components/modal-dialog";
 
 type ClientOption = { id: string; name: string };
 
@@ -13,6 +14,12 @@ type CreateProjectButtonProps = {
 
 export function CreateProjectButton({ canCreate = true, lockedReason = "Only managers and owners can create projects." }: CreateProjectButtonProps) {
   const router = useRouter();
+  const titleId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const inFlight = useRef(false);
+  const formIdentity = useRef(0);
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -25,14 +32,21 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
   const [budgetAmount, setBudgetAmount] = useState("");
 
   useEffect(() => {
+    errorRef.current?.scrollIntoView({ block: "nearest" });
+  }, [error]);
+
+  useEffect(() => {
     if (!isOpen) return;
+    let current = true;
+    const identity = formIdentity.current;
     fetch("/api/clients")
       .then((res) => {
         if (!res.ok) throw new Error("Clients unavailable");
         return res.json();
       })
-      .then((data) => setClients(data.clients ?? []))
-      .catch(() => setError("We couldn't load your clients. Close this form and try again to choose a client."));
+      .then((data) => { if (current && identity === formIdentity.current) setClients(data.clients ?? []); })
+      .catch(() => { if (current && identity === formIdentity.current) setError("We couldn't load your clients. Close this form and try again to choose a client."); });
+    return () => { current = false; };
   }, [isOpen]);
 
   function resetForm() {
@@ -46,32 +60,47 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
   }
 
   function close() {
+    if (inFlight.current) return;
+    formIdentity.current++;
     setIsOpen(false);
     resetForm();
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (inFlight.current) return;
     if (step === 1) {
       setStep(2);
       return;
     }
     if (!name.trim()) return;
+    inFlight.current = true;
+    const identity = formIdentity.current;
     setLoading(true);
     setError("");
+    const submitted = { name: name.trim(), clientId: clientId || undefined, billingModel, budgetType, budgetAmount: budgetAmount ? Number.parseFloat(budgetAmount) : undefined };
     try {
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), clientId: clientId || undefined, billingModel, budgetType, budgetAmount: budgetAmount ? Number.parseFloat(budgetAmount) : undefined }),
+        body: JSON.stringify(submitted),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create project");
+      if (data.ok !== true || typeof data.project?.id !== "string" || !data.project.id.trim()
+        || data.project.name !== submitted.name || (data.project.clientId ?? null) !== (submitted.clientId ?? null)
+        || data.project.billingModel !== submitted.billingModel || data.project.budgetType !== submitted.budgetType
+        || (data.project.budgetAmount == null ? null : Math.fround(data.project.budgetAmount)) !== (submitted.budgetAmount ? Math.fround(submitted.budgetAmount) : null)) {
+        throw new Error("We couldn't confirm the project was created. Check Projects before trying again; your draft is retained.");
+      }
+      if (identity !== formIdentity.current) return;
+      inFlight.current = false;
       close();
       router.refresh();
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   }
@@ -79,7 +108,9 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
   return (
     <>
       <button
-        onClick={() => canCreate ? setIsOpen(true) : setError(lockedReason)}
+        ref={triggerRef}
+        disabled={loading}
+        onClick={() => { if (!inFlight.current) { if (canCreate) { formIdentity.current++; setClients([]); setIsOpen(true); } else setError(lockedReason); } }}
         className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold shadow-sm transition ${canCreate ? "bg-slate-950 text-white hover:bg-slate-800" : "border border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300"}`}
         title={canCreate ? "Create project" : lockedReason}
       >
@@ -89,17 +120,18 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
       {!canCreate && error && <p className="mt-2 text-sm font-semibold text-amber-700">{error}</p>}
 
       {isOpen && canCreate && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-[28px] border border-slate-200 bg-white text-slate-950 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight">Create New Project</h2>
+        <ModalDialog onClose={close} labelledBy={titleId} initialFocusRef={nameRef} returnFocusRef={triggerRef} className="inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg rounded-[28px] border border-slate-200 bg-white text-slate-950 shadow-2xl backdrop:bg-slate-950/55 backdrop:backdrop-blur-sm">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6 sm:py-5">
+              <div className="min-w-0">
+                <h2 id={titleId} className="text-xl font-semibold tracking-tight sm:text-2xl">Create New Project</h2>
                 <p className="text-sm text-slate-500">Step {step} of 2</p>
               </div>
-              <button onClick={close} title="Close" aria-label="Close modal" className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><XIcon className="h-5 w-5" /></button>
+              <button type="button" onClick={close} title="Close" aria-label="Close modal" className="shrink-0 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><XIcon className="h-5 w-5" /></button>
             </div>
 
-            <form onSubmit={submit} className="space-y-6 p-6">
+            <form onSubmit={submit} className="flex min-h-0 flex-col">
+              <fieldset disabled={loading} className="contents">
+              <div className="min-h-0 space-y-6 overflow-y-auto overscroll-contain p-5 sm:p-6">
               {step === 1 ? (
                 <>
                   <div className="mb-6 rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4">
@@ -122,7 +154,7 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
                       </button>
                     </div>
                   </div>
-                  <label htmlFor="projectName" className="block text-sm font-bold text-slate-700">Project Name<input id="projectName" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Website Redesign" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
+                  <label htmlFor="projectName" className="block text-sm font-bold text-slate-700">Project Name<input ref={nameRef} id="projectName" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Website Redesign" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
                   <label className="block text-sm font-bold text-slate-700">Client <span className="font-normal text-slate-400">(Optional)</span><span className="relative mt-1 block"><BuildingIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select aria-label="Select Client" value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-cyan-500 focus:bg-white"><option value="">No client - team work</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></span></label>
                 </>
               ) : (
@@ -143,14 +175,15 @@ export function CreateProjectButton({ canCreate = true, lockedReason = "Only man
 
               {step === 2 && <p className="text-xs leading-5 text-slate-500">Budgets help you compare time and value; they do not cap timers or invoices. Invoices use approved time. Recurring and milestone billing are not automated.</p>}
 
-              {error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p>}
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-5">
+              {error && <p ref={errorRef} role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p>}
+              </div>
+              <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 px-5 py-4 sm:px-6">
                 {step === 2 && <button type="button" onClick={() => setStep(1)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Back</button>}
                 <button type="submit" disabled={loading || (step === 1 && !name.trim())} className="rounded-2xl bg-cyan-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-cyan-500 disabled:opacity-50">{loading ? "Saving..." : step === 1 ? "Next" : "Create Project"}</button>
               </div>
+              </fieldset>
             </form>
-          </div>
-        </div>
+        </ModalDialog>
       )}
     </>
   );

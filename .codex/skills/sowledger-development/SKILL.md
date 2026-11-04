@@ -6,7 +6,7 @@ description: Use when modifying the SOWLedger Next.js application, database sche
 # SOWLedger Development
 
 ## Overview
-SOWLedger is a Next.js 16.2 App Router application for planning, tracking, billing, exporting, and integrating time data. Treat framework version drift, workspace isolation, and product workflow continuity as primary risks.
+SOWLedger is a Next.js 16.4.1 App Router application for planning, tracking, billing, exporting, and integrating time data. Treat framework version drift, workspace isolation, and product workflow continuity as primary risks.
 
 ## Quick Start
 1. Confirm the repo root is `/Users/example/Projects/sowledger`.
@@ -23,7 +23,7 @@ SOWLedger is a Next.js 16.2 App Router application for planning, tracking, billi
 - `components`: shared client/server UI components.
 - `lib/db/schema.ts`: Drizzle schema source.
 - `lib/integrations`: provider helpers for encrypted credentials, OAuth state, Google Calendar, Slack, and QuickBooks.
-- `lib/db/ensure-workspace-schema.ts`: runtime schema hardening for existing databases.
+- `lib/db/ensure-workspace-schema.ts`: compatibility no-op; requests never run schema DDL.
 - `db/migrations`: SQL migrations.
 - `vercel.json`: production cron registration for reminders and unfinished timer checks.
 - `tests`: Playwright user-flow coverage.
@@ -34,4 +34,5 @@ SOWLedger is a Next.js 16.2 App Router application for planning, tracking, billi
 - Do not bypass `workspaceId` filters for convenience.
 - Do not claim UI work is done without checking reachability from navigation.
 - Do not return provider tokens, webhook URLs, or other bearer-like integration secrets from app APIs.
-- When adding integration schema, keep runtime schema hardening and SQL migrations aligned.
+- Keep ORM tables explicitly qualified in the shared database's dedicated `sowledger` schema through `lib/db/namespace.ts`; never create SOWLedger tables in shared `public` or alter another application's schema.
+- Runtime `DATABASE_URL`/`NEON_DATABASE_URL` uses restricted `sowledger_app` with no DDL privileges. Schema changes use maintenance-only direct `DATABASE_MIGRATION_URL` and reviewed migrations (`npm run db:migrate:product` for product changes), preserving the runner's backup/checksum journal. Never run DDL from authentication or request paths.
