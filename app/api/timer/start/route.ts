@@ -1,3 +1,4 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse, after } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { requireSession, requireRole } from "@/lib/auth";
@@ -5,7 +6,7 @@ import { db } from "@/lib/db";
 import { projects, goals, userActions, scheduledWorkBlocks, timeEntries } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
-import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
+import { lockScheduledBlockForEntry } from "@/lib/scheduled-block-entry";
 import { and, eq } from "drizzle-orm";
 import { normalizeTags } from "@/lib/validators";
 
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     requireRole("member", session.role);
 
-    const body = await req.json() as {
+    const body = await readRequestJson(req) as {
       taskId?: string;
       description?: string;
       collaborators?: string[];
@@ -25,19 +26,20 @@ export async function POST(req: NextRequest) {
       actionId?: string;
       scheduledBlockId?: string;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
 
     if (!body.taskId) return NextResponse.json({ error: "taskId is required" }, { status: 400 });
 
     if (body.projectId) {
-      const [project] = await db.select().from(projects).where(eq(projects.id, body.projectId));
-      if (!project || project.workspaceId !== session.workspaceId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId)));
+      if (!project) {
         return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
       }
     }
 
     if (body.goalId) {
-      const [goal] = await db.select().from(goals).where(eq(goals.id, body.goalId));
-      if (!goal || goal.workspaceId !== session.workspaceId) {
+      const [goal] = await db.select().from(goals).where(and(eq(goals.id, body.goalId), eq(goals.workspaceId, session.workspaceId)));
+      if (!goal) {
         return NextResponse.json({ error: "Invalid goalId" }, { status: 400 });
       }
     }
@@ -46,22 +48,12 @@ export async function POST(req: NextRequest) {
     let hourlyRate: number | undefined;
 
     if (body.actionId) {
-      const [uAction] = await db.select().from(userActions).where(eq(userActions.id, body.actionId));
-      if (!uAction || uAction.workspaceId !== session.workspaceId || uAction.userId !== session.sub) {
+      const [uAction] = await db.select().from(userActions).where(and(eq(userActions.id, body.actionId), eq(userActions.workspaceId, session.workspaceId), eq(userActions.userId, session.sub)));
+      if (!uAction) {
         return NextResponse.json({ error: "Invalid actionId" }, { status: 400 });
       }
       actionName = uAction.name;
-      hourlyRate = uAction.hourlyRate || undefined;
-    }
-
-    if (body.scheduledBlockId) {
-      const [block] = await db.select().from(scheduledWorkBlocks).where(eq(scheduledWorkBlocks.id, body.scheduledBlockId));
-      if (!block || block.workspaceId !== session.workspaceId || block.userId !== session.sub) {
-        return NextResponse.json({ error: "Invalid scheduledBlockId" }, { status: 400 });
-      }
-      if (isUnavailableScheduledBlock(block)) {
-        return NextResponse.json({ error: "Unavailable, OOO, and external-calendar blocks cannot be started as timers" }, { status: 409 });
-      }
+      hourlyRate = uAction.hourlyRate ?? undefined;
     }
 
     const entryData = {
@@ -82,10 +74,13 @@ export async function POST(req: NextRequest) {
       collaborators: body.collaborators ?? [],
       expenses: [],
       action: actionName || null,
-      hourlyRate: hourlyRate || null,
+      hourlyRate: hourlyRate ?? null,
     };
 
     const entry = await db.transaction(async (tx) => {
+      if (body.scheduledBlockId) {
+        await lockScheduledBlockForEntry(tx, { blockId: body.scheduledBlockId, workspaceId: session.workspaceId, userId: session.sub });
+      }
       const [newEntry] = await tx.insert(timeEntries).values(entryData).returning();
 
       if (body.scheduledBlockId) {
@@ -109,14 +104,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, entry });
   } catch (error) {
-    const err = error as Record<string, unknown>;
-    const status =
-      typeof err?.status === "number"
-        ? err.status
-        : typeof err?.statusCode === "number"
-        ? err.statusCode
-        : 500;
-    const message = typeof err?.message === "string" ? err.message : "Internal Server Error";
-    return NextResponse.json({ error: message }, { status });
+    return workflowErrorResponse(error, "We couldn't confirm the timer started. Check your active timers before trying again.", { route: "/api/timer/start", method: "POST" });
   }
 }

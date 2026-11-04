@@ -1,5 +1,6 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
-import { ForbiddenError, inviteUser, requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
+import { inviteUser, requireRole, requireSession } from "@/lib/auth";
 import { isValidEmail } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
@@ -7,7 +8,8 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     requireRole("manager", session.role);
 
-    const body = await req.json() as { email?: string; role?: "client" | "member" | "manager" };
+    const body = await readRequestJson(req) as { email?: string; role?: "client" | "member" | "manager" };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     const email = body.email?.trim().toLowerCase();
     if (!email) return NextResponse.json({ error: "email is required" }, { status: 400 });
     if (!isValidEmail(email)) return NextResponse.json({ error: "email is invalid" }, { status: 400 });
@@ -35,7 +37,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, invitationId: invitation.id, expiresAt: invitation.expiresAt });
   } catch (error) {
-    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't confirm the invitation was created. Check your invitations before trying again.", { route: "/api/auth/invite", method: "POST" });
   }
 }

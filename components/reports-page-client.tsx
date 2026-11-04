@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -28,6 +28,7 @@ import {
 } from "@/components/app-page-shell";
 import { ManualTimeDialog } from "@/components/manual-time-dialog";
 import { DataLoadNotice } from "@/components/data-load-notice";
+import { localDateKey, localDateRange } from "@/lib/date-input";
 
 type ReportData = {
   ok: boolean;
@@ -75,7 +76,7 @@ const COLORS = ["#0891b2", "#0f766e", "#d97706", "#4f46e5", "#be123c", "#64748b"
 function get30DaysAgo() {
   const d = new Date();
   d.setDate(d.getDate() - 30);
-  return d.toISOString().split("T")[0];
+  return localDateKey(d);
 }
 
 function metric(value: number, suffix = "") {
@@ -109,30 +110,56 @@ export function ReportsPageClient() {
   const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"mine" | "team">("mine");
-  const [startDate, setStartDate] = useState(get30DaysAgo());
-  const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [datesReady, setDatesReady] = useState(false);
+  const [timeZone, setTimeZone] = useState("UTC");
   const [manualOpen, setManualOpen] = useState(false);
+  const requestId = useRef(0);
+  const range = useMemo(() => {
+    try { return { ...localDateRange(startDate, endDate), error: null }; }
+    catch (error) { return { start: undefined, end: undefined, error: error instanceof Error ? error.message : "Choose a valid date range." }; }
+  }, [startDate, endDate]);
 
-  async function fetchReports() {
+  useEffect(() => {
+    // Initialize in the browser so server timezone differences do not change a calendar day during hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStartDate(get30DaysAgo());
+    setEndDate(localDateKey());
+    setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    setDatesReady(true);
+  }, []);
+
+  const fetchReports = useCallback(async () => {
+    if (!datesReady) return;
+    const currentRequest = ++requestId.current;
+    setData(null);
+    setIntelligence(null);
+    if (range.error) {
+      setLoading(false);
+      setIntelligenceLoading(false);
+      setIntelligenceError(null);
+      return;
+    }
     setLoading(true);
     setIntelligenceLoading(true);
     setIntelligenceError(null);
     try {
-      const query = new URLSearchParams({ scope });
-      if (startDate) query.append("start", startDate);
-      if (endDate) query.append("end", endDate);
+      const query = new URLSearchParams({ scope, timeZone });
+      if (range.start) query.append("start", range.start);
+      if (range.end) query.append("end", range.end);
       const queryString = query.toString();
       const [reportResult, intelligenceResult] = await Promise.allSettled([
         fetchJson<ReportData>(`/api/reports?${queryString}`, "Unable to load analytics"),
         fetchJson<RevenueIntelligenceData>(`/api/revenue-intelligence?${queryString}`, "Could not load budget and time review"),
       ]);
+      if (currentRequest !== requestId.current) return;
 
       if (reportResult.status === "fulfilled") {
         setData(reportResult.value);
       } else {
         setData(null);
-        if (scope === "team") setScope("mine");
-        toast.error("Analytics unavailable", { description: reportResult.reason instanceof Error ? reportResult.reason.message : "Unknown error" });
+        toast.error("Analytics unavailable", { description: "Please try again. Team analytics requires an owner or manager role." });
       }
 
       if (intelligenceResult.status === "fulfilled") {
@@ -142,16 +169,20 @@ export function ReportsPageClient() {
         setIntelligenceError("We couldn't load budget and time review.");
       }
     } finally {
-      setLoading(false);
-      setIntelligenceLoading(false);
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+        setIntelligenceLoading(false);
+      }
     }
-  }
+  }, [datesReady, range.start, range.end, range.error, scope, timeZone]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchReports();
+    void fetchReports();
+    // This is a request generation, not a DOM ref. Invalidate pending work on cleanup.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, startDate, endDate]);
+    return () => { requestId.current++; };
+  }, [fetchReports]);
 
   useEffect(() => {
     const onTimeSaved = () => {
@@ -159,8 +190,7 @@ export function ReportsPageClient() {
     };
     window.addEventListener("sowledger:time-saved", onTimeSaved);
     return () => window.removeEventListener("sowledger:time-saved", onTimeSaved);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, startDate, endDate]);
+  }, [fetchReports]);
 
   const utilizationLabel = useMemo(() => {
     if (!data || data.utilization == null) return "No plan yet";
@@ -168,13 +198,16 @@ export function ReportsPageClient() {
   }, [data]);
 
   function exportAnalytics() {
+    if (range.error || loading || !data) return;
     if (scope !== "team") {
       toast.error("CSV export unavailable for personal analytics", {
         description: "Use team analytics or the Exports page person filter so exported data matches the visible scope.",
       });
       return;
     }
-    const query = new URLSearchParams({ format: "csv", scope, start: startDate, end: endDate, include: "projects,timeEntries,users,schedule" });
+    const query = new URLSearchParams({ format: "csv", scope, include: "projects,timeEntries,users,schedule" });
+    if (range.start) query.set("start", range.start);
+    if (range.end) query.set("end", range.end);
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = `/api/export/csv?${query.toString()}`;
   }
@@ -185,7 +218,6 @@ export function ReportsPageClient() {
     <>
       <AppPageShell>
         <AppPageHeader
-          eyebrow="Analytics"
           title="Analytics"
           description="Compare planned and logged time, see where the hours went, and review work before invoicing."
           icon={LineChart}
@@ -204,7 +236,7 @@ export function ReportsPageClient() {
           primaryAction={(
             <button
               onClick={exportAnalytics}
-              disabled={!data || analyticsExportUnavailable}
+              disabled={!data || loading || Boolean(range.error) || analyticsExportUnavailable}
               title={analyticsExportUnavailable ? "CSV export is available from team analytics or the Exports page person filter." : "Export visible team analytics to CSV"}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:w-auto"
             >
@@ -222,23 +254,30 @@ export function ReportsPageClient() {
               <button
                 key={option}
                 onClick={() => setScope(option)}
+                aria-pressed={scope === option}
                 className={`flex-1 rounded-full px-4 py-2 text-sm font-bold capitalize transition sm:flex-none ${scope === option ? "bg-slate-950 text-white shadow-sm" : "text-slate-500 hover:text-slate-950"}`}
               >
                 {option === "mine" ? "My analytics" : "Team analytics"}
               </button>
             ))}
           </div>
-          <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+          <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 sm:pb-2.5">
               <CalendarIcon className="h-4 w-4" />
               Date range
             </div>
-            <input type="date" title="Start Date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" />
-            <span className="hidden text-slate-400 sm:inline">to</span>
-            <input type="date" title="End Date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500" />
+            <label className="min-w-0 space-y-1 text-xs font-semibold text-slate-600">Start date
+              <input type="date" title="Start Date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="block h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal outline-none focus:border-cyan-500" />
+            </label>
+            <label className="min-w-0 space-y-1 text-xs font-semibold text-slate-600">End date
+              <input type="date" title="End Date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="block h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal outline-none focus:border-cyan-500" />
+            </label>
           </div>
         </section>
+        <p className="text-xs leading-5 text-slate-500">Dates use your browser timezone ({timeZone}). Logged totals include entries that start in this range; overnight entries stay with their start day. Planned hours include only the time inside the range.</p>
+        {range.error && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{range.error}</p>}
 
+        {!range.error && <>
         <RevenueIntelligenceSection
           intelligence={intelligence}
           loading={intelligenceLoading}
@@ -370,6 +409,7 @@ export function ReportsPageClient() {
             </section>
           </motion.div>
         )}
+        </>}
       </AppPageShell>
       <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} onSaved={fetchReports} />
     </>

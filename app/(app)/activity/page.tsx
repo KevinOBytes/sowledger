@@ -234,6 +234,7 @@ export default function ActivityPage() {
         />
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Activity filters">
+          <p className="mb-3 text-xs text-slate-500">Dates use your browser’s local time. Entries appear on the day they started, including work that continued past midnight.</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm font-semibold text-slate-700">From date<input type="date" value={fromDate} onChange={(event) => { setFromDate(event.target.value); setPage(0); }} className="mt-1 h-11 w-full min-w-0 rounded-xl border border-slate-200 px-3 font-normal" /></label>
             <label className="text-sm font-semibold text-slate-700">To date<input type="date" value={toDate} onChange={(event) => { setToDate(event.target.value); setPage(0); }} className="mt-1 h-11 w-full min-w-0 rounded-xl border border-slate-200 px-3 font-normal" /></label>

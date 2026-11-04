@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
+import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { auditLogs, users, timeEntries } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
+import { workflowErrorResponse } from "@/lib/workflow-validation";
 
 export async function GET(req: NextRequest) {
   try {
     const session = await requireSession();
+    // Audit diffs can contain complete invoice proof snapshots. Client access
+    // stays on the entitlement-checked client endpoints, not this team feed.
+    requireRole("member", session.role);
     const projectId = req.nextUrl.searchParams.get("projectId");
 
     const baseQuery = db.select({
@@ -22,18 +26,22 @@ export async function GET(req: NextRequest) {
     })
     .from(auditLogs)
     .leftJoin(users, eq(users.id, auditLogs.actorUserId))
-    .leftJoin(timeEntries, eq(timeEntries.id, auditLogs.timeEntryId));
+    .leftJoin(timeEntries, and(eq(timeEntries.id, auditLogs.timeEntryId), eq(timeEntries.workspaceId, session.workspaceId)));
 
-    const condition = projectId 
-      ? and(eq(auditLogs.workspaceId, session.workspaceId), eq(timeEntries.projectId, projectId))
-      : eq(auditLogs.workspaceId, session.workspaceId);
+    // Ownership follows the target entry, not the actor who made a change.
+    // The WHERE owner predicate also excludes audits without a scoped entry.
+    const condition = and(
+      eq(auditLogs.workspaceId, session.workspaceId),
+      session.role === "member" ? eq(timeEntries.userId, session.sub) : undefined,
+      projectId ? eq(timeEntries.projectId, projectId) : undefined,
+    );
 
     const results = await baseQuery.where(condition).orderBy(desc(auditLogs.createdAt)).limit(50);
 
     const activities = results.map(row => ({
       id: row.id,
       eventType: row.eventType,
-      diff: row.diff,
+      diff: session.role === "member" ? {} : row.diff,
       createdAt: row.createdAt,
       actor: {
         name: row.actorDisplayName || row.actorEmail || "Unknown User",
@@ -47,6 +55,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, activities });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 401 });
+    return workflowErrorResponse(error, "Could not load activity. Please try again.");
   }
 }

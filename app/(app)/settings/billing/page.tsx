@@ -20,6 +20,9 @@ type BillingData = {
   plan: "free" | "pro" | "smb" | "enterprise";
   storedPlan?: "free" | "pro" | "smb" | "enterprise";
   planSource?: "stripe" | "internal";
+  billingStatus?: string;
+  graceEndsAt?: string | null;
+  graceExpired?: boolean;
   hasStripeCustomer: boolean;
   isOwner: boolean;
   usage: { members: number; projects: number };
@@ -135,13 +138,25 @@ export default function BillingPage() {
                 <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">Business access</span>
               )}
               <Link href="/settings" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700">Settings</Link>
-              {data.isOwner && data.hasStripeCustomer && data.plan !== "free" && (
+              {data.isOwner && data.hasStripeCustomer && (
                 <button onClick={handlePortal} disabled={processing === "portal"} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
                   {processing === "portal" ? "Opening..." : "Manage subscription"}
                 </button>
               )}
             </div>
           </div>
+          {data.billingStatus === "reconciliation_pending" ? (
+            <div role="status" className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">Stripe payment verification is still in progress. {data.planSource === "internal" ? "Your internal Business access remains available." : "Paid access is temporarily unavailable while we check your billing status."}</p>
+              <p className="mt-1">Your workspace data hasn&apos;t been deleted. {data.isOwner ? "Use Manage subscription to review your Stripe billing details." : "Your workspace owner can review the Stripe billing details."}</p>
+            </div>
+          ) : (data.billingStatus === "grace" || data.graceExpired || data.billingStatus === "past_due" || data.billingStatus === "unpaid" || data.billingStatus === "payment_required") && (
+            <div role="status" className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">{data.planSource === "internal" ? "Your Stripe subscription needs payment attention. Your internal Business access remains available." : data.graceExpired ? "Your seven-day renewal grace period has expired." : data.billingStatus === "grace" ? "Your renewal payment failed. Paid access continues during your seven-day grace period." : "Your subscription needs a successful payment to restore paid access."}</p>
+              {data.graceEndsAt && <p className="mt-1">{data.planSource === "internal" ? data.graceExpired ? "Stripe renewal grace ended" : "Stripe renewal grace ends" : data.graceExpired ? "Paid access ended" : "Paid access ends"} at <time dateTime={data.graceEndsAt}>{new Date(data.graceEndsAt).toLocaleString(undefined, { dateStyle: "long", timeStyle: "long" })}</time>.</p>}
+              <p className="mt-1">Your workspace data hasn&apos;t been deleted. {data.isOwner ? <>Use Manage subscription to review the unpaid invoice and payment method.{data.planSource !== "internal" && " Paid access returns after Stripe confirms the required payment."}</> : "Ask your workspace owner to review the unpaid invoice in billing."}</p>
+            </div>
+          )}
           {checkoutNotice && (
             <div className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${checkoutNotice === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
               {checkoutNotice === "success" ? "You have returned from checkout. Your plan will update once Stripe confirms the subscription." : "Checkout was canceled. You can choose a plan again when you are ready."}

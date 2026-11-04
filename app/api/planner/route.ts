@@ -1,3 +1,4 @@
+import { workflowErrorResponse } from "@/lib/workflow-validation";
 import { NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -38,8 +39,6 @@ export async function GET() {
       goals: workspaceGoals,
     });
   } catch (error) {
-    const err = error as Record<string, unknown>;
-    const status = err.code === "FORBIDDEN" || err.status === 403 ? 403 : 401;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't load your plan. Please try again.", { route: "/api/planner", method: "GET" });
   }
 }

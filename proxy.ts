@@ -45,6 +45,16 @@ const RATE_LIMIT_RULES: RateLimitRule[] = [
 
 const memoryCounters = new Map<string, { count: number; resetAt: number }>();
 
+// Increment and expiry must be one operation. Repair older counters whose
+// separate expiry request failed, without extending an existing fixed window.
+const INCREMENT_WITH_EXPIRY = `
+local count = redis.call("INCR", KEYS[1])
+if count == 1 or redis.call("TTL", KEYS[1]) < 0 then
+  redis.call("EXPIRE", KEYS[1], ARGV[1])
+end
+return count
+`;
+
 function addSecurityHeaders(response: NextResponse) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
@@ -59,16 +69,19 @@ async function incrementWithUpstash(key: string, windowSeconds: number) {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   if (!url || !token) return null;
 
-  const safeKey = encodeURIComponent(key);
-  const headers = { Authorization: `Bearer ${token}` };
-  const response = await fetch(`${url.replace(/\/$/, "")}/incr/${safeKey}`, { headers, cache: "no-store" });
+  const response = await fetch(url.replace(/\/$/, ""), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(["EVAL", INCREMENT_WITH_EXPIRY, 1, key, windowSeconds]),
+    cache: "no-store",
+  });
   if (!response.ok) throw new Error("Rate limit store unavailable");
-  const data = await response.json() as { result?: number };
-  const count = Number(data.result ?? 1);
-  if (count === 1) {
-    await fetch(`${url.replace(/\/$/, "")}/expire/${safeKey}/${windowSeconds}`, { headers, cache: "no-store" }).catch(() => null);
+  const data: unknown = await response.json();
+  if (!data || typeof data !== "object" || "error" in data || !("result" in data) ||
+    typeof data.result !== "number" || !Number.isSafeInteger(data.result) || data.result < 1) {
+    throw new Error("Rate limit store returned an invalid count");
   }
-  return count;
+  return data.result;
 }
 
 function incrementInMemory(key: string, windowSeconds: number) {

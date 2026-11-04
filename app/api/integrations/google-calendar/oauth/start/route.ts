@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { integrationErrorResponse } from "@/lib/integrations/errors";
 
 import { requireRole, requireSession } from "@/lib/auth";
 import { createIntegrationOAuthState } from "@/lib/integrations/oauth-state";
@@ -12,7 +13,6 @@ export async function GET() {
     const state = createIntegrationOAuthState({ provider: "google_calendar", workspaceId: session.workspaceId, userId: session.sub, returnTo: "/integrations" });
     return NextResponse.redirect(buildGoogleCalendarAuthUrl(state));
   } catch (error) {
-    const err = error as { status?: number };
-    return NextResponse.json({ error: (error as Error).message }, { status: err.status ?? 400 });
+    return integrationErrorResponse(error, "We couldn't start Google Calendar setup. Please try again.", { route: "/api/integrations/google-calendar/oauth/start", method: "GET" });
   }
 }

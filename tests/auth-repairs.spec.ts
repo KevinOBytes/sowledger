@@ -7,7 +7,7 @@ import { GET as testLogin } from "../app/api/test/login/route";
 import { consumeMagicLink, createMagicLink, generatedWorkspaceSlug, inviteUser } from "../lib/auth";
 import { getAppOrigin } from "../lib/app-url";
 import { db } from "../lib/db";
-import { invitations, magicLinks, memberships, users } from "../lib/db/schema";
+import { invitations, magicLinks, memberships, users, workspaces } from "../lib/db/schema";
 import { env } from "../lib/env";
 import { ensureMembership, ensureUser, ensureWorkspace } from "../lib/store";
 
@@ -72,6 +72,7 @@ test("a failed workspace setup rolls back the account and leaves the sign-in lin
   const email = `rollback-${randomUUID()}@example.com`;
   const owner = await ensureUser(`owner-${randomUUID()}@example.com`);
   const workspace = await ensureWorkspace(`rollback-${randomUUID()}`);
+  await db.update(workspaces).set({ plan: "pro" }).where(eq(workspaces.id, workspace.id));
   await ensureMembership(owner.id, workspace.id, "owner");
   const invitation = await inviteUser({ email, workspaceId: workspace.id, role: "member", invitedByUserId: owner.id });
   const token = await createMagicLink(email);

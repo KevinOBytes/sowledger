@@ -162,6 +162,8 @@ test("planned-work review suggestions point to the calendar", async () => {
   const block = {
     id: "past-plan", workspaceId: "review-workspace", userId: "review-person", projectId: null,
     title: "Research", status: "planned", startsAt: "2000-01-01T10:00:00.000Z", endsAt: "2000-01-01T11:00:00.000Z",
+    taskId: null, actionId: null, linkedTimeEntryId: null, notes: null, tags: [], reminderSentAt: null,
+    createdByUserId: "review-person", createdAt: "2000-01-01T09:00:00.000Z", updatedAt: "2000-01-01T09:00:00.000Z",
   };
   const bundle = await build({
     absWorkingDir: root,
@@ -175,10 +177,16 @@ test("planned-work review suggestions point to the calendar", async () => {
       setup(builder) {
         builder.onResolve({ filter: /^@\/lib\/db(?:\/ensure-workspace-schema)?$/ }, (args) => ({ path: args.path, namespace: "review-fixture" }));
         builder.onLoad({ filter: /.*/, namespace: "review-fixture" }, (args) => ({
+          resolveDir: root,
           contents: args.path.endsWith("ensure-workspace-schema")
             ? "export async function ensureWorkspaceSchema() {}"
-            : `const results = ${JSON.stringify([[], [], [], [block]])};
-export const db = { select() { return { from() { return { async where() { if (!results.length) throw new Error("Unexpected database read"); return results.shift(); } }; } }; } };`,
+            : `import { getTableName } from "drizzle-orm";
+const results = ${JSON.stringify({ projects: [], time_entries: [], invoices: [], scheduled_work_blocks: [block], integration_sync_records: [] })};
+export const db = { select() { return { from(table) {
+  const name = getTableName(table);
+  if (!Object.hasOwn(results, name)) throw new Error("Unexpected database read: " + name);
+  return { async where() { return structuredClone(results[name]); } };
+} }; } };`,
           loader: "js",
         }));
       },

@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, Workflow } from "lucide-react";
+import { ArrowRight, FileText } from "lucide-react";
 import Link from "next/link";
 import type { InvoiceExample } from "@/lib/content/industries";
 
@@ -26,8 +26,7 @@ export function HeroSection({
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center lg:gap-10">
       <div className="@container min-w-0 max-w-3xl">
-        <p className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-surface/90 px-4 py-1.5 text-sm font-bold text-cyan-800 shadow-sm">
-          <Workflow className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <p className="text-sm font-semibold text-cyan-800">
           {label}
         </p>
         {/* Scale with the text column, including when the desktop grid narrows it. */}

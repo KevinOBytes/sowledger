@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, lt } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
@@ -19,6 +19,8 @@ import {
   workspaceTags as workspaceTagsTable,
 } from "@/lib/db/schema";
 import { toCsv } from "@/lib/security";
+import { parseDateRange } from "@/lib/date-input";
+import { exposeFinancialRows, lockInvoiceLifecycle } from "@/lib/invoice-lifecycle";
 
 export type ExportFilters = {
   projectId?: string | null;
@@ -34,31 +36,30 @@ export type ExportFilters = {
 type TimeEntryStatus = "draft" | "submitted" | "approved" | "invoiced";
 type TimeEntrySource = "web" | "calendar" | "manual";
 
-function parseDate(value?: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function parseEndDate(value?: string | null) {
-  const date = parseDate(value);
-  if (!date) return null;
-  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) date.setDate(date.getDate() + 1);
-  return date;
-}
-
 function includedSet(include?: string | null) {
   if (!include || include === "all") return null;
   return new Set(include.split(",").map((item) => item.trim()).filter(Boolean));
 }
 
-export async function loadExportData(workspaceId: string, filters: ExportFilters = {}) {
+export async function loadExportData(workspaceId: string, filters: ExportFilters = {}, exposure: { actorUserId: string; format: "csv" | "json" } = { actorUserId: "export", format: "json" }) {
+  return db.transaction(async tx => {
+    await lockInvoiceLifecycle(tx, workspaceId);
+    const data = await readExportData(workspaceId, filters, tx);
+    // CSV exports only time rows. JSON may also contain invoice snapshots in audits.
+    const auditIds = exposure.format === "json" ? data.auditLogs.map(row => row.timeEntryId) : [];
+    await exposeFinancialRows(tx, workspaceId, exposure.actorUserId,
+      exposure.format === "json" ? [...data.invoices.map(row => row.id), ...auditIds] : [],
+      [...data.timeEntries.map(row => row.id), ...auditIds], "Financial data export");
+    return data;
+  }, { isolationLevel: "repeatable read" });
+}
+
+async function readExportData(workspaceId: string, filters: ExportFilters, db: Pick<typeof import("@/lib/db").db, "select">) {
   await ensureWorkspaceSchema();
 
   const include = includedSet(filters.include);
   const wants = (key: string) => !include || include.has(key);
-  const start = parseDate(filters.start);
-  const end = parseEndDate(filters.end);
+  const { start, end } = parseDateRange(filters.start, filters.end);
 
   const timeFilters = [eq(timeEntries.workspaceId, workspaceId)];
   if (filters.projectId) timeFilters.push(eq(timeEntries.projectId, filters.projectId));
@@ -81,7 +82,7 @@ export async function loadExportData(workspaceId: string, filters: ExportFilters
   const scheduleFilters = [eq(scheduledWorkBlocks.workspaceId, workspaceId)];
   if (filters.projectId) scheduleFilters.push(eq(scheduledWorkBlocks.projectId, filters.projectId));
   if (filters.userId) scheduleFilters.push(eq(scheduledWorkBlocks.userId, filters.userId));
-  if (start) scheduleFilters.push(gte(scheduledWorkBlocks.startsAt, start));
+  if (start) scheduleFilters.push(gt(scheduledWorkBlocks.endsAt, start));
   if (end) scheduleFilters.push(lt(scheduledWorkBlocks.startsAt, end));
 
   const [workspace] = wants("workspace") ? await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)) : [null];
@@ -95,7 +96,9 @@ export async function loadExportData(workspaceId: string, filters: ExportFilters
   const workspaceInvoices = wants("invoices") ? await db.select().from(invoices).where(eq(invoices.workspaceId, workspaceId)) : [];
   const workspaceAuditLogs = wants("auditLogs") ? await db.select().from(auditLogs).where(eq(auditLogs.workspaceId, workspaceId)) : [];
   const workspaceApiRequests = wants("apiUsage") ? await db.select().from(apiKeyRequests).where(eq(apiKeyRequests.workspaceId, workspaceId)) : [];
-  const workspaceMemberships = wants("memberships") ? await db.select().from(memberships).where(eq(memberships.workspaceId, workspaceId)) : [];
+  // Users are independently selectable, but their workspace boundary comes
+  // from memberships. Load that boundary without exporting an unselected set.
+  const workspaceMemberships = wants("memberships") || wants("users") ? await db.select().from(memberships).where(eq(memberships.workspaceId, workspaceId)) : [];
   const memberIds = workspaceMemberships.map((membership) => membership.userId);
   const workspaceUsers = wants("users") && memberIds.length > 0 ? await db.select().from(users).where(inArray(users.id, memberIds)) : [];
 
@@ -104,7 +107,7 @@ export async function loadExportData(workspaceId: string, filters: ExportFilters
     filters,
     workspace,
     users: workspaceUsers,
-    memberships: workspaceMemberships,
+    memberships: wants("memberships") ? workspaceMemberships : [],
     clients: workspaceClients,
     projects: workspaceProjects,
     projectTasks: workspaceTasks,

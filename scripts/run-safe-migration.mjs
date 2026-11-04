@@ -6,10 +6,19 @@ import process from "node:process";
 import { Client } from "pg";
 import { config as loadEnv } from "dotenv";
 
-loadEnv();
+// The disposable launcher supplies the only approved URL and deliberately
+// strips runtime/provider secrets. Never repopulate them from a local env file.
+if (process.env.SOWLEDGER_TEST_DATABASE !== "true") loadEnv();
 
-const migrationFile = resolve(process.argv[2] || "db/migrations/0003_product_completion.sql");
-const migrationId = process.argv[3] || migrationFile.split("/").at(-1)?.replace(/\.sql$/, "") || "manual";
+const args = process.argv.slice(2);
+const positional = args.filter((arg) => !arg.startsWith("--"));
+if (args.some((arg) => arg.startsWith("--") && arg !== "--dry-run") || positional.length > 2) {
+  console.error("Usage: npm run db:migrate:product -- [migration.sql] [migration-id] [--dry-run]");
+  process.exit(1);
+}
+const dryRun = args.includes("--dry-run");
+const migrationFile = resolve(positional[0] || "db/migrations/0003_product_completion.sql");
+const migrationId = positional[1] || migrationFile.split("/").at(-1)?.replace(/\.sql$/, "") || "manual";
 const databaseUrl = process.env.DATABASE_MIGRATION_URL;
 const databaseSchema = "sowledger";
 const journalSchema = "sowledger_migrations";
@@ -108,6 +117,10 @@ try {
     console.log(`Catalog schema snapshot written to ${catalogPath}`);
   }
 
+  await client.query("BEGIN");
+  inTransaction = true;
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('sowledger-schema-migrations'))");
+
   // The destination database is shared. Create and inspect only SOWLedger's
   // namespaces; never grant or alter privileges on another application's schema.
   await client.query(`CREATE SCHEMA IF NOT EXISTS ${databaseSchema}`);
@@ -122,9 +135,6 @@ try {
     throw new Error(`Migration role must have USAGE and CREATE on the ${databaseSchema} schema.`);
   }
 
-  await client.query("BEGIN");
-  inTransaction = true;
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('sowledger-schema-migrations'))");
   await client.query(`SET LOCAL search_path TO ${databaseSchema}, pg_catalog`);
   await client.query(`
     CREATE TABLE IF NOT EXISTS ${journalSchema}.schema_migrations (
@@ -136,7 +146,7 @@ try {
 
   const existing = await client.query(`SELECT checksum FROM ${journalSchema}.schema_migrations WHERE version = $1`, [migrationId]);
   if (existing.rowCount && existing.rows[0].checksum === checksum) {
-    await client.query("COMMIT");
+    await client.query(dryRun ? "ROLLBACK" : "COMMIT");
     inTransaction = false;
     console.log(`Migration ${migrationId} already applied; checksum matches.`);
   } else {
@@ -146,9 +156,9 @@ try {
 
     await client.query(sql);
     await client.query(`INSERT INTO ${journalSchema}.schema_migrations (version, checksum) VALUES ($1, $2)`, [migrationId, checksum]);
-    await client.query("COMMIT");
+    await client.query(dryRun ? "ROLLBACK" : "COMMIT");
     inTransaction = false;
-    console.log(`Migration ${migrationId} applied successfully.`);
+    console.log(dryRun ? `Migration ${migrationId} dry-run succeeded; all database changes rolled back.` : `Migration ${migrationId} applied successfully.`);
   }
 } catch (error) {
   if (inTransaction) await client.query("ROLLBACK").catch(() => null);

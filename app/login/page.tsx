@@ -16,8 +16,10 @@ export default function LoginPage() {
     const linkError = params.get("error");
     if (!linkError) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setError(linkError === "service_unavailable"
-      ? "We couldn't finish signing you in. Try the link in your email again in a moment."
+    setError(linkError === "workspace_full"
+      ? "This workspace is at its member limit. Ask the workspace owner to choose a larger plan, then try the same invitation again."
+      : linkError === "service_unavailable"
+        ? "We couldn't finish signing you in. Try the link in your email again in a moment."
       : linkError.includes("invitation") || linkError.includes("invited")
         ? "This invitation is no longer available. Ask your workspace owner for a new one."
         : "This sign-in link is missing, expired, or already used. Enter your email for a new one.");

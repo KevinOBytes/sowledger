@@ -1,4 +1,4 @@
-import { requireSession } from "@/lib/auth";
+import { requireTeamPageSession } from "@/lib/team-page-session";
 import { db } from "@/lib/db";
 import { projects as projectsTable } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -12,7 +12,7 @@ import Link from "next/link";
 import { ChevronLeft, Activity, LayoutDashboard, Archive, LayoutList } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ projectId: string }> }) {
-  const session = await requireSession();
+  const session = await requireTeamPageSession();
   const { projectId } = await params;
   const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.workspaceId, session.workspaceId)));
   return { title: project ? `${project.name} – SOWLedger` : "Project – SOWLedger" };
@@ -25,7 +25,7 @@ export default async function ProjectBoardPage({
   params: Promise<{ projectId: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const session = await requireSession();
+  const session = await requireTeamPageSession();
   const { projectId } = await params;
   const { tab = "board" } = await searchParams;
   

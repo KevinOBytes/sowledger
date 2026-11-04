@@ -3,18 +3,10 @@ import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { clients, projects } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
+import { createWorkspaceProject } from "@/lib/project-creation";
+import { deleteUnusedWorkspaceProject, updateWorkspaceProject } from "@/lib/project-history";
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { eq, and } from "drizzle-orm";
-
-function getErrorStatus(error: unknown, fallback = 500): number {
-  const err: unknown = error;
-  if (err && ((err as Record<string, unknown>).code === "FORBIDDEN" || (err as Record<string, unknown>).status === 403 || (err as Record<string, unknown>).message === "Forbidden")) {
-    return 403;
-  }
-  if (err && ((err as Record<string, unknown>).code === "UNAUTHORIZED" || (err as Record<string, unknown>).status === 401)) {
-    return 401;
-  }
-  return fallback;
-}
 
 export async function GET() {
   try {
@@ -25,7 +17,7 @@ export async function GET() {
     const data = await db.select().from(projects).where(eq(projects.workspaceId, session.workspaceId));
     return NextResponse.json({ ok: true, projects: data });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't load your projects. Please try again.", { route: "/api/projects", method: "GET" });
   }
 }
 
@@ -35,7 +27,7 @@ export async function POST(req: NextRequest) {
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as {
+    const body = await readRequestJson(req) as {
       name?: string;
       billingModel?: "hourly" | "fixed_fee" | "hybrid";
       percentComplete?: number;
@@ -50,16 +42,11 @@ export async function POST(req: NextRequest) {
       endDate?: string;
       isPrivate?: boolean;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
 
     const normalizedName = body.name?.trim();
     if (!normalizedName) return NextResponse.json({ error: "name is required" }, { status: 400 });
     if (normalizedName.length > 120) return NextResponse.json({ error: "name must be 120 chars or fewer" }, { status: 400 });
-
-    const { checkWorkspaceLimits } = await import("@/lib/billing");
-    const limits = await checkWorkspaceLimits(session.workspaceId, "projects");
-    if (!limits.allowed) {
-      return NextResponse.json({ error: limits.error }, { status: 402 }); // 402 Payment Required
-    }
 
     if (body.clientId) {
       const [client] = await db
@@ -87,10 +74,11 @@ export async function POST(req: NextRequest) {
       percentComplete: Math.max(0, Math.min(100, body.percentComplete ?? 0)),
     };
 
-    const [project] = await db.insert(projects).values(newProject).returning();
-    return NextResponse.json({ ok: true, project });
+    const result = await createWorkspaceProject(newProject);
+    if (!result.allowed) return NextResponse.json({ error: result.error }, { status: 402 });
+    return NextResponse.json({ ok: true, project: result.project });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the project was created. Check your project list before trying again.", { route: "/api/projects", method: "POST" });
   }
 }
 
@@ -100,7 +88,7 @@ export async function PATCH(req: NextRequest) {
     requireRole("manager", session.role);
     await ensureWorkspaceSchema();
 
-    const body = await req.json() as {
+    const body = await readRequestJson(req) as {
       projectId?: string;
       name?: string;
       clientId?: string;
@@ -117,6 +105,7 @@ export async function PATCH(req: NextRequest) {
       status?: "active" | "archived";
       percentComplete?: number;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
 
     if (!body.projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
 
@@ -158,10 +147,10 @@ export async function PATCH(req: NextRequest) {
     if (body.status !== undefined) updates.status = body.status;
     if (body.percentComplete !== undefined) updates.percentComplete = Math.max(0, Math.min(100, body.percentComplete));
 
-    const [project] = await db.update(projects).set(updates).where(and(eq(projects.id, body.projectId), eq(projects.workspaceId, session.workspaceId))).returning();
+    const project = await updateWorkspaceProject(session.workspaceId, body.projectId, updates);
     return NextResponse.json({ ok: true, project });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "Could not update the project. Please try again.", { route: "/api/projects", method: "PATCH" });
   }
 }
 
@@ -174,20 +163,10 @@ export async function DELETE(req: NextRequest) {
     const projectId = req.nextUrl.searchParams.get("projectId");
     if (!projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
 
-    const [existing] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.workspaceId, session.workspaceId)));
-    if (!existing) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
-
-    const { timeEntries, goals } = await import("@/lib/db/schema");
-    await db.transaction(async (tx) => {
-      await tx.update(timeEntries).set({ projectId: null }).where(and(eq(timeEntries.workspaceId, session.workspaceId), eq(timeEntries.projectId, projectId!)));
-      await tx.update(goals).set({ projectId: null }).where(and(eq(goals.workspaceId, session.workspaceId), eq(goals.projectId, projectId!)));
-      await tx.delete(projects).where(and(eq(projects.id, projectId!), eq(projects.workspaceId, session.workspaceId)));
-    });
+    await deleteUnusedWorkspaceProject(session.workspaceId, projectId);
 
     return NextResponse.json({ ok: true, deletedProjectId: projectId });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getErrorStatus(error) });
+    return workflowErrorResponse(error, "Could not delete the project. Please try again.");
   }
 }

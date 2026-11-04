@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { AppEmptyState, AppMetricCard, AppPageHeader, AppPageShell, AppWorkflowRail } from "@/components/app-page-shell";
 import { ManualTimeDialog } from "@/components/manual-time-dialog";
+import { localDateKey, localDateTimeValue, parseLocalDateTime } from "@/lib/date-input";
 import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
 
 type Project = { id: string; name: string };
@@ -35,6 +36,9 @@ type ScheduledBlock = {
   startsAt: string;
   endsAt: string;
   status: "planned" | "in_progress" | "completed" | "skipped" | "canceled";
+  linkedTimeEntryId?: string | null;
+  hasRecordedTime?: boolean;
+  isImported?: boolean;
   createdAt?: string;
 };
 type StopTimerResponse = {
@@ -68,16 +72,9 @@ function fmt(seconds: number) {
 function timeRange(block: ScheduledBlock) {
   const start = new Date(block.startsAt);
   const end = new Date(block.endsAt);
-  return `${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
-}
-
-function toLocalInput(date: Date) {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const hh = String(date.getHours()).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  const dateLabel = (date: Date) => date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const timeLabel = (date: Date) => date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${dateLabel(start)} · ${timeLabel(start)} – ${localDateKey(start) === localDateKey(end) ? "" : `${dateLabel(end)} · `}${timeLabel(end)}`;
 }
 
 export function TimerDashboard() {
@@ -95,8 +92,9 @@ export function TimerDashboard() {
   const [selectedBlock, setSelectedBlock] = useState<ScheduledBlock | null>(null);
   const [planningOpen, setPlanningOpen] = useState(false);
   const [planTitle, setPlanTitle] = useState("Focused work block");
-  const [planStart, setPlanStart] = useState(() => toLocalInput(new Date(Date.now() + 30 * 60 * 1000)));
-  const [planEnd, setPlanEnd] = useState(() => toLocalInput(new Date(Date.now() + 90 * 60 * 1000)));
+  const [planStart, setPlanStart] = useState(() => localDateTimeValue(new Date(Date.now() + 30 * 60 * 1000)));
+  const [planEnd, setPlanEnd] = useState(() => localDateTimeValue(new Date(Date.now() + 90 * 60 * 1000)));
+  const [timeZone, setTimeZone] = useState("");
   const [onboarding, setOnboarding] = useState<OnboardingProgress>({ completedSteps: [], skippedAt: null, completedAt: null });
   const [startingTimer, setStartingTimer] = useState(false);
   const [creatingPlan, setCreatingPlan] = useState(false);
@@ -106,9 +104,23 @@ export function TimerDashboard() {
   const [scheduleError, setScheduleError] = useState(false);
   const [choicesLoading, setChoicesLoading] = useState(true);
   const [choicesError, setChoicesError] = useState(false);
+  const manualOpenerRef = useRef<HTMLElement | null>(null);
+  const startingTimerRef = useRef(false);
+  const creatingPlanRef = useRef(false);
+  const pendingBlockIdsRef = useRef(new Set<string>());
+  const [pendingBlockIds, setPendingBlockIds] = useState(new Set<string>());
   const refreshSequence = useRef(0);
   const loading = timersLoading || scheduleLoading || choicesLoading;
   const loadError = timersError || scheduleError || choicesError;
+
+  function hasRecordedTime(block: ScheduledBlock) {
+    return block.hasRecordedTime || Boolean(block.linkedTimeEntryId) || block.status === "in_progress" || block.status === "completed"
+      || activeTimers.some(timer => timer.scheduledBlockId === block.id);
+  }
+
+  function unavailable(block: ScheduledBlock) {
+    return block.isImported || isUnavailableScheduledBlock(block);
+  }
 
   function showPlanningForm() {
     setPlanningOpen(true);
@@ -292,6 +304,7 @@ export function TimerDashboard() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
+      setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
       Promise.all([
         refresh(),
         refreshOnboarding(),
@@ -313,9 +326,9 @@ export function TimerDashboard() {
   }, [refresh]);
 
   async function startTimer(block?: ScheduledBlock) {
-    if (startingTimer) return;
-    if (block && isUnavailableScheduledBlock(block)) {
-      toast.error("Unavailable calendar blocks cannot become timers.");
+    if (startingTimerRef.current) return;
+    if (block && (unavailable(block) || hasRecordedTime(block) || block.status !== "planned")) {
+      toast.error("This block cannot start another timer. Review its recorded time or refresh the calendar.");
       return;
     }
 
@@ -339,6 +352,7 @@ export function TimerDashboard() {
       return;
     }
 
+    startingTimerRef.current = true;
     setStartingTimer(true);
     try {
       const response = await fetch("/api/timer/start", {
@@ -358,6 +372,7 @@ export function TimerDashboard() {
     } catch {
       toast.error("Could not start timer", { description: "Check your connection and try again." });
     } finally {
+      startingTimerRef.current = false;
       setStartingTimer(false);
     }
   }
@@ -426,6 +441,13 @@ export function TimerDashboard() {
   }
 
   async function updateBlock(block: ScheduledBlock, updates: Partial<ScheduledBlock>) {
+    if (pendingBlockIdsRef.current.has(block.id)) return false;
+    if (unavailable(block) || hasRecordedTime(block) || block.status !== "planned") {
+      toast.error("This block cannot be moved or skipped. Refresh the calendar to review it.");
+      return false;
+    }
+    pendingBlockIdsRef.current.add(block.id);
+    setPendingBlockIds(new Set(pendingBlockIdsRef.current));
     try {
       const response = await fetch("/api/schedule", {
         method: "PATCH",
@@ -438,32 +460,50 @@ export function TimerDashboard() {
         return false;
       }
       await refresh();
+      window.dispatchEvent(new Event("sowledger:calendar-updated"));
       return true;
     } catch {
       toast.error("Could not update scheduled work", { description: "Check your connection and try again." });
       return false;
+    } finally {
+      pendingBlockIdsRef.current.delete(block.id);
+      setPendingBlockIds(new Set(pendingBlockIdsRef.current));
     }
   }
 
-  async function rescheduleTomorrow(block: ScheduledBlock) {
+  async function rescheduleOneDayLater(block: ScheduledBlock) {
     const start = new Date(block.startsAt);
     const end = new Date(block.endsAt);
+    const startClock = [start.getHours(), start.getMinutes()];
+    const endClock = [end.getHours(), end.getMinutes()];
     start.setDate(start.getDate() + 1);
     end.setDate(end.getDate() + 1);
+    if (start.getHours() !== startClock[0] || start.getMinutes() !== startClock[1] || end.getHours() !== endClock[0] || end.getMinutes() !== endClock[1] || end <= start) {
+      toast.error("The clocks change at that time. Open Calendar to choose a new time.");
+      return;
+    }
     const updated = await updateBlock(block, { startsAt: start.toISOString(), endsAt: end.toISOString() } as Partial<ScheduledBlock>);
-    if (updated) toast.success("Moved to tomorrow");
+    if (updated) toast.success("Moved one day later");
   }
 
   async function createPlan() {
-    if (creatingPlan) return;
+    if (creatingPlanRef.current) return;
 
-    const startsAt = new Date(planStart);
-    const endsAt = new Date(planEnd);
-    if (!planTitle.trim() || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
+    let startsAt: Date;
+    let endsAt: Date;
+    try {
+      startsAt = parseLocalDateTime(planStart);
+      endsAt = parseLocalDateTime(planEnd);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Choose a valid date and time.");
+      return;
+    }
+    if (!planTitle.trim() || endsAt <= startsAt) {
       toast.error("Enter a valid scheduled work block.");
       return;
     }
 
+    creatingPlanRef.current = true;
     setCreatingPlan(true);
     try {
       const response = await fetch("/api/schedule", {
@@ -490,12 +530,14 @@ export function TimerDashboard() {
         setBlocks((current) => [createdBlock, ...current.filter((block) => block.id !== createdBlock.id)].slice(0, 5));
       }
       toast.success("Work scheduled");
+      window.dispatchEvent(new Event("sowledger:calendar-updated"));
       setPlanningOpen(false);
       await completeSetupStep("schedule");
       await refresh();
     } catch {
       toast.error("Could not schedule work", { description: "Check your connection and try again." });
     } finally {
+      creatingPlanRef.current = false;
       setCreatingPlan(false);
     }
   }
@@ -535,7 +577,7 @@ export function TimerDashboard() {
         ]}
         secondaryAction={
           <button
-            onClick={() => { setSelectedBlock(null); setManualOpen(true); }}
+            onClick={(event) => { manualOpenerRef.current = event.currentTarget; setSelectedBlock(null); setManualOpen(true); }}
             className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700"
           >
             Log completed work
@@ -672,6 +714,7 @@ export function TimerDashboard() {
 
           {planningOpen && (
             <div id="dashboard-schedule-form" className="mt-5 scroll-mt-4 rounded-[24px] border border-cyan-100 bg-cyan-50/60 p-4">
+              <p className="mb-3 text-xs text-slate-600">Dates and times use your browser timezone: {timeZone}. When an hour repeats, new times use its first occurrence.</p>
               <div className="mb-3 flex items-center justify-between gap-3"><h3 className="font-semibold">Schedule work</h3><button type="button" onClick={() => setPlanningOpen(false)} className="text-sm font-semibold text-slate-600">Close schedule form</button></div>
               <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
                 <label className="min-w-0 text-sm font-semibold text-slate-700">
@@ -698,6 +741,7 @@ export function TimerDashboard() {
               <p className="text-sm font-semibold text-slate-500">Upcoming work</p>
               <h2 className="mt-1 text-xl font-semibold text-slate-950">Up next</h2>
               <p className="mt-1 text-sm text-slate-500">Start a timer or log time for your next planned task.</p>
+              {timeZone && <p className="mt-1 text-xs text-slate-500">Times in {timeZone}.</p>}
             </div>
             <button
               onClick={showPlanningForm}
@@ -725,24 +769,26 @@ export function TimerDashboard() {
                 }
               />
             ) : blocks.map((block) => (
-              <article key={block.id} className={`rounded-2xl border p-4 ${isUnavailableScheduledBlock(block) ? "border-slate-200 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
+              <article key={block.id} className={`rounded-2xl border p-4 ${unavailable(block) ? "border-slate-200 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="break-words font-semibold text-slate-950">{block.title}</p>
                     <p className="mt-1 text-sm text-slate-500">{timeRange(block)}{block.projectId ? ` · ${projectNameById.get(block.projectId) ?? "Project"}` : ""}</p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">{isUnavailableScheduledBlock(block) ? "blocked" : "scheduled"}</span>
+                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">{unavailable(block) ? "blocked" : hasRecordedTime(block) ? "tracked" : "scheduled"}</span>
                 </div>
-                {isUnavailableScheduledBlock(block) ? (
+                {unavailable(block) ? (
                   <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
                     Unavailable time cannot be started or logged as completed work.
                   </div>
+                ) : hasRecordedTime(block) ? (
+                  <p className="mt-4 text-sm text-slate-600">This block already has tracked work. <Link href="/activity" className="font-semibold text-cyan-700 underline">Review recorded time</Link></p>
                 ) : (
                   <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
                     <button onClick={() => startTimer(block)} disabled={startingTimer || timersLoading || timersError} className="min-h-10 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold leading-4 text-white disabled:cursor-not-allowed disabled:opacity-60">Start timer</button>
-                    <button onClick={() => { setSelectedBlock(block); setManualOpen(true); }} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Log completed work</button>
-                    <button onClick={() => rescheduleTomorrow(block)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Tomorrow</button>
-                    <button onClick={() => updateBlock(block, { status: "skipped" })} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Skip</button>
+                    <button onClick={(event) => { manualOpenerRef.current = event.currentTarget; setSelectedBlock(block); setManualOpen(true); }} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700">Log completed work</button>
+                    <button onClick={() => rescheduleOneDayLater(block)} disabled={pendingBlockIds.has(block.id)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700 disabled:opacity-60">One day later</button>
+                    <button onClick={() => updateBlock(block, { status: "skipped" })} disabled={pendingBlockIds.has(block.id)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-4 text-slate-700 disabled:opacity-60">Skip</button>
                   </div>
                 )}
               </article>
@@ -928,10 +974,10 @@ export function TimerDashboard() {
                   if (step.href) {
                     return <Link key={step.id} href={step.href} onClick={() => completeSetupStep(step.id)} className={className}>{content}</Link>;
                   }
-                  return <button key={step.id} onClick={() => {
+                  return <button key={step.id} onClick={(event) => {
                     if (step.action === "schedule") showPlanningForm();
                     if (step.action === "track") void startTimer();
-                    if (step.action === "log") { setSelectedBlock(null); setManualOpen(true); }
+                    if (step.action === "log") { manualOpenerRef.current = event.currentTarget; setSelectedBlock(null); setManualOpen(true); }
                   }} disabled={step.id === "track" && (startingTimer || timersLoading || timersError)} className={className}>{content}</button>;
                 })}
               </div>
@@ -949,7 +995,7 @@ export function TimerDashboard() {
       </details>
 
 
-      <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} scheduledBlock={selectedBlock} onSaved={handleManualSaved} defaultTaskId={taskId} defaultProjectId={projectId} defaultDescription={notes} />
+      <ManualTimeDialog open={manualOpen} onOpenChange={setManualOpen} returnFocusRef={manualOpenerRef} scheduledBlock={selectedBlock} onSaved={handleManualSaved} defaultTaskId={taskId} defaultProjectId={projectId} defaultDescription={notes} />
     </AppPageShell>
   );
 }

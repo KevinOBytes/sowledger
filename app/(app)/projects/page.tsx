@@ -1,4 +1,4 @@
-import { requireSession } from "@/lib/auth";
+import { requireTeamPageSession } from "@/lib/team-page-session";
 import { db } from "@/lib/db";
 import { projects as projectsTable, projectTasks as tasksTable } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
@@ -15,7 +15,7 @@ export default async function ProjectsPage({
 }: {
   searchParams?: Promise<{ client?: string }>;
 }) {
-  const session = await requireSession();
+  const session = await requireTeamPageSession();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const clientFilter = resolvedSearchParams?.client || null;
 

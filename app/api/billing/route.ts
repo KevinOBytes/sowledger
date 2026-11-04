@@ -24,6 +24,9 @@ export async function GET() {
       plan: resolvedPlan.plan,
       storedPlan: ws.plan,
       planSource: resolvedPlan.source,
+      billingStatus: resolvedPlan.billingStatus,
+      graceEndsAt: resolvedPlan.graceEndsAt,
+      graceExpired: resolvedPlan.graceExpired,
       hasStripeCustomer: Boolean(ws.stripeCustomerId),
       isOwner: session.role === "owner",
       usage: {

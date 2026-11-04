@@ -1,4 +1,4 @@
-import { requireSession } from "@/lib/auth";
+import { requireTeamPageSession } from "@/lib/team-page-session";
 import { db } from "@/lib/db";
 import { clients as clientsTable, organizations as organizationsTable, projects as projectsTable, workspacePeople as workspacePeopleTable } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
@@ -10,7 +10,8 @@ import { DataLoadNotice } from "@/components/data-load-notice";
 export const metadata = { title: "Clients - SOWLedger" };
 
 export default async function ClientsPage() {
-  const session = await requireSession();
+  const session = await requireTeamPageSession();
+  const canManageClients = session.role === "owner" || session.role === "manager";
   let clientsData: Array<{ id: string; name: string; email: string | null; status: "active" | "archived" }> = [];
   let projectsData: Array<{ id: string; clientId: string | null }> = [];
   let organizationsData: Array<{ id: string; clientId: string | null }> = [];
@@ -37,7 +38,7 @@ export default async function ClientsPage() {
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Clients</h1>
               <p className="mt-2 max-w-2xl text-sm text-slate-500">Keep client contact details and their projects in one place.</p>
             </div>
-            <CreateClientButton />
+            {canManageClients && <CreateClientButton />}
           </div>
           {!loadError && (
             <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold">
@@ -50,7 +51,7 @@ export default async function ClientsPage() {
         {loadError ? (
           <DataLoadNotice message={loadError} />
         ) : (
-          <ClientsPageClient initialClients={clientsData} projects={projectsData} organizations={organizationsData} people={peopleData} />
+          <ClientsPageClient initialClients={clientsData} projects={projectsData} organizations={organizationsData} people={peopleData} canManageClients={canManageClients} />
         )}
       </div>
     </main>

@@ -27,15 +27,15 @@ export function WorkflowSection({ headline, subhead }: WorkflowSectionProps) {
             {subhead}
           </p>
         </div>
-        <div className="mt-8 divide-y divide-border border-y border-border">
+        <ol className="mt-8 divide-y divide-border border-y border-border">
           {WORKFLOW.map((item, index) => (
-            <div key={item.step} className="grid gap-3 py-5 md:grid-cols-[6rem_18rem_1fr] md:items-center">
-              <p className="font-mono text-xs font-black uppercase tracking-[0.22em] text-cyan-700">0{index + 1}</p>
+            <li key={item.step} className="grid grid-cols-[1.5rem_1fr] gap-x-3 gap-y-2 py-5 md:grid-cols-[1.5rem_18rem_1fr] md:items-center">
+              <span aria-hidden="true" className="text-sm font-semibold text-cyan-700">{index + 1}.</span>
               <h3 className="text-xl font-semibold">{item.step}</h3>
-              <p className="text-sm leading-6 text-slate-600">{item.detail}</p>
-            </div>
+              <p className="col-start-2 text-sm leading-6 text-slate-600 md:col-start-auto">{item.detail}</p>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
     </section>
   );

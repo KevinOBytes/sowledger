@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./helpers/stream-diagnostic-fixture";
+import { finishResponse, mutationResponse } from "./helpers/request-completion";
 import { gotoApp, requestGetApp } from "./helpers/navigation";
 
 const unique = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -243,13 +245,31 @@ test.describe("Operational workflow interface", () => {
     const selection = dialog.getByRole("combobox", { name: "Work type / rate", exact: true });
     await expect(selection).toHaveValue(rate.id);
     await selection.selectOption("");
-    const saved = page.waitForResponse((response) => response.url().endsWith("/api/timer/manual") && response.request().method() === "POST");
+    const initialSetup = await page.request.get("/api/onboarding");
+    expect(initialSetup.status()).toBe(200);
+    const initial = await initialSetup.json();
+    expect(initial.ok).toBe(true);
+    expect(initial.onboarding.completedSteps).not.toContain("log");
+    const saved = page.waitForResponse(mutationResponse(page.url(), "/api/timer/manual", "POST", { actionId: "", scheduledBlockId: block.id }));
+    const setupSaved = page.waitForResponse(mutationResponse(page.url(), "/api/onboarding", "PATCH", { step: "log", skipped: false }));
     await dialog.getByRole("button", { name: "Log time", exact: true }).click();
-    const response = await saved;
+    const [response, setupResponse] = await Promise.all([saved, setupSaved]);
     expect(response.ok()).toBeTruthy();
+    expect(response.status()).toBe(200);
+    await finishResponse(response);
     expect(response.request().postDataJSON()).toMatchObject({ actionId: "", scheduledBlockId: block.id });
     expect((await response.json()).entry).toMatchObject({ action: null, hourlyRate: null, scheduledBlockId: block.id });
     await expect(dialog).toBeHidden();
+    expect(setupResponse.status()).toBe(200);
+    await finishResponse(setupResponse);
+    const completed = await setupResponse.json();
+    expect(completed.ok).toBe(true);
+    expect(completed.onboarding.completedSteps).toContain("log");
+    const readback = await page.request.get("/api/onboarding");
+    expect(readback.status()).toBe(200);
+    const persisted = await readback.json();
+    expect(persisted.ok).toBe(true);
+    expect(persisted.onboarding.completedSteps).toContain("log");
   });
 
   test("Calendar and Activity report failed requests and recover on retry", async ({ page }) => {
@@ -368,11 +388,11 @@ test.describe("Operational workflow interface", () => {
     const startsAt = new Date();
     startsAt.setHours(10, 0, 0, 0);
     const block = { id: "imported-busy-block", userId: session.sub, title: "Imported busy event", projectId: null, taskId: null, actionId: null, notes: null, tags: ["external-calendar", "unavailable"], startsAt: startsAt.toISOString(), endsAt: new Date(startsAt.getTime() + 3600000).toISOString(), status: "planned" };
-    await page.route("**/api/integrations", (route) => route.fulfill({ json: { connections: [{ provider: "google_calendar", status: "connected", displayName: "Test calendar", lastSyncedAt: null, lastError: null }], readiness: { googleCalendarOAuth: true } } }));
+    await page.route("**/api/integrations", (route) => route.fulfill({ json: { canManage: true, connections: [{ provider: "google_calendar", status: "connected", displayName: "Test calendar", lastSyncedAt: null, lastError: null }], readiness: { googleCalendarOAuth: true } } }));
     await page.route("**/api/schedule?scope=team", (route) => route.fulfill({ json: { blocks: imported ? [block] : [] } }));
     await page.route("**/api/integrations/google-calendar/sync", async (route) => {
       imported = true;
-      await route.fulfill({ json: { ok: true, result: { imported: 1 } } });
+      await route.fulfill({ json: { ok: true, result: { exported: 0, imported: 1, updated: 0, canceled: 0, skipped: 0, warnings: [] } } });
     });
     await gotoApp(page, "/calendar");
     await expect(page.locator("[data-calendar-slot]").first()).toBeVisible();

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { integrationErrorResponse } from "@/lib/integrations/errors";
 
 import { requireRole, requireSession } from "@/lib/auth";
 import { testGoogleCalendarConnection } from "@/lib/integrations/google-calendar";
@@ -16,7 +17,6 @@ export async function POST(_req: Request, context: { params: Promise<{ provider:
     else return NextResponse.json({ error: "Unsupported integration provider" }, { status: 400 });
     return NextResponse.json({ ok: true, message: "Connection test succeeded" });
   } catch (error) {
-    const err = error as { status?: number };
-    return NextResponse.json({ error: (error as Error).message }, { status: err.status ?? 400 });
+    return integrationErrorResponse(error, "We couldn't test this integration. Please try again.", { route: "/api/integrations/[provider]/test", method: "POST" });
   }
 }

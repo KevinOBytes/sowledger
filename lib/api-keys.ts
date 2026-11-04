@@ -37,7 +37,11 @@ export type ApiKeyContext = {
   createdByUserId: string;
 };
 
-type ApiKeyAuthError = UnauthorizedError & { apiKeyContext?: ApiKeyContext };
+const apiKeyErrorContexts = new WeakMap<object, ApiKeyContext>();
+
+export function getApiKeyErrorContext(error: unknown): ApiKeyContext | null {
+  return (typeof error === "object" && error !== null) || typeof error === "function" ? apiKeyErrorContexts.get(error) ?? null : null;
+}
 
 function hashInput(rawKey: string) {
   if (env.NODE_ENV === "production" && !env.AUTH_COOKIE_SECRET) {
@@ -85,13 +89,13 @@ export async function authenticateApiKey(req: NextRequest): Promise<ApiKeyContex
     createdByUserId: key.createdByUserId,
   };
   if (key.revokedAt) {
-    const error = new UnauthorizedError("API key revoked") as ApiKeyAuthError;
-    error.apiKeyContext = context;
+    const error = new UnauthorizedError("API key revoked");
+    apiKeyErrorContexts.set(error, context);
     throw error;
   }
   if (key.expiresAt && new Date(key.expiresAt).getTime() <= Date.now()) {
-    const error = new UnauthorizedError("API key expired") as ApiKeyAuthError;
-    error.apiKeyContext = context;
+    const error = new UnauthorizedError("API key expired");
+    apiKeyErrorContexts.set(error, context);
     throw error;
   }
 

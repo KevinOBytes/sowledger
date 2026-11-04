@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { integrationConnections, type IntegrationProvider } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { WorkflowError } from "@/lib/workflow-validation";
+import { IntegrationProviderError, integrationFetch, integrationResponseJson, integrationResponseText, invalidProviderResponse, integrationFailureKind, providerString } from "@/lib/integrations/errors";
 import { validateWebhookUrl } from "@/lib/security";
 import { decryptSecret, encryptSecret } from "@/lib/integrations/crypto";
 import {
@@ -50,7 +52,7 @@ type SlackOAuthResponse = {
 
 export async function exchangeSlackAuthorizationCode(code: string) {
   if (!env.SLACK_CLIENT_ID || !env.SLACK_CLIENT_SECRET) throw new Error("Slack OAuth is not configured");
-  const response = await fetch(SLACK_TOKEN_URL, {
+  const response = await integrationFetch(SLACK_PROVIDER, SLACK_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -61,13 +63,13 @@ export async function exchangeSlackAuthorizationCode(code: string) {
     }),
     cache: "no-store",
   });
-  const data = await response.json() as SlackOAuthResponse;
-  if (!response.ok || !data.ok) throw new Error(data.error || "Slack authorization failed");
-  if (!data.incoming_webhook?.url) throw new Error("Slack did not return an incoming webhook URL");
+  const data = await integrationResponseJson(SLACK_PROVIDER, response) as SlackOAuthResponse;
+  if (data.ok !== true || !usableSlackWebhook(data.incoming_webhook?.url)) throw invalidProviderResponse(SLACK_PROVIDER);
   return data;
 }
 
 export async function storeSlackOAuthConnection(input: { workspaceId: string; userId: string; oauth: SlackOAuthResponse }) {
+  if (input.oauth.ok !== true || !usableSlackWebhook(input.oauth.incoming_webhook?.url)) throw invalidProviderResponse(SLACK_PROVIDER);
   return upsertIntegrationConnection({
     workspaceId: input.workspaceId,
     provider: SLACK_PROVIDER,
@@ -89,7 +91,7 @@ export async function storeSlackOAuthConnection(input: { workspaceId: string; us
 
 export async function storeSlackWebhookConnection(input: { workspaceId: string; userId: string; webhookUrl: string; channelLabel?: string | null }) {
   const url = await validateWebhookUrl(input.webhookUrl);
-  if (!url.startsWith("https://hooks.slack.com/")) throw new Error("Slack webhook URL must start with https://hooks.slack.com/");
+  if (!url.startsWith("https://hooks.slack.com/")) throw new WorkflowError("Slack webhook URL must start with https://hooks.slack.com/", 400);
   return upsertIntegrationConnection({
     workspaceId: input.workspaceId,
     provider: SLACK_PROVIDER,
@@ -106,9 +108,14 @@ export async function storeSlackWebhookConnection(input: { workspaceId: string; 
   });
 }
 
+function usableSlackWebhook(value: unknown) {
+  if (!providerString(value)) return false;
+  try { const url = new URL(value); return url.protocol === "https:" && url.hostname === "hooks.slack.com" && !url.username && !url.password && !url.port && url.pathname !== "/"; } catch { return false; }
+}
+
 function slackWebhookUrl(connection: IntegrationConnection) {
   const url = decryptSecret(connection.credentials.webhookUrl);
-  if (!url) throw new Error("Slack webhook URL is missing. Reconnect Slack.");
+  if (!url) throw new WorkflowError("Slack webhook URL is missing. Reconnect Slack.", 409);
   return url;
 }
 
@@ -117,28 +124,36 @@ function subscribed(connection: IntegrationConnection, eventType: string) {
   return events.length === 0 || events.includes("*") || events.includes(eventType);
 }
 
-export async function sendSlackMessage(connection: IntegrationConnection, text: string, blocks?: unknown[]) {
-  const response = await fetch(slackWebhookUrl(connection), {
+export async function sendSlackMessage(connection: IntegrationConnection, text: string, blocks?: unknown[], signal?: AbortSignal) {
+  const url = slackWebhookUrl(connection);
+  const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000);
+  const response = await integrationFetch(SLACK_PROVIDER, url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, blocks }),
     cache: "no-store",
+    signal: requestSignal,
   });
-  const body = await response.text();
-  if (!response.ok || body.trim() !== "ok") throw new Error(body || `Slack returned ${response.status}`);
-  await markIntegrationSynced(connection);
+  if (!response.ok) throw new IntegrationProviderError(SLACK_PROVIDER, response.status);
+  const body = await integrationResponseText(SLACK_PROVIDER, response, requestSignal);
+  if (body.trim() !== "ok") throw invalidProviderResponse(SLACK_PROVIDER);
+  // Slack has accepted the message already. A local status-write failure must
+  // not turn that acceptance into a false delivery failure and an extra retry.
+  await markIntegrationSynced(connection).catch(() => undefined);
   return true;
 }
 
 export async function testSlackConnection(workspaceId: string) {
   const connection = await getIntegrationConnection(workspaceId, SLACK_PROVIDER);
-  if (!connection || connection.status === "disabled") throw new Error("Slack is not connected");
+  if (!connection || connection.status === "disabled") throw new WorkflowError("Slack is not connected", 404);
   await sendSlackMessage(connection, "SOWLedger Slack alerts are connected.");
 }
 
-export async function notifySlack(workspaceId: string, eventType: string, payload: { title: string; body?: string; url?: string }) {
+export type SlackNotificationResult = { status: "sent" | "failed" | "skipped" };
+
+export async function notifySlack(workspaceId: string, eventType: string, payload: { title: string; body?: string; url?: string }, signal?: AbortSignal): Promise<SlackNotificationResult> {
   const connection = await getIntegrationConnection(workspaceId, SLACK_PROVIDER);
-  if (!connection || connection.status !== "connected" || !subscribed(connection, eventType)) return;
+  if (!connection || !["connected", "error"].includes(connection.status) || !subscribed(connection, eventType)) return { status: "skipped" };
   try {
     await sendSlackMessage(connection, payload.body ? `${payload.title}\n${payload.body}` : payload.title, [
       {
@@ -146,19 +161,22 @@ export async function notifySlack(workspaceId: string, eventType: string, payloa
         text: { type: "mrkdwn", text: `*${payload.title}*${payload.body ? `\n${payload.body}` : ""}` },
       },
       ...(payload.url ? [{ type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "Open in SOWLedger" }, url: payload.url }] }] : []),
-    ]);
+    ], signal);
+    return { status: "sent" };
   } catch (error) {
-    await markIntegrationError(connection, error instanceof Error ? error.message : "Slack notification failed");
+    await markIntegrationError(connection, integrationFailureKind(error)).catch(() => undefined);
+    return { status: "failed" };
   }
 }
 
 export async function updateSlackConfig(workspaceId: string, events: string[]) {
   const connection = await getIntegrationConnection(workspaceId, SLACK_PROVIDER);
-  if (!connection) throw new Error("Slack is not connected");
+  if (!connection || connection.status === "disabled") throw new WorkflowError("Slack is not connected", 404);
   const [updated] = await db
     .update(integrationConnections)
     .set({ config: { ...connection.config, events }, updatedAt: new Date(), lastError: null })
     .where(and(eq(integrationConnections.id, connection.id), eq(integrationConnections.workspaceId, workspaceId)))
     .returning();
+  if (!updated) throw new Error("Slack configuration update was not confirmed.");
   return updated;
 }
