@@ -1,6 +1,6 @@
 import { Building2, MailPlus, Users } from "lucide-react";
 
-import { requireSession } from "@/lib/auth";
+import { requireTeamPageSession } from "@/lib/team-page-session";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { listWorkspacePeopleDirectory } from "@/lib/people-directory";
 
@@ -13,7 +13,7 @@ export default async function PeoplePage({
 }: {
   searchParams?: Promise<{ client?: string; organization?: string; type?: string }>;
 }) {
-  const session = await requireSession();
+  const session = await requireTeamPageSession();
   await ensureWorkspaceSchema();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
 

@@ -1,5 +1,6 @@
+import { workflowErrorResponse } from "@/lib/workflow-validation";
 import { NextResponse } from "next/server";
-import { ForbiddenError, requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
+import { ForbiddenError, requireRole, requireSession } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin";
 import { db } from "@/lib/db";
 import { users, workspaces, memberships, timeEntries } from "@/lib/db/schema";
@@ -56,7 +57,6 @@ export async function GET() {
       memberships: mappedMemberships,
     });
   } catch (error) {
-    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't load administration statistics. Please try again.", { route: "/api/admin/stats", method: "GET" });
   }
 }

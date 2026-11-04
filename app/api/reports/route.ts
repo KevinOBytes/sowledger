@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { timeEntries, projects, users, scheduledWorkBlocks } from "@/lib/db/schema";
+import { timeEntries, projects, users } from "@/lib/db/schema";
 import { eq, and, gte, inArray, lt } from "drizzle-orm";
-import { isUnavailableScheduledBlock } from "@/lib/scheduled-block-guards";
+import { loadEligiblePlannedWork } from "@/lib/planned-work";
 import { workflowErrorResponse } from "@/lib/workflow-validation";
-
-function endExclusive(value: string) {
-  const date = new Date(value);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    date.setDate(date.getDate() + 1);
-  }
-  return date;
-}
+import { checkedTimeZone, dateKeyInZone, overlappingSeconds, parseDateRange } from "@/lib/date-input";
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,7 +15,9 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("end");
     const scope = searchParams.get("scope") ?? "mine";
     const projectId = searchParams.get("projectId");
-    if (!["mine", "team"].includes(scope) || (startDate && !Number.isFinite(Date.parse(startDate))) || (endDate && !Number.isFinite(Date.parse(endDate))) || (startDate && endDate && new Date(startDate) >= endExclusive(endDate))) return NextResponse.json({ error: "Choose a valid report scope and date range." }, { status: 400 });
+    if (!["mine", "team"].includes(scope)) return NextResponse.json({ error: "Choose a valid report scope." }, { status: 400 });
+    const { start, end } = parseDateRange(startDate, endDate);
+    const timeZone = checkedTimeZone(searchParams.get("timeZone"));
 
     if (scope === "team") {
       requireRole("manager", session.role);
@@ -37,21 +32,15 @@ export async function GET(req: NextRequest) {
     if (projectId) {
       conditions.push(eq(timeEntries.projectId, projectId));
     }
-    if (startDate) {
-      conditions.push(gte(timeEntries.startedAt, new Date(startDate)));
+    if (start) {
+      conditions.push(gte(timeEntries.startedAt, start));
     }
-    if (endDate) {
-      conditions.push(lt(timeEntries.startedAt, endExclusive(endDate)));
+    if (end) {
+      conditions.push(lt(timeEntries.startedAt, end));
     }
 
     const filtered = await db.select().from(timeEntries).where(and(...conditions));
-    const scheduleConditions = [eq(scheduledWorkBlocks.workspaceId, session.workspaceId)];
-    if (scope !== "team") scheduleConditions.push(eq(scheduledWorkBlocks.userId, session.sub));
-    if (projectId) scheduleConditions.push(eq(scheduledWorkBlocks.projectId, projectId));
-    if (startDate) scheduleConditions.push(gte(scheduledWorkBlocks.startsAt, new Date(startDate)));
-    if (endDate) scheduleConditions.push(lt(scheduledWorkBlocks.startsAt, endExclusive(endDate)));
-    const scheduledRows = await db.select().from(scheduledWorkBlocks).where(and(...scheduleConditions));
-    const scheduled = scheduledRows.filter((block) => block.status !== "canceled" && !isUnavailableScheduledBlock(block) && !/^busy(?:\b|:)/i.test(block.title.trim()) && !block.tags.some((tag) => tag.toLowerCase() === "busy"));
+    const scheduled = await loadEligiblePlannedWork(session.workspaceId, { userId: scope === "team" ? null : session.sub, projectId, start, end });
     
     // Process aggregations
     let totalDurationSeconds = 0;
@@ -76,7 +65,7 @@ export async function GET(req: NextRequest) {
         totalBillableAmount += (entry.durationSeconds / 3600) * entry.hourlyRate;
       }
 
-      const dayParams = entry.startedAt.toISOString().split("T")[0];
+      const dayParams = dateKeyInZone(entry.startedAt, timeZone);
       byDate[dayParams] = (byDate[dayParams] || 0) + entry.durationSeconds;
 
       if (entry.projectId) {
@@ -117,13 +106,14 @@ export async function GET(req: NextRequest) {
     });
 
     const plannedSeconds = scheduled.reduce((sum, block) => {
-      return sum + Math.max(0, (new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000);
+      return sum + overlappingSeconds(block.startsAt, block.endsAt, start, end);
     }, 0);
     const missedBlocks = scheduled.filter((block) => block.status === "planned" && new Date(block.endsAt).getTime() < Date.now()).length;
 
     return NextResponse.json({
       ok: true,
       scope,
+      timeZone,
       totalHours: totalDurationSeconds / 3600,
       totalBillableAmount,
       plannedHours: plannedSeconds / 3600,

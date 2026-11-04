@@ -2,23 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { GoogleAnalytics } from "@next/third-parties/google";
+import { readBrowserConsent, subscribeBrowserConsent } from "@/lib/browser-consent";
 
 export function AnalyticsWrapper({ gaId }: { gaId: string }) {
   const [hasConsent, setHasConsent] = useState(false);
 
   useEffect(() => {
-    // Check for consent on mount and setup an interval or listen to storage/cookie changes
-    // But since setting the cookie refreshes the router or we can just rely on the router refresh
-    const checkConsent = () => {
-      setHasConsent(document.cookie.includes("sowledger-cookie-consent=true"));
+    const flag = `ga-disable-${gaId}`;
+    const browser = window as Window & Record<string, unknown>;
+    const sync = () => {
+      const accepted = readBrowserConsent();
+      browser[flag] = !accepted;
+      setHasConsent(accepted);
     };
-    
-    checkConsent();
-    
-    // Periodically check in case it's accepted in another tab or just accepted now
-    const interval = setInterval(checkConsent, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    const unsubscribe = subscribeBrowserConsent(sync);
+    sync();
+    return () => {
+      browser[flag] = true;
+      unsubscribe();
+    };
+  }, [gaId]);
 
   if (!hasConsent) return null;
 

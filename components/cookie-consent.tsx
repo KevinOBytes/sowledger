@@ -3,34 +3,25 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Cookie } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { hasBrowserConsentChoice, setBrowserConsent, subscribeBrowserConsent } from "@/lib/browser-consent";
 
 export function CookieConsent() {
   const [show, setShow] = useState(false);
-  const router = useRouter();
-
   useEffect(() => {
-    // Check if consent cookie exists
-    const hasConsent = document.cookie.includes("sowledger-cookie-consent=");
-    if (!hasConsent) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setShow(true);
-    }
+    const sync = () => setShow(!hasBrowserConsentChoice());
+    const unsubscribe = subscribeBrowserConsent(sync);
+    sync();
+    return unsubscribe;
   }, []);
 
   const handleAccept = () => {
-    // Set cookie for 1 year
-    document.cookie = "sowledger-cookie-consent=true; path=/; max-age=31536000; SameSite=Lax";
+    setBrowserConsent(true);
     setShow(false);
-    // Refresh the router so the server-side layout reads the cookie and renders GA
-    router.refresh();
   };
 
   const handleDecline = () => {
-    // Set cookie to false to remember their choice and not ask again
-    document.cookie = "sowledger-cookie-consent=false; path=/; max-age=31536000; SameSite=Lax";
+    setBrowserConsent(false);
     setShow(false);
-    router.refresh();
   };
 
   return (

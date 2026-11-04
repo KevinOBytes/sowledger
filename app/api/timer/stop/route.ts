@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
-import { appendAuditLog, createTimeEntry, enforceStopRateLimit, ensurePeriodUnlocked, fitTimeWindowSegmentsToDailyLimit, splitTimeWindowByUtcDay } from "@/lib/security";
-import { db } from "@/lib/db";
-import { scheduledWorkBlocks, timeEntries } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { enforceStopRateLimit, PeriodLockedError, TimerStopRateLimitError } from "@/lib/security";
+import { TimeDataError, TimePrecisionError } from "@/lib/time-capacity";
+import { stopTimer } from "@/lib/timer-stop";
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,181 +11,25 @@ export async function POST(req: NextRequest) {
     requireRole("member", session.role);
     await enforceStopRateLimit(session.sub);
 
-    const body = await req.json() as { entryId?: string; endedAt?: string };
+    const body = await readRequestJson(req) as { entryId?: string; endedAt?: string };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     if (!body.entryId) return NextResponse.json({ error: "entryId is required" }, { status: 400 });
 
-    const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, body.entryId));
-    if (!entry || entry.workspaceId !== session.workspaceId || entry.userId !== session.sub || entry.stoppedAt) {
-      return NextResponse.json({ error: "No active timer found for entry" }, { status: 404 });
-    }
-
-    const endedAt = body.endedAt ? new Date(body.endedAt) : new Date();
-    const startedAt = new Date(entry.startedAt!);
-
-    if (Number.isNaN(endedAt.getTime())) {
-      return NextResponse.json({ error: "endedAt must be a valid date" }, { status: 400 });
-    }
-
-    if (endedAt.getTime() < startedAt.getTime()) {
-      return NextResponse.json({ error: "endedAt must be greater than or equal to startedAt" }, { status: 400 });
-    }
-
-    if (endedAt.getTime() > Date.now()) {
-      return NextResponse.json({ error: "endedAt cannot be in the future" }, { status: 400 });
-    }
-
-    const totalPausedSeconds = entry.accumulatedSeconds + (entry.isPaused && entry.pausedAt ? Math.max(0, Math.floor((endedAt.getTime() - entry.pausedAt.getTime()) / 1000)) : 0);
-
-    const rawSegments = splitTimeWindowByUtcDay(startedAt, endedAt);
-    let remainingPaused = totalPausedSeconds;
-    for (let i = rawSegments.length - 1; i >= 0; i--) {
-      const deduct = Math.min(rawSegments[i].durationSeconds, remainingPaused);
-      rawSegments[i].durationSeconds -= deduct;
-      remainingPaused -= deduct;
-    }
-    const originalSegments = rawSegments.filter(s => s.durationSeconds > 0);
-    if (originalSegments.length === 0 && rawSegments.length > 0) {
-      // If it was fully paused, keep at least one segment of 0 duration
-      originalSegments.push(rawSegments[0]);
-    }
-    const originalDurationSeconds = originalSegments.reduce((sum, segment) => sum + segment.durationSeconds, 0);
-
-    await ensurePeriodUnlocked(session.workspaceId, startedAt, endedAt);
-    const fitted = await fitTimeWindowSegmentsToDailyLimit({
+    const result = await stopTimer({
       workspaceId: session.workspaceId,
       userId: session.sub,
-      segments: originalSegments,
-      excludeEntryId: entry.id,
+      entryId: body.entryId,
+      endedAt: body.endedAt ? new Date(body.endedAt) : new Date(),
     });
-    const segments = fitted.segments;
-    const durationSeconds = segments.reduce((sum, segment) => sum + segment.durationSeconds, 0);
-    const adjustedForDailyLimit = fitted.trimmedSeconds > 0;
-    const [firstSegment, ...continuationSegments] = segments;
-
-    if (!firstSegment) {
-      await db.update(timeEntries).set({
-        stoppedAt: startedAt,
-        durationSeconds: 0,
-      }).where(eq(timeEntries.id, entry.id));
-
-      if (entry.scheduledBlockId) {
-        await db.update(scheduledWorkBlocks).set({
-          status: "completed",
-          linkedTimeEntryId: entry.id,
-          updatedAt: new Date(),
-        }).where(and(eq(scheduledWorkBlocks.id, entry.scheduledBlockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId), eq(scheduledWorkBlocks.userId, session.sub)));
-      }
-
-      await appendAuditLog({
-        workspaceId: session.workspaceId,
-        timeEntryId: entry.id,
-        actorUserId: session.sub,
-        eventType: "timer_stopped_no_daily_capacity",
-        diff: {
-          stoppedAt: { before: null, after: startedAt.toISOString() },
-          durationSeconds: { before: null, after: 0 },
-          requestedStoppedAt: { before: null, after: endedAt.toISOString() },
-          trimmedSeconds: { before: 0, after: originalDurationSeconds },
-        },
-      });
-
-      return NextResponse.json({
-        ok: true,
-        entryId: entry.id,
-        entryIds: [entry.id],
-        durationSeconds: 0,
-        splitAcrossDays: false,
-        adjustedForDailyLimit: true,
-        trimmedSeconds: originalDurationSeconds,
-        message: "Timer stopped. No additional time was logged because the affected day already has 24 hours recorded.",
-      });
-    }
-
-    const stoppedAtIso = endedAt.toISOString();
-    
-    await db.update(timeEntries).set({
-      startedAt: firstSegment.startedAt,
-      stoppedAt: firstSegment.stoppedAt,
-      durationSeconds: firstSegment.durationSeconds,
-    }).where(eq(timeEntries.id, entry.id));
-
-    const continuationEntries = [];
-    for (const segment of continuationSegments) {
-      continuationEntries.push(await createTimeEntry({
-        workspaceId: entry.workspaceId,
-        userId: entry.userId,
-        scheduledBlockId: null,
-        taskId: entry.taskId,
-        projectId: entry.projectId,
-        goalId: entry.goalId,
-        tags: entry.tags,
-        startedAt: segment.startedAt,
-        stoppedAt: segment.stoppedAt,
-        durationSeconds: segment.durationSeconds,
-        description: entry.description,
-        status: entry.status,
-        source: entry.source,
-        collaborators: entry.collaborators,
-        expenses: entry.expenses,
-        action: entry.action,
-        hourlyRate: entry.hourlyRate,
-      }));
-    }
-
-    if (entry.scheduledBlockId) {
-      await db.update(scheduledWorkBlocks).set({
-        status: "completed",
-        linkedTimeEntryId: entry.id,
-        updatedAt: new Date(),
-      }).where(and(eq(scheduledWorkBlocks.id, entry.scheduledBlockId), eq(scheduledWorkBlocks.workspaceId, session.workspaceId), eq(scheduledWorkBlocks.userId, session.sub)));
-    }
-
-    await appendAuditLog({
-      workspaceId: session.workspaceId,
-      timeEntryId: entry.id,
-      actorUserId: session.sub,
-      eventType: adjustedForDailyLimit
-        ? "timer_stopped_adjusted_daily_limit"
-        : continuationEntries.length > 0
-        ? "timer_stopped_split"
-        : "timer_stopped",
-      diff: {
-        startedAt: { before: entry.startedAt, after: firstSegment.startedAt.toISOString() },
-        stoppedAt: { before: null, after: firstSegment.stoppedAt.toISOString() },
-        durationSeconds: { before: null, after: firstSegment.durationSeconds },
-        requestedStoppedAt: { before: null, after: endedAt.toISOString() },
-        trimmedSeconds: { before: 0, after: fitted.trimmedSeconds },
-        continuationEntryIds: { before: [], after: continuationEntries.map((continued) => continued.id) },
-      },
-    });
-
-    for (const continued of continuationEntries) {
-      await appendAuditLog({
-        workspaceId: session.workspaceId,
-        timeEntryId: continued.id,
-        actorUserId: session.sub,
-        eventType: "timer_continued_after_midnight",
-        diff: {
-          sourceEntryId: { before: null, after: entry.id },
-          stoppedAt: { before: null, after: continued.stoppedAt?.toISOString() ?? stoppedAtIso },
-          durationSeconds: { before: null, after: continued.durationSeconds },
-        },
-      });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      entryId: entry.id,
-      entryIds: [entry.id, ...continuationEntries.map((continued) => continued.id)],
-      durationSeconds,
-      splitAcrossDays: continuationEntries.length > 0,
-      adjustedForDailyLimit,
-      trimmedSeconds: fitted.trimmedSeconds,
-      message: adjustedForDailyLimit
-        ? "Timer stopped and adjusted so no day exceeds 24 logged hours. Review the draft entry if the stale timer needs a different allocation."
-        : undefined,
-    });
+    return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 403 });
+    // Preserve the existing user-facing lock/rate-limit responses, but never
+    // send an unexpected database error (including query text) to the browser.
+    if (error instanceof PeriodLockedError || error instanceof TimerStopRateLimitError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    if (error instanceof TimeDataError) return NextResponse.json({ error: error.message }, { status: 409 });
+    if (error instanceof TimePrecisionError) return NextResponse.json({ error: error.message }, { status: 400 });
+    return workflowErrorResponse(error, "Could not stop this timer. Please try again.", { route: "/api/timer/stop", method: "POST" });
   }
 }

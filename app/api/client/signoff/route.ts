@@ -7,13 +7,13 @@ import { auditLogs, invoices } from "@/lib/db/schema";
 import { appendAuditLog, dispatchWebhook } from "@/lib/security";
 import { buildInvoiceProofPack } from "@/lib/invoice-proof-pack";
 import { invoiceApprovalFromDiff } from "@/lib/invoice-approval";
-import { WorkflowError, workflowErrorResponse } from "@/lib/workflow-validation";
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 
 export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("client", session.role);
-    const body = await req.json() as { invoiceId?: string; digest?: string };
+    const body = await readRequestJson(req) as { invoiceId?: string; digest?: string };
     if (typeof body?.invoiceId !== "string" || !body.invoiceId || body.invoiceId.length > 255 || typeof body.digest !== "string" || !/^[a-f0-9]{64}$/.test(body.digest)) throw new WorkflowError("Open the invoice details before approving this version.", 400);
     const invoiceId = body.invoiceId;
     const clientIds = await getClientEntitlementIds(session);
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     const approval = await db.transaction(async (tx) => {
       const [invoice] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.workspaceId, session.workspaceId))).for("update");
-      if (!invoice || invoice.status === "draft") throw new WorkflowError("Invoice not found.", 404);
+      if (!invoice || (invoice.status !== "sent" && invoice.status !== "paid")) throw new WorkflowError("Invoice not found.", 404);
       const proof = await buildInvoiceProofPack(session.workspaceId, invoice.id, tx);
       if (!proof || proof.digest !== body.digest) throw new WorkflowError("The invoice details changed. Open the latest version and review it before approving.", 409);
       const prior = await tx.select().from(auditLogs).where(and(eq(auditLogs.workspaceId, session.workspaceId), eq(auditLogs.timeEntryId, invoice.id), eq(auditLogs.eventType, "client_invoice_signed_off"))).orderBy(desc(auditLogs.createdAt));
@@ -41,5 +41,7 @@ export async function POST(req: NextRequest) {
       await dispatchWebhook(session.workspaceId, "client_invoice_signed_off", approval.diff);
     });
     return NextResponse.json({ ok: true, signoff: { invoiceId, invoiceNumber: approval.invoiceNumber, signedOffAt: approval.signedOffAt, digest: approval.digest } });
-  } catch (error) { return workflowErrorResponse(error, "Could not approve this invoice. Please try again."); }
+  } catch (error) {
+    return workflowErrorResponse(error, "Could not approve this invoice. Please try again.", { route: "/api/client/signoff", method: "POST" });
+  }
 }

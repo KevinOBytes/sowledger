@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { integrationErrorResponse } from "@/lib/integrations/errors";
 
 import { requireRole, requireSession } from "@/lib/auth";
 import { disconnectIntegration, INTEGRATION_PROVIDERS, toPublicConnection } from "@/lib/integrations/connections";
@@ -15,7 +16,6 @@ export async function POST(_req: Request, context: { params: Promise<{ provider:
     const connection = await disconnectIntegration(session.workspaceId, provider as IntegrationProvider);
     return NextResponse.json({ ok: true, connection: connection ? toPublicConnection(connection) : null });
   } catch (error) {
-    const err = error as { status?: number };
-    return NextResponse.json({ error: (error as Error).message }, { status: err.status ?? 403 });
+    return integrationErrorResponse(error, "We couldn't confirm the integration was disconnected. Reload your integrations before trying again.", { route: "/api/integrations/[provider]/disconnect", method: "POST" });
   }
 }

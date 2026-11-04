@@ -4,14 +4,8 @@ import { db } from "@/lib/db";
 import { goals, memberships, projects, timeEntries } from "@/lib/db/schema";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
 import { eq, and } from "drizzle-orm";
-
-function getAuthStatus(error: unknown): number {
-  const err: unknown = error;
-  if (err && ((err as Record<string, unknown>).code === "FORBIDDEN" || (err as Record<string, unknown>).status === 403 || (err as Record<string, unknown>).message === "Forbidden")) {
-    return 403;
-  }
-  return 401;
-}
+import { parseDueDate } from "@/lib/date-input";
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 
 async function validateAssignedUser(workspaceId: string, assignedUserId?: string | null) {
   if (!assignedUserId) return true;
@@ -31,7 +25,7 @@ export async function GET() {
     const data = await db.select().from(goals).where(eq(goals.workspaceId, session.workspaceId));
     return NextResponse.json({ ok: true, goals: data });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
+    return workflowErrorResponse(error, "We couldn't load your goals. Please try again.", { route: "/api/goals", method: "GET" });
   }
 }
 
@@ -41,7 +35,7 @@ export async function POST(req: NextRequest) {
     const session = await requireSession();
     requireRole("manager", session.role);
 
-    const body = await req.json() as {
+    const body = await readRequestJson(req) as {
       name?: string;
       projectId?: string;
       assignedUserId?: string;
@@ -52,6 +46,7 @@ export async function POST(req: NextRequest) {
       targetType?: "hours" | "amount";
       dueDate?: string;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
 
     const normalizedName = body.name?.trim();
     if (!normalizedName) return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -78,14 +73,14 @@ export async function POST(req: NextRequest) {
       targetHours: body.targetHours || null,
       targetAmount: body.targetAmount || null,
       targetType: body.targetType || "hours",
-      dueDate: body.dueDate ? new Date(body.dueDate) : null,
+      dueDate: parseDueDate(body.dueDate),
       completed: false,
     };
 
     const [goal] = await db.insert(goals).values(newGoal).returning();
     return NextResponse.json({ ok: true, goal });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
+    return workflowErrorResponse(error, "Could not create this goal. Please try again.", { route: "/api/goals", method: "POST" });
   }
 }
 
@@ -95,7 +90,7 @@ export async function PATCH(req: NextRequest) {
     const session = await requireSession();
     requireRole("manager", session.role);
 
-    const body = await req.json() as {
+    const body = await readRequestJson(req) as {
       goalId?: string;
       name?: string;
       projectId?: string | null;
@@ -108,6 +103,7 @@ export async function PATCH(req: NextRequest) {
       dueDate?: string | null;
       completed?: boolean;
     };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
 
     if (!body.goalId) return NextResponse.json({ error: "goalId is required" }, { status: 400 });
 
@@ -143,13 +139,13 @@ export async function PATCH(req: NextRequest) {
     if (body.targetHours !== undefined) updates.targetHours = body.targetHours;
     if (body.targetAmount !== undefined) updates.targetAmount = body.targetAmount;
     if (body.targetType !== undefined) updates.targetType = body.targetType;
-    if (body.dueDate !== undefined) updates.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+    if (body.dueDate !== undefined) updates.dueDate = parseDueDate(body.dueDate);
     if (body.completed !== undefined) updates.completed = body.completed;
 
     const [goal] = await db.update(goals).set(updates).where(and(eq(goals.id, body.goalId), eq(goals.workspaceId, session.workspaceId))).returning();
     return NextResponse.json({ ok: true, goal });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
+    return workflowErrorResponse(error, "Could not update this goal. Please try again.", { route: "/api/goals", method: "PATCH" });
   }
 }
 
@@ -173,6 +169,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true, deletedGoalId: goalId });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: getAuthStatus(error) });
+    return workflowErrorResponse(error, "We couldn't confirm the goal was deleted. Check your goals before trying again.", { route: "/api/goals", method: "DELETE" });
   }
 }

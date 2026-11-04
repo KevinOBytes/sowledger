@@ -164,10 +164,21 @@ test.describe("Public marketing", () => {
     await expect(page.getByRole("link", { name: "support@sowledger.com", exact: true })).toHaveAttribute("href", "mailto:support@sowledger.com");
   });
 
-  test("keeps public content within the viewport", async ({ page }) => {
+  test("keeps public content within the viewport", async ({ context }) => {
     for (const route of ["/", "/for/freelance-developers", "/for/seo-consultants", "/support/api"]) {
-      await gotoApp(page, route);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `${route} should not overflow horizontally`).toBeLessThanOrEqual(1);
+      // Measure each rendered page independently. Navigation between audience pages
+      // is exercised above; this check must wait for the actual text and font layout.
+      const page = await context.newPage();
+      try {
+        const response = await gotoApp(page, route);
+        expect(response?.status()).toBe(200);
+        await expect(page).toHaveURL(new RegExp(`${route === "/" ? "/" : route}$`));
+        await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `${route} should not overflow horizontally`).toBeLessThanOrEqual(1);
+      } finally {
+        await page.close();
+      }
     }
   });
 

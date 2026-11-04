@@ -1,3 +1,4 @@
+import { workflowErrorResponse } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireRole, requireSession } from "@/lib/auth";
@@ -20,7 +21,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    const status = (error as { status?: number; statusCode?: number }).status ?? (error as { statusCode?: number }).statusCode ?? 403;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't load your revenue analysis. Please try again.", { route: "/api/revenue-intelligence", method: "GET" });
   }
 }

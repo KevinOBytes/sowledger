@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { integrationErrorResponse } from "@/lib/integrations/errors";
 
 import { requireRole, requireSession } from "@/lib/auth";
 import { listIntegrationConnections, toPublicConnection } from "@/lib/integrations/connections";
@@ -13,6 +14,7 @@ export async function GET() {
     const connections = await listIntegrationConnections(session.workspaceId);
     return NextResponse.json({
       ok: true,
+      canManage: session.role === "manager" || session.role === "owner",
       connections: connections.map(toPublicConnection),
       readiness: {
         googleCalendarOAuth: googleCalendarConfigured(),
@@ -22,7 +24,6 @@ export async function GET() {
       },
     });
   } catch (error) {
-    const err = error as { status?: number };
-    return NextResponse.json({ error: (error as Error).message }, { status: err.status ?? 401 });
+    return integrationErrorResponse(error, "We couldn't load your integrations. Please try again.", { route: "/api/integrations", method: "GET" });
   }
 }

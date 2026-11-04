@@ -2,7 +2,9 @@ import { and, eq, gte, lt } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
-import { invoices, projects, scheduledWorkBlocks, timeEntries } from "@/lib/db/schema";
+import { invoices, projects, timeEntries } from "@/lib/db/schema";
+import { overlappingSeconds, parseDateRange } from "@/lib/date-input";
+import { loadEligiblePlannedWork } from "@/lib/planned-work";
 
 type IntelligenceScope = "mine" | "team";
 type Severity = "low" | "medium" | "high";
@@ -35,19 +37,6 @@ export type IntelligenceItem = {
   url?: string;
 };
 
-function parseDate(value?: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function endExclusive(value?: string | null) {
-  const date = parseDate(value);
-  if (!date) return null;
-  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) date.setDate(date.getDate() + 1);
-  return date;
-}
-
 function hours(seconds: number) {
   return Number((seconds / 3600).toFixed(2));
 }
@@ -66,42 +55,36 @@ function severityFor(percent: number): Severity {
   return "low";
 }
 
-export async function buildRevenueIntelligence(workspaceId: string, options: RevenueIntelligenceOptions = {}) {
+export async function buildRevenueIntelligence(workspaceId: string, options: RevenueIntelligenceOptions = {}, client: Pick<typeof db, "select"> = db) {
   await ensureWorkspaceSchema();
 
-  const start = parseDate(options.start);
-  const end = endExclusive(options.end);
+  const { start, end } = parseDateRange(options.start, options.end);
   const projectId = options.projectId || null;
   const personalUserId = options.scope === "team" ? null : options.userId ?? null;
 
   const entryFilters = [eq(timeEntries.workspaceId, workspaceId)];
-  const scheduleFilters = [eq(scheduledWorkBlocks.workspaceId, workspaceId)];
   const invoiceFilters = [eq(invoices.workspaceId, workspaceId)];
   if (projectId) {
     entryFilters.push(eq(timeEntries.projectId, projectId));
-    scheduleFilters.push(eq(scheduledWorkBlocks.projectId, projectId));
     invoiceFilters.push(eq(invoices.projectId, projectId));
   }
   if (personalUserId) {
     entryFilters.push(eq(timeEntries.userId, personalUserId));
-    scheduleFilters.push(eq(scheduledWorkBlocks.userId, personalUserId));
   }
   if (start) {
     entryFilters.push(gte(timeEntries.startedAt, start));
-    scheduleFilters.push(gte(scheduledWorkBlocks.startsAt, start));
     invoiceFilters.push(gte(invoices.createdAt, start));
   }
   if (end) {
     entryFilters.push(lt(timeEntries.startedAt, end));
-    scheduleFilters.push(lt(scheduledWorkBlocks.startsAt, end));
     invoiceFilters.push(lt(invoices.createdAt, end));
   }
 
   const [workspaceProjects, workspaceEntries, workspaceInvoices, workspaceSchedule] = await Promise.all([
-    db.select().from(projects).where(projectId ? and(eq(projects.workspaceId, workspaceId), eq(projects.id, projectId)) : eq(projects.workspaceId, workspaceId)),
-    db.select().from(timeEntries).where(and(...entryFilters)),
-    db.select().from(invoices).where(and(...invoiceFilters)),
-    db.select().from(scheduledWorkBlocks).where(and(...scheduleFilters)),
+    client.select().from(projects).where(projectId ? and(eq(projects.workspaceId, workspaceId), eq(projects.id, projectId)) : eq(projects.workspaceId, workspaceId)),
+    client.select().from(timeEntries).where(and(...entryFilters)),
+    client.select().from(invoices).where(and(...invoiceFilters)),
+    loadEligiblePlannedWork(workspaceId, { userId: personalUserId, projectId, start, end }, client),
   ]);
 
   const projectsById = new Map(workspaceProjects.map((project) => [project.id, project]));
@@ -124,7 +107,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
     const projectEntries = entriesByProject.get(project.id) ?? [];
     const projectSchedule = scheduledByProject.get(project.id) ?? [];
     const actualSeconds = projectEntries.reduce((sum, entry) => sum + (entry.durationSeconds ?? 0), 0);
-    const plannedSeconds = projectSchedule.reduce((sum, block) => sum + Math.max(0, (new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000), 0);
+    const plannedSeconds = projectSchedule.reduce((sum, block) => sum + overlappingSeconds(block.startsAt, block.endsAt, start, end), 0);
     const unbilledApproved = projectEntries
       .filter((entry) => entry.status === "approved" && entry.hourlyRate && entry.durationSeconds)
       .reduce((sum, entry) => sum + entryAmount(entry), 0);
@@ -182,7 +165,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
         url: `/projects/${project.id}`,
         reason: `${missingRateCount} entries have no rate and ${missedBlocks.length} past blocks are still marked planned.`,
         notes: "Check which work happened and whether it should be billed. Add rates only where appropriate.",
-        missingHours: hours(missedBlocks.reduce((sum, block) => sum + Math.max(0, (new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000), 0)),
+        missingHours: hours(missedBlocks.reduce((sum, block) => sum + overlappingSeconds(block.startsAt, block.endsAt, start, end), 0)),
         actualHours: hours(actualSeconds),
       });
     }
@@ -193,7 +176,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
     if (block.status !== "planned" || new Date(block.endsAt).getTime() >= now) continue;
     const linked = workspaceEntries.some((entry) => entry.scheduledBlockId === block.id);
     if (linked) continue;
-    const plannedSeconds = Math.max(0, Math.floor((new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000));
+    const plannedSeconds = Math.floor(overlappingSeconds(block.startsAt, block.endsAt, start, end));
     recoveryOpportunities.push({
       id: `missed-block-${block.id}`,
       type: "missed_scheduled_work",
@@ -248,7 +231,7 @@ export async function buildRevenueIntelligence(workspaceId: string, options: Rev
   const approvedUninvoicedValue = workspaceEntries
     .filter((entry) => entry.status === "approved" && entry.hourlyRate && entry.durationSeconds)
     .reduce((sum, entry) => sum + entryAmount(entry), 0);
-  const invoicedValue = workspaceInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+  const invoicedValue = workspaceInvoices.filter(invoice => invoice.status !== "void").reduce((sum, invoice) => sum + invoice.amount, 0);
 
   return {
     ok: true,

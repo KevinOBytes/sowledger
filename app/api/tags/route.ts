@@ -1,5 +1,6 @@
+import { readRequestJson, workflowErrorResponse, WorkflowError } from "@/lib/workflow-validation";
 import { NextRequest, NextResponse } from "next/server";
-import { ForbiddenError, requireRole, requireSession, UnauthorizedError } from "@/lib/auth";
+import { requireRole, requireSession } from "@/lib/auth";
 import { listWorkspaceTags } from "@/lib/store";
 import { db } from "@/lib/db";
 import { timeEntries, users, memberships } from "@/lib/db/schema";
@@ -14,8 +15,7 @@ export async function GET() {
     const tags = await listWorkspaceTags(session.workspaceId);
     return NextResponse.json({ ok: true, tags });
   } catch (error) {
-    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't load your tags. Please try again.", { route: "/api/tags", method: "GET" });
   }
 }
 
@@ -24,7 +24,8 @@ export async function PATCH(req: NextRequest) {
     const session = await requireSession();
     requireRole("manager", session.role);
 
-    const body = await req.json() as { fromTag?: string; toTag?: string };
+    const body = await readRequestJson(req) as { fromTag?: string; toTag?: string };
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new WorkflowError("Send a JSON object.", 400);
     if (!body.fromTag || !body.toTag) {
       return NextResponse.json({ error: "fromTag and toTag are required" }, { status: 400 });
     }
@@ -59,8 +60,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, fromTag: from, toTag: to, changedEntries });
   } catch (error) {
-    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't confirm the tag changes were saved. Check your tags before trying again.", { route: "/api/tags", method: "PATCH" });
   }
 }
 
@@ -97,7 +97,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true, removedTag: tag, changedEntries });
   } catch (error) {
-    const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    return NextResponse.json({ error: (error as Error).message }, { status });
+    return workflowErrorResponse(error, "We couldn't confirm the tag was removed. Check your tags before trying again.", { route: "/api/tags", method: "DELETE" });
   }
 }

@@ -3,14 +3,14 @@ import { and, eq, inArray } from "drizzle-orm";
 import { requireRole, requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { timeEntries } from "@/lib/db/schema";
-import { appendAuditLog, dispatchWebhook, ensurePeriodUnlocked } from "@/lib/security";
-import { entryIdsFrom, WorkflowError, workflowErrorResponse } from "@/lib/workflow-validation";
+import { appendAuditLog, dispatchWebhook, ensurePeriodUnlocked, PeriodLockedError } from "@/lib/security";
+import { readRequestJson, workflowErrorResponse, WorkflowError, entryIdsFrom } from "@/lib/workflow-validation";
 
 export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
     requireRole("member", session.role);
-    const body = await req.json();
+    const body = await readRequestJson(req);
     const entryIds = entryIdsFrom(body?.entryIds);
     const canManage = session.role === "manager" || session.role === "owner";
     const events = await db.transaction(async (tx) => {
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
           throw new WorkflowError("Only completed draft or sent-back entries with recorded time can be submitted.", 409);
         }
         try { await ensurePeriodUnlocked(session.workspaceId, entry.startedAt, entry.stoppedAt); }
-        catch { throw new WorkflowError("One or more entries are in a locked period.", 409); }
+        catch (error) { if (error instanceof PeriodLockedError) throw new WorkflowError("One or more entries are in a locked period.", 409); throw error; }
       }
       await tx.update(timeEntries).set({ status: "submitted", rejectionReason: null }).where(and(eq(timeEntries.workspaceId, session.workspaceId), inArray(timeEntries.id, entryIds), eq(timeEntries.status, "draft")));
       const events = [];
@@ -39,5 +39,7 @@ export async function POST(req: NextRequest) {
     });
     after(async () => { for (const event of events) await dispatchWebhook(session.workspaceId, event.eventType, event.diff); });
     return NextResponse.json({ ok: true, submitted: entryIds.length });
-  } catch (error) { return workflowErrorResponse(error, "Could not submit time. Please try again."); }
+  } catch (error) {
+    return workflowErrorResponse(error, "Could not submit time. Please try again.", { route: "/api/timer/submit", method: "POST" });
+  }
 }
