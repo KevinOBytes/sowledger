@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { ManualTimeDialog } from "@/components/manual-time-dialog";
+import { ModalDialog } from "@/components/modal-dialog";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 type NavItem = {
@@ -143,6 +144,16 @@ export function Sidebar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!mobileMoreOpen) return;
+    const desktop = window.matchMedia("(min-width: 768px)");
+    const closeOnDesktop = () => { if (desktop.matches) setMobileMoreOpen(false); };
+    closeOnDesktop();
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, [mobileMoreOpen]);
 
   useEffect(() => {
     async function fetchNotifications() {
@@ -262,6 +273,7 @@ export function Sidebar() {
           const Icon = item.icon;
           return isMore ? (
             <button
+              ref={moreTriggerRef}
               key={item.href}
               type="button"
               onClick={() => setMobileMoreOpen((open) => !open)}
@@ -299,14 +311,13 @@ export function Sidebar() {
       </nav>
 
       {mobileMoreOpen && (
-        <div className="fixed inset-0 z-[110] bg-slate-950/40 backdrop-blur-sm md:hidden" role="presentation" onClick={() => setMobileMoreOpen(false)}>
-          <section
+          <ModalDialog
             id="mobile-more-hub"
-            role="dialog"
-            aria-modal="true"
-            aria-label="More SOWLedger navigation"
-            className="absolute inset-x-3 bottom-24 flex max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow-2xl shadow-stone-950/20"
-            onClick={(event) => event.stopPropagation()}
+            label="More SOWLedger navigation"
+            onClose={() => setMobileMoreOpen(false)}
+            returnFocusRef={moreTriggerRef}
+            dismissOnBackdrop
+            className="inset-x-3 top-auto bottom-24 m-0 max-h-[calc(100dvh-7rem)] w-auto max-w-none rounded-[28px] border border-stone-200 bg-[#fffdf8] text-[#17211d] shadow-2xl shadow-stone-950/20 backdrop:bg-slate-950/40 backdrop:backdrop-blur-sm"
           >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-stone-200/80 px-5 py-4">
               <div>
@@ -319,7 +330,7 @@ export function Sidebar() {
               </button>
             </div>
             <div className="shrink-0 border-b border-stone-200 px-4 py-3"><WorkspaceSwitcher /></div>
-            <div className="grid min-h-0 grid-cols-2 gap-2 overflow-y-auto p-3">
+            <div className="grid min-h-0 grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-3">
               {mobileMoreItems.map((item) => {
                 const isActive = routeIsActive(pathname, item);
                 const Icon = item.icon;
@@ -342,8 +353,7 @@ export function Sidebar() {
             <a href="/api/auth/logout" className="flex shrink-0 items-center gap-2 border-t border-stone-200 px-5 py-4 text-sm font-semibold text-stone-700 hover:bg-rose-50 hover:text-rose-700">
               <LogOut className="h-4 w-4" /> Sign out
             </a>
-          </section>
-        </div>
+          </ModalDialog>
       )}
 
       <button

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Archive, Download, FileJson, FileSpreadsheet, Filter, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { DataLoadNotice } from "@/components/data-load-notice";
+import { localDateKey, localDateRange } from "@/lib/date-input";
 
 import {
   AppEmptyState,
@@ -43,7 +44,7 @@ const DATASETS = [
 ];
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }
 
 export default function ExportsPage() {
@@ -79,21 +80,25 @@ export default function ExportsPage() {
   const completeExport = include.length === DATASETS.length && !projectId && !start && !end && !userId && !status && !source;
   const selectedProjectName = useMemo(() => projects.find((project) => project.id === projectId)?.name, [projectId, projects]);
   const activeFilterCount = [projectId, start, end, userId, status, source].filter(Boolean).length;
+  const range = useMemo(() => {
+    try { return { ...localDateRange(start, end), error: null }; }
+    catch (error) { return { start: undefined, end: undefined, error: error instanceof Error ? error.message : "Choose a valid date range." }; }
+  }, [start, end]);
 
   function toggleDataset(id: string) {
     setInclude((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
 
   async function downloadExport(nextFormat = format) {
-    if (filtersLoading || loadError || (nextFormat === "json" && include.length === 0)) return;
+    if (downloading || filtersLoading || loadError || range.error || (nextFormat === "json" && include.length === 0)) return;
     setDownloading(true);
     setLastDigest(null);
     try {
       const query = new URLSearchParams({ format: nextFormat });
       query.set("layout", layout);
       if (projectId) query.set("projectId", projectId);
-      if (start) query.set("start", start);
-      if (end) query.set("end", end);
+      if (range.start) query.set("start", range.start);
+      if (range.end) query.set("end", range.end);
       if (userId.trim()) query.set("userId", userId.trim());
       if (status) query.set("status", status);
       if (source) query.set("source", source);
@@ -136,7 +141,7 @@ export default function ExportsPage() {
         secondaryAction={(
           <button
             onClick={() => { setFormat("csv"); downloadExport("csv"); }}
-            disabled={downloading || filtersLoading || loadError}
+            disabled={downloading || filtersLoading || loadError || Boolean(range.error)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm hover:border-cyan-300 hover:text-cyan-700 disabled:opacity-50 sm:w-auto"
           >
             <FileSpreadsheet className="h-4 w-4" />
@@ -146,7 +151,7 @@ export default function ExportsPage() {
         primaryAction={(
           <button
             onClick={() => { setFormat("json"); downloadExport("json"); }}
-            disabled={downloading || filtersLoading || loadError || include.length === 0}
+            disabled={downloading || filtersLoading || loadError || Boolean(range.error) || include.length === 0}
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:w-auto"
           >
             <FileJson className="h-4 w-4" />
@@ -159,6 +164,7 @@ export default function ExportsPage() {
 
       {loadError && <DataLoadNotice message="We couldn't load the people and projects for your export. Downloads are paused until the filters are available." />}
       {filtersLoading && <p role="status" className="text-sm text-slate-500">Loading export filters...</p>}
+      {range.error && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{range.error}</p>}
 
       <section className="grid gap-4 sm:grid-cols-3">
         <AppMetricCard label="JSON datasets" value={`${include.length}/${DATASETS.length}`} detail={include.length === DATASETS.length ? "All listed datasets are selected for JSON." : "Only the selected datasets will be included in JSON."} accent="cyan" icon={Archive} />
@@ -169,6 +175,7 @@ export default function ExportsPage() {
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center gap-3"><Filter className="h-5 w-5 text-cyan-700" /><h2 className="text-xl font-semibold">Filters</h2></div>
+            <p className="mb-4 text-xs leading-5 text-slate-500">Dates use your browser timezone. Time entries are selected by their start date; scheduled work is included when it overlaps the range. Exported timestamps remain in UTC.</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm font-bold text-slate-700">Format<select value={format} onChange={(event) => setFormat(event.target.value as ExportFormat)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="json">JSON workspace records</option><option value="csv">CSV spreadsheet</option></select></label>
               <label className="text-sm font-bold text-slate-700">CSV layout<select value={layout} onChange={(event) => setLayout(event.target.value as ExportLayout)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-cyan-500"><option value="detailed">Detailed rows</option><option value="summary">Summarized hours</option></select></label>
@@ -218,7 +225,7 @@ export default function ExportsPage() {
               <h2 className="text-xl font-semibold">{format === "csv" ? "Time-entry spreadsheet" : "Workspace records"}</h2>
               <p className="mt-1 text-sm text-slate-500">{format === "csv" ? "CSV includes time entries that match the selected filters. Dataset checkboxes apply to JSON only." : "JSON can include workspace-wide records even when a project, person, or date filter is selected. Review the file before sharing it."}</p>
             </div>
-            <button onClick={() => downloadExport(format)} disabled={downloading || filtersLoading || loadError || (format === "json" && include.length === 0)} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-cyan-500 disabled:opacity-50">
+            <button onClick={() => downloadExport(format)} disabled={downloading || filtersLoading || loadError || Boolean(range.error) || (format === "json" && include.length === 0)} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-cyan-500 disabled:opacity-50">
               <Download className="h-4 w-4" />
               {downloading ? "Generating..." : `Download ${format.toUpperCase()}`}
             </button>

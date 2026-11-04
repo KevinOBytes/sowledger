@@ -323,6 +323,7 @@ export default function DevelopersPage() {
       {rawKey && (
         <section
           ref={rawKeySectionRef}
+          data-dd-privacy="hidden"
           role="status"
           aria-live="polite"
           aria-atomic="true"
@@ -391,6 +392,7 @@ export default function DevelopersPage() {
                 </label>
               </div>
 
+              <p className="text-xs text-slate-500">Expiry is at the end of the selected date in your browser’s timezone. Leave the date blank for no expiry.</p>
               <div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>

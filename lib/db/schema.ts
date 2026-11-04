@@ -1,4 +1,5 @@
-import { boolean, jsonb, real, text, timestamp, varchar, primaryKey, bigint, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, jsonb, real, text, timestamp, varchar, primaryKey, bigint, index, uniqueIndex, foreignKey, check } from "drizzle-orm/pg-core";
 import { appTable } from "./namespace";
 
 const pgTable = appTable;
@@ -26,6 +27,43 @@ export const workspaces = pgTable("workspaces", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   stripeSubscriptionIdx: index("workspaces_stripe_sub_idx").on(table.stripeSubscriptionId),
+}));
+
+// Absence is intentional for legacy workspaces: migrations never infer paid
+// history, provider state, grace eligibility, or provenance from existing plans.
+export const workspaceBillingState = pgTable("workspace_billing_state", {
+  workspaceId: varchar("workspace_id", { length: 255 }).primaryKey().references(() => workspaces.id, { onDelete: "cascade" }),
+  subscriptionId: varchar("subscription_id", { length: 255 }).notNull(),
+  customerId: varchar("customer_id", { length: 255 }).notNull(),
+  plan: varchar("plan", { enum: ["free", "pro", "smb", "enterprise"] }).notNull(),
+  status: varchar("status", { length: 64 }).notNull(),
+  everActiveAt: timestamp("ever_active_at", { withTimezone: true }),
+  latestInvoiceId: varchar("latest_invoice_id", { length: 255 }),
+  graceInvoiceId: varchar("grace_invoice_id", { length: 255 }),
+  graceStartedAt: timestamp("grace_started_at", { withTimezone: true }),
+  graceEndsAt: timestamp("grace_ends_at", { withTimezone: true }),
+  lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const billingPaymentFailures = pgTable("billing_payment_failures", {
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  invoiceId: varchar("invoice_id", { length: 255 }).notNull(),
+  subscriptionId: varchar("subscription_id", { length: 255 }).notNull(),
+  firstFailedAt: timestamp("first_failed_at", { withTimezone: true }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.workspaceId, table.invoiceId] }),
+}));
+
+export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
+  eventId: varchar("event_id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  subscriptionId: varchar("subscription_id", { length: 255 }).notNull(),
+  eventType: varchar("event_type", { length: 255 }).notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  workspaceIdx: index("stripe_webhook_events_workspace_idx").on(table.workspaceId),
 }));
 
 export const memberships = pgTable("memberships", {
@@ -238,13 +276,33 @@ export const invoices = pgTable("invoices", {
   projectId: varchar("project_id", { length: 255 }),
   number: varchar("number", { length: 255 }).notNull(),
   amount: real("amount").notNull(),
-  status: varchar("status", { enum: ["draft", "sent", "paid"] }).notNull().default("draft"),
+  status: varchar("status", { enum: ["draft", "sent", "paid", "void"] }).notNull().default("draft"),
   dueDate: timestamp("due_date"),
   timeEntryIds: jsonb("time_entry_ids").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   workspaceIdx: index("invoices_workspace_idx").on(table.workspaceId),
   projectIdx: index("invoices_project_idx").on(table.projectId),
+  idWorkspaceUnique: uniqueIndex("invoices_id_workspace_unique").on(table.id, table.workspaceId),
+}));
+
+export const invoiceLifecycle = pgTable("invoice_lifecycle", {
+  invoiceId: varchar("invoice_id", { length: 255 }).primaryKey(),
+  workspaceId: varchar("workspace_id", { length: 255 }).notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  originalTimeEntryIds: jsonb("original_time_entry_ids").$type<string[]>().notNull(),
+  invoiceFingerprint: varchar("invoice_fingerprint", { length: 64 }).notNull(),
+  createdBy: varchar("created_by", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  exposedAt: timestamp("exposed_at", { withTimezone: true }),
+  exposureReason: text("exposure_reason"),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedBy: varchar("voided_by", { length: 255 }),
+  voidReason: text("void_reason"),
+  releaseAuditId: varchar("release_audit_id", { length: 255 }),
+}, (table) => ({
+  invoiceWorkspaceFk: foreignKey({ name: "invoice_lifecycle_invoice_workspace_fk", columns: [table.invoiceId, table.workspaceId], foreignColumns: [invoices.id, invoices.workspaceId] }).onDelete("cascade"),
+  workspaceIdx: index("invoice_lifecycle_workspace_idx").on(table.workspaceId),
+  releaseComplete: check("invoice_lifecycle_release_complete", sql`num_nonnulls(${table.voidedAt}, ${table.voidedBy}, ${table.voidReason}, ${table.releaseAuditId}) IN (0, 4)`),
 }));
 
 export const webhooks = pgTable("webhooks", {

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import 'dotenv/config';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../lib/db';
-import { clients, scheduledWorkBlocks, timeEntries, userActions } from '../lib/db/schema';
+import { clients, invoices, scheduledWorkBlocks, timeEntries, userActions } from '../lib/db/schema';
 import { getPaidPlanById } from '../lib/billing-plans';
 import { buildStripeCheckoutParams, hasActivePaidBilling } from '../lib/stripe-checkout';
 import { gotoApp, requestGetApp } from './helpers/navigation';
@@ -42,16 +42,16 @@ test.describe('Deep Authenticated Workflows', () => {
     const projectHref = await projectLink.getAttribute('href');
     expect(projectHref).toBeTruthy();
     await gotoApp(page, projectHref!);
-    await page.locator('.w-80').filter({ hasText: 'To Do' }).getByRole('button').first().click();
-    await page.getByPlaceholder('What needs to be done?').fill('E2E Generated Task');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Add task to To Do', exact: true }).click();
+    await page.getByLabel('New task title', { exact: true }).fill('E2E Generated Task');
+    await page.getByRole('button', { name: 'Add task', exact: true }).click();
     await expect(page.getByText('E2E Generated Task')).toBeVisible();
   });
 
   test('Test 13: calendar planning surface renders', async ({ page }) => {
     await gotoApp(page, '/calendar');
     await expect(page.getByRole('heading', { level: 1, name: 'Calendar', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Schedule/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Schedule work', exact: true })).toBeVisible();
   });
 
   test('Test 13b: calendar drag selection creates and keyboard-reschedules work', async ({ page }) => {
@@ -195,19 +195,22 @@ test.describe('Deep Authenticated Workflows', () => {
     expect(integrations.ok()).toBeTruthy();
     const integrationsBody = await integrations.json();
     expect(integrationsBody.readiness).toBeTruthy();
+    expect(integrationsBody.connections.some((connection: { provider: string }) => connection.provider === 'google_calendar')).toBe(false);
 
     const syncWithoutConnection = await page.request.post('/api/integrations/google-calendar/sync', { data: {} });
-    expect(syncWithoutConnection.status()).toBe(400);
+    expect(syncWithoutConnection.status()).toBe(404);
+    expect(await syncWithoutConnection.json()).toEqual({ error: 'Google Calendar is not connected' });
 
     const unsafeSlackWebhook = await page.request.post('/api/integrations/slack/manual', {
       data: { webhookUrl: 'https://127.0.0.1/services/test', channelLabel: '#ops' },
     });
     expect(unsafeSlackWebhook.status()).toBe(400);
 
-    const quickBooksWithoutConnection = await page.request.post('/api/integrations/quickbooks/push-invoice', {
+    const missingQuickBooksInvoice = await page.request.post('/api/integrations/quickbooks/push-invoice', {
       data: { invoiceId: 'missing-invoice' },
     });
-    expect(quickBooksWithoutConnection.status()).toBe(400);
+    expect(missingQuickBooksInvoice.status()).toBe(404);
+    expect(await missingQuickBooksInvoice.json()).toEqual({ error: 'Invoice not found.' });
   });
 
   test('Test 22: managers cannot promote other members to elevated roles', async ({ page }) => {
@@ -369,8 +372,10 @@ test.describe('Deep Authenticated Workflows', () => {
     const mixedInvoiceResponse = await page.request.post('/api/invoices', {
       data: { timeEntryIds: [entitledEntry.id, unrelatedEntry.id] },
     });
-    expect(mixedInvoiceResponse.ok()).toBeTruthy();
-    const mixedInvoice = (await mixedInvoiceResponse.json()).invoice;
+    expect(mixedInvoiceResponse.status()).toBe(400);
+    // Historical malformed linkage must still be denied by the portal. Seed
+    // that legacy record directly; the corrected creation route now refuses it.
+    const [mixedInvoice] = await db.insert(invoices).values({ id: crypto.randomUUID(), workspaceId: ownerData.workspaceId, projectId: null, number: `LEGACY-MIXED-${crypto.randomUUID()}`, amount: 200, status: 'draft', timeEntryIds: [entitledEntry.id, unrelatedEntry.id] }).returning();
     const markMixedSent = await page.request.patch(`/api/invoices/${mixedInvoice.id}`, { data: { status: 'sent' } });
     expect(markMixedSent.ok()).toBeTruthy();
 
@@ -510,13 +515,8 @@ test.describe('Deep Authenticated Workflows', () => {
     const invalidDurationEntry = (await invalidDurationEntryResponse.json()).entry;
     const approveInvalidDuration = await page.request.post('/api/timer/approve', { data: { entryId: invalidDurationEntry.id } });
     expect(approveInvalidDuration.ok()).toBeTruthy();
-    await db
-      .update(timeEntries)
-      .set({ durationSeconds: -1 })
-      .where(and(eq(timeEntries.id, invalidDurationEntry.id), eq(timeEntries.workspaceId, ownerData.workspaceId)));
-    const invalidDurationInvoice = await page.request.post('/api/invoices', { data: { timeEntryIds: [invalidDurationEntry.id] } });
-    expect(invalidDurationInvoice.status()).toBe(400);
-
+    // Prepare valid invoice inputs before intentionally damaging this UTC
+    // capacity bucket: later writes must fail closed on the saved bad duration.
     const validSecondEntryResponse = await page.request.post('/api/v1/time-entries', {
       headers: { authorization: `Bearer ${rawKey}` },
       data: {
@@ -527,10 +527,34 @@ test.describe('Deep Authenticated Workflows', () => {
         status: 'submitted',
       },
     });
-    expect(validSecondEntryResponse.ok()).toBeTruthy();
+    expect(validSecondEntryResponse.ok(), await validSecondEntryResponse.text()).toBeTruthy();
     const validSecondEntry = (await validSecondEntryResponse.json()).entry;
     const approveValidSecond = await page.request.post('/api/timer/approve', { data: { entryId: validSecondEntry.id } });
     expect(approveValidSecond.ok()).toBeTruthy();
+    await db
+      .update(timeEntries)
+      .set({ durationSeconds: -1 })
+      .where(and(eq(timeEntries.id, invalidDurationEntry.id), eq(timeEntries.workspaceId, ownerData.workspaceId)));
+    const invalidDurationInvoice = await page.request.post('/api/invoices', { data: { timeEntryIds: [invalidDurationEntry.id] } });
+    expect(invalidDurationInvoice.status()).toBe(400);
+
+    const beforeDamagedBucketWrite = await db.select().from(timeEntries)
+      .where(eq(timeEntries.workspaceId, ownerData.workspaceId)).orderBy(timeEntries.id);
+    const damagedBucketWrite = await page.request.post('/api/v1/time-entries', {
+      headers: { authorization: `Bearer ${rawKey}` },
+      data: {
+        userId: ownerData.userId,
+        startedAt: '2026-05-02T20:00:00.000Z',
+        stoppedAt: '2026-05-02T20:30:00.000Z',
+        hourlyRate: 50,
+        status: 'submitted',
+      },
+    });
+    expect(damagedBucketWrite.status(), await damagedBucketWrite.text()).toBe(409);
+    expect(await damagedBucketWrite.json()).toMatchObject({ error: 'Saved time data is invalid. Ask a workspace manager to review it.', resource: 'time-entries' });
+    const afterDamagedBucketWrite = await db.select().from(timeEntries)
+      .where(eq(timeEntries.workspaceId, ownerData.workspaceId)).orderBy(timeEntries.id);
+    expect(afterDamagedBucketWrite).toEqual(beforeDamagedBucketWrite);
     const mixedValidityInvoice = await page.request.post('/api/invoices', { data: { timeEntryIds: [validSecondEntry.id, invalidRateEntry.id] } });
     expect(mixedValidityInvoice.status()).toBe(400);
     const validSecondEntries = await page.request.get(`/api/v1/time-entries?status=approved&userId=${ownerData.userId}`, {
@@ -720,7 +744,7 @@ test.describe('Deep Authenticated Workflows', () => {
       },
     });
     expect(invalidPatch.status()).toBe(400);
-    await expect(invalidPatch.json()).resolves.toMatchObject({ error: expect.stringContaining('actionId') });
+    await expect(invalidPatch.json()).resolves.toMatchObject({ error: 'Choose a work type belonging to the assigned member.' });
 
     const unchangedBlock = await db
       .select({ actionId: scheduledWorkBlocks.actionId })

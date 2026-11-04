@@ -4,7 +4,12 @@ import { db } from "@/lib/db";
 import { integrationConnections, invoices, type IntegrationProvider } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { buildInvoiceProofPack } from "@/lib/invoice-proof-pack";
+import { WorkflowError } from "@/lib/workflow-validation";
+import { duplicateInvoiceConflict, hasDuplicateInvoiceLinks } from "@/lib/invoice-client-state";
+import { exposeInvoice, lockInvoiceLifecycle } from "@/lib/invoice-lifecycle";
+import { integrationFetch, integrationResponseJson, invalidProviderResponse, integrationFailureKind, providerObject, providerString } from "@/lib/integrations/errors";
 import { decryptSecret, encryptSecret } from "@/lib/integrations/crypto";
+import { abandonUnsentQuickBooksInvoice, assertQuickBooksCurrent, claimQuickBooksInvoice, claimQuickBooksRefresh, confirmQuickBooksInvoice, confirmedQuickBooksReceipt, quickBooksChanged, quickBooksIdentity, quickBooksOwnership } from "@/lib/integrations/quickbooks-operations";
 import {
   findSyncRecord,
   getIntegrationConnection,
@@ -12,7 +17,6 @@ import {
   markIntegrationSynced,
   type IntegrationConnection,
   upsertIntegrationConnection,
-  upsertSyncRecord,
 } from "@/lib/integrations/connections";
 
 export const QUICKBOOKS_PROVIDER: IntegrationProvider = "quickbooks";
@@ -66,7 +70,7 @@ type QuickBooksInvoiceResponse = {
 
 async function tokenRequest(body: URLSearchParams) {
   if (!env.QUICKBOOKS_CLIENT_ID || !env.QUICKBOOKS_CLIENT_SECRET) throw new Error("QuickBooks OAuth is not configured");
-  const response = await fetch(QUICKBOOKS_TOKEN_URL, {
+  const response = await integrationFetch(QUICKBOOKS_PROVIDER, QUICKBOOKS_TOKEN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -75,11 +79,13 @@ async function tokenRequest(body: URLSearchParams) {
     },
     body,
     cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
   });
-  const data = await response.json() as QuickBooksTokenResponse;
-  if (!response.ok || data.error || !data.access_token) {
-    throw new Error(data.error_description || data.error || "QuickBooks token request failed");
-  }
+  const data = await integrationResponseJson(QUICKBOOKS_PROVIDER, response) as QuickBooksTokenResponse;
+  if (data.error || !providerString(data.access_token)
+    || (data.refresh_token !== undefined && !providerString(data.refresh_token))
+    || (data.expires_in !== undefined && (typeof data.expires_in !== "number" || !Number.isFinite(data.expires_in)))
+    || (data.token_type !== undefined && !providerString(data.token_type))) throw invalidProviderResponse(QUICKBOOKS_PROVIDER);
   return data;
 }
 
@@ -92,6 +98,7 @@ export async function exchangeQuickBooksAuthorizationCode(code: string) {
 }
 
 export async function storeQuickBooksConnection(input: { workspaceId: string; userId: string; realmId: string; token: QuickBooksTokenResponse }) {
+  if (!providerString(input.token.access_token) || !providerString(input.token.refresh_token)) throw invalidProviderResponse(QUICKBOOKS_PROVIDER);
   const expiresAt = new Date(Date.now() + Math.max(60, input.token.expires_in ?? 3600) * 1000);
   return upsertIntegrationConnection({
     workspaceId: input.workspaceId,
@@ -106,17 +113,21 @@ export async function storeQuickBooksConnection(input: { workspaceId: string; us
       tokenType: input.token.token_type ?? "Bearer",
     },
     config: {
+      connectionGeneration: crypto.randomUUID(),
       realmId: input.realmId,
       environment: env.QUICKBOOKS_ENVIRONMENT === "production" ? "production" : "sandbox",
       customerRefId: null,
       serviceItemRefId: null,
     },
     tokenExpiresAt: expiresAt,
+    lastSyncedAt: null,
     lastError: null,
   });
 }
 
 export async function ensureQuickBooksAccessToken(connection: IntegrationConnection) {
+  quickBooksIdentity(connection);
+  await assertQuickBooksCurrent(connection);
   const expiresAt = connection.tokenExpiresAt ? new Date(connection.tokenExpiresAt).getTime() : 0;
   const encryptedAccessToken = connection.credentials.accessToken;
   if (encryptedAccessToken && expiresAt > Date.now() + 60_000) {
@@ -125,10 +136,12 @@ export async function ensureQuickBooksAccessToken(connection: IntegrationConnect
   }
 
   const refreshToken = decryptSecret(connection.credentials.refreshToken);
-  if (!refreshToken) throw new Error("QuickBooks refresh token is missing. Reconnect QuickBooks.");
+  if (!refreshToken) throw new WorkflowError("QuickBooks refresh token is missing. Reconnect QuickBooks.", 409);
+  await claimQuickBooksRefresh(connection);
+  await assertQuickBooksCurrent(connection);
   const token = await tokenRequest(new URLSearchParams({ refresh_token: refreshToken, grant_type: "refresh_token" }));
   const nextExpiresAt = new Date(Date.now() + Math.max(60, token.expires_in ?? 3600) * 1000);
-  await db
+  const [updated] = await db
     .update(integrationConnections)
     .set({
       credentials: {
@@ -142,15 +155,18 @@ export async function ensureQuickBooksAccessToken(connection: IntegrationConnect
       lastError: null,
       updatedAt: new Date(),
     })
-    .where(and(eq(integrationConnections.id, connection.id), eq(integrationConnections.workspaceId, connection.workspaceId)));
+    .where(quickBooksOwnership(connection)).returning();
+  if (!updated) throw new WorkflowError(quickBooksChanged, 409);
+  Object.assign(connection, updated);
   return token.access_token;
 }
 
 async function quickBooksFetch<T>(connection: IntegrationConnection, path: string, init?: RequestInit) {
-  const realmId = typeof connection.config.realmId === "string" ? connection.config.realmId : connection.externalAccountId;
-  if (!realmId) throw new Error("QuickBooks realm ID is missing. Reconnect QuickBooks.");
+  const { realmId, environment } = quickBooksIdentity(connection);
   const accessToken = await ensureQuickBooksAccessToken(connection);
-  const response = await fetch(`${quickBooksApiBase()}/v3/company/${encodeURIComponent(realmId)}${path}`, {
+  await assertQuickBooksCurrent(connection);
+  const base = environment === "production" ? "https://quickbooks.api.intuit.com" : "https://sandbox-quickbooks.api.intuit.com";
+  const response = await integrationFetch(QUICKBOOKS_PROVIDER, `${base}/v3/company/${encodeURIComponent(realmId)}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -159,12 +175,9 @@ async function quickBooksFetch<T>(connection: IntegrationConnection, path: strin
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
+    signal: init?.signal ?? AbortSignal.timeout(20_000),
   });
-  const data = await response.json() as T & { Fault?: { Error?: Array<{ Message?: string; Detail?: string }> } };
-  if (!response.ok) {
-    const fault = data.Fault?.Error?.[0];
-    throw new Error(fault?.Detail || fault?.Message || `QuickBooks request failed with ${response.status}`);
-  }
+  const data = await integrationResponseJson(QUICKBOOKS_PROVIDER, response, init?.signal);
   return data as T;
 }
 
@@ -175,14 +188,15 @@ function stringConfig(connection: IntegrationConnection, key: string) {
 
 export async function testQuickBooksConnection(workspaceId: string) {
   const connection = await getIntegrationConnection(workspaceId, QUICKBOOKS_PROVIDER);
-  if (!connection || connection.status === "disabled") throw new Error("QuickBooks is not connected");
-  await quickBooksFetch(connection, "/companyinfo/1?minorversion=75");
+  if (!connection || connection.status === "disabled") throw new WorkflowError("QuickBooks is not connected", 404);
+  const data = await quickBooksFetch<Record<string, unknown>>(connection, "/companyinfo/1?minorversion=75");
+  if (!providerObject(data.CompanyInfo) || !providerString(data.CompanyInfo.Id)) throw invalidProviderResponse(QUICKBOOKS_PROVIDER);
   await markIntegrationSynced(connection);
 }
 
 export async function updateQuickBooksConfig(input: { workspaceId: string; customerRefId?: string | null; serviceItemRefId?: string | null }) {
   const connection = await getIntegrationConnection(input.workspaceId, QUICKBOOKS_PROVIDER);
-  if (!connection) throw new Error("QuickBooks is not connected");
+  if (!connection || connection.status === "disabled") throw new WorkflowError("QuickBooks is not connected", 404);
   const [updated] = await db
     .update(integrationConnections)
     .set({
@@ -194,25 +208,34 @@ export async function updateQuickBooksConfig(input: { workspaceId: string; custo
       updatedAt: new Date(),
       lastError: null,
     })
-    .where(and(eq(integrationConnections.id, connection.id), eq(integrationConnections.workspaceId, input.workspaceId)))
+    .where(quickBooksOwnership(connection))
     .returning();
+  if (!updated) throw new WorkflowError(quickBooksChanged, 409);
   return updated;
 }
 
 export async function pushInvoiceToQuickBooks(input: { workspaceId: string; invoiceId: string; customerRefId?: string | null; serviceItemRefId?: string | null }) {
+  // Commit the scoped, monotonic-status check before touching credentials or
+  // receipts. This is a local perimeter, not an atomic DB/provider export.
+  const invoice = await db.transaction(async (tx) => {
+    await lockInvoiceLifecycle(tx, input.workspaceId);
+    const [current] = await tx.select().from(invoices)
+      .where(and(eq(invoices.workspaceId, input.workspaceId), eq(invoices.id, input.invoiceId))).for("update");
+    if (!current) throw new WorkflowError("Invoice not found.", 404);
+    if (hasDuplicateInvoiceLinks(current.timeEntryIds)) throw new WorkflowError(duplicateInvoiceConflict, 409);
+    if (current.status !== "sent" && current.status !== "paid") throw new WorkflowError("Review the invoice and mark it as sent before pushing it to QuickBooks.", 409);
+    // Durable even if integration receipts later disappear on disconnect.
+    await exposeInvoice(tx, input.workspaceId, current.id, "quickbooks", "QuickBooks invoice push attempted");
+    return current;
+  }, { isolationLevel: "read committed" });
   const connection = await getIntegrationConnection(input.workspaceId, QUICKBOOKS_PROVIDER);
-  if (!connection || connection.status === "disabled") throw new Error("QuickBooks is not connected");
-  const [invoice] = await db
-    .select()
-    .from(invoices)
-    .where(and(eq(invoices.workspaceId, input.workspaceId), eq(invoices.id, input.invoiceId)));
-  if (!invoice) throw new Error("Invoice not found");
+  if (!connection || connection.status === "disabled") throw new WorkflowError("QuickBooks is not connected", 404);
 
   const proof = await buildInvoiceProofPack(input.workspaceId, input.invoiceId);
   const customerRefId = input.customerRefId || stringConfig(connection, "customerRefId");
   const serviceItemRefId = input.serviceItemRefId || stringConfig(connection, "serviceItemRefId");
   if (!customerRefId || !serviceItemRefId) {
-    throw new Error("Set QuickBooks customerRefId and serviceItemRefId before pushing invoices.");
+    throw new WorkflowError("Set QuickBooks customerRefId and serviceItemRefId before pushing invoices.", 400);
   }
 
   const existing = await findSyncRecord({
@@ -221,7 +244,16 @@ export async function pushInvoiceToQuickBooks(input: { workspaceId: string; invo
     resourceType: "invoice",
     resourceId: invoice.id,
   });
-  if (existing?.externalId) return { externalId: existing.externalId, reused: true };
+  if (existing) {
+    await assertQuickBooksCurrent(connection);
+    return { externalId: confirmedQuickBooksReceipt(existing, connection), reused: true };
+  }
+
+  // Refresh before reserving an invoice: a proven authorization/config failure
+  // must not strand an invoice that was never dispatched.
+  const accessToken = await ensureQuickBooksAccessToken(connection);
+  let reservation: Awaited<ReturnType<typeof claimQuickBooksInvoice>> | undefined;
+  let dispatched = false;
 
   try {
     const description = [
@@ -245,25 +277,27 @@ export async function pushInvoiceToQuickBooks(input: { workspaceId: string; invo
       ],
       PrivateNote: proof ? `SOWLedger proof digest ${proof.digest}` : "Created from SOWLedger.",
     };
-    const data = await quickBooksFetch<QuickBooksInvoiceResponse>(connection, "/invoice?minorversion=75", {
+    reservation = await claimQuickBooksInvoice(connection, invoice.id, payload);
+    if (reservation.reused) return { externalId: reservation.externalId, reused: true };
+    await assertQuickBooksCurrent(connection);
+    const { realmId, environment } = quickBooksIdentity(connection);
+    const base = environment === "production" ? "https://quickbooks.api.intuit.com" : "https://sandbox-quickbooks.api.intuit.com";
+    dispatched = true;
+    const response = await integrationFetch(QUICKBOOKS_PROVIDER, `${base}/v3/company/${encodeURIComponent(realmId)}/invoice?minorversion=75&requestid=${encodeURIComponent(String(reservation.record.metadata.requestId))}`, {
       method: "POST",
       body: JSON.stringify(payload),
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
+      cache: "no-store", signal: AbortSignal.timeout(20_000),
     });
+    const data = await integrationResponseJson(QUICKBOOKS_PROVIDER, response) as QuickBooksInvoiceResponse;
     const externalId = data.Invoice?.Id;
-    if (!externalId) throw new Error(data.Fault?.Error?.[0]?.Detail || "QuickBooks did not return an invoice ID");
-    await upsertSyncRecord({
-      workspaceId: input.workspaceId,
-      connectionId: connection.id,
-      provider: QUICKBOOKS_PROVIDER,
-      resourceType: "invoice",
-      resourceId: invoice.id,
-      externalId,
-      metadata: { docNumber: data.Invoice?.DocNumber ?? invoice.number, pushedAt: new Date().toISOString() },
-    });
+    if (!providerString(externalId)) throw invalidProviderResponse(QUICKBOOKS_PROVIDER);
+    await confirmQuickBooksInvoice(reservation.record, externalId, data.Invoice?.DocNumber ?? invoice.number);
     await markIntegrationSynced(connection);
     return { externalId, reused: false };
   } catch (error) {
-    await markIntegrationError(connection, error instanceof Error ? error.message : "QuickBooks push failed");
+    if (reservation && !reservation.reused && !dispatched) await abandonUnsentQuickBooksInvoice(reservation.record);
+    await markIntegrationError(connection, integrationFailureKind(error));
     throw error;
   }
 }

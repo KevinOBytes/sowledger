@@ -8,7 +8,7 @@ import { gotoApp } from "./helpers/navigation";
 const at = (value: string) => new Date(`2026-01-12T${value}:00.000Z`);
 
 test("paused entry edits preserve net duration and reject ranges shorter than breaks", () => {
-  const entry = { startedAt: at("09:00"), stoppedAt: at("12:00"), durationSeconds: 7200 };
+  const entry = { startedAt: at("09:00"), stoppedAt: at("12:00"), durationSeconds: 7200, accumulatedSeconds: 3600 };
   expect(editedTimeDuration(entry, at("09:00"), at("12:00")).durationSeconds).toBe(7200);
   expect(editedTimeDuration(entry, at("09:00"), at("13:00")).durationSeconds).toBe(10800);
   expect(editedTimeDuration(entry, at("10:00"), at("12:00")).durationSeconds).toBe(3600);

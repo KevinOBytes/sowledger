@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Analytics } from "@vercel/analytics/next";
-import DatadogInit from "@/components/DatadogInit";
 import { Toaster } from "sonner";
 import { CookieConsent } from "@/components/cookie-consent";
-import { AnalyticsWrapper } from "@/components/analytics-wrapper";
+import { OptionalAnalytics } from "@/components/optional-analytics";
 import { MARKETING_DESCRIPTION, MARKETING_SOCIAL_IMAGE, MARKETING_TITLE, PUBLIC_SITE_URL } from "@/lib/marketing-metadata";
 import "./globals.css";
 
@@ -59,11 +57,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
-        <DatadogInit />
         {children}
-        <Toaster theme="light" richColors position="bottom-right" />
-        <Analytics />
-        {googleAnalyticsId ? <AnalyticsWrapper gaId={googleAnalyticsId} /> : null}
+        <Toaster theme="light" richColors position="bottom-right" closeButton toastOptions={{ closeButtonAriaLabel: "Dismiss notification", classNames: { closeButton: "h-7! w-7!" } }} />
+        <OptionalAnalytics gaId={googleAnalyticsId} vercelEnabled={process.env.NODE_ENV === "production" && process.env.VERCEL === "1" && process.env.SOWLEDGER_TEST_DATABASE !== "true"} />
         <CookieConsent />
       </body>
     </html>

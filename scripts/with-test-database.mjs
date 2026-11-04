@@ -53,11 +53,13 @@ try {
     "NEXT_PUBLIC_DATADOG_APPLICATION_ID", "NEXT_PUBLIC_DATADOG_CLIENT_TOKEN",
     "NEXT_PUBLIC_DATADOG_SITE", "NEXT_PUBLIC_SENTRY_DSN", "SENTRY_DSN",
     "SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT",
+    "VERCEL", "VERCEL_ENV", "VERCEL_TARGET_ENV",
+    "NEXT_PUBLIC_VERCEL_OBSERVABILITY_BASEPATH", "NEXT_PUBLIC_VERCEL_OBSERVABILITY_CLIENT_CONFIG",
   ];
   for (const key of disabledKeys) childEnv[key] = "";
   // Also clear matching inherited extensions and future provider variables.
   for (const key of Object.keys(childEnv)) {
-    if (/^(RESEND_|STRIPE_|NEXT_PUBLIC_STRIPE_|GOOGLE_CALENDAR_|SLACK_|QUICKBOOKS_|SENTRY_|NEXT_PUBLIC_SENTRY_|NEXT_PUBLIC_GA_|NEXT_PUBLIC_DATADOG_|UPSTASH_|KV_|REDIS_)/.test(key)) childEnv[key] = "";
+    if (/^(RESEND_|STRIPE_|NEXT_PUBLIC_STRIPE_|GOOGLE_CALENDAR_|SLACK_|QUICKBOOKS_|SENTRY_|NEXT_PUBLIC_SENTRY_|NEXT_PUBLIC_GA_|NEXT_PUBLIC_DATADOG_|NEXT_PUBLIC_VERCEL_OBSERVABILITY_|UPSTASH_|KV_|REDIS_)/.test(key)) childEnv[key] = "";
   }
   console.log(`Using isolated database branch ${branch.name} (${branch.id}).`);
   const child = spawn(command[0], command.slice(1), { env: childEnv, stdio: "inherit" });

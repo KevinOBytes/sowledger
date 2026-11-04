@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, Code2, CreditCard, FileDown, Plug, Settings, Tag, UserRound, Webhook } from "lucide-react";
+import { Bell, Code2, CreditCard, FileDown, Plug, Tag, UserRound, Webhook } from "lucide-react";
 import { DataLoadNotice } from "@/components/data-load-notice";
+import { normalizeTags } from "@/lib/validators";
 
 type UserData = {
   id: string;
@@ -12,14 +13,21 @@ type UserData = {
   displayName: string;
   timezone: string;
   preferredTags: string[];
+  calendarPreferences: { visibleStartHour?: number; visibleEndHour?: number };
 };
+
+function isProfile(value: unknown): value is UserData {
+  if (!value || typeof value !== "object") return false;
+  const user = value as Record<string, unknown>;
+  return typeof user.id === "string" && !!user.id && typeof user.email === "string" && typeof user.displayName === "string" && typeof user.timezone === "string" && Array.isArray(user.preferredTags) && user.preferredTags.every(tag => typeof tag === "string") && !!user.calendarPreferences && typeof user.calendarPreferences === "object" && !Array.isArray(user.calendarPreferences);
+}
 
 const SETTINGS_LINKS = [
   { href: "/settings/billing", title: "Billing", description: "View your plan and manage the workspace subscription.", icon: CreditCard },
   { href: "/integrations", title: "Integrations", description: "Connect Google Calendar, Slack, QuickBooks, and your own tools.", icon: Plug },
   { href: "/settings/developers", title: "Developers", description: "Create API keys, review requests, and find documentation.", icon: Code2 },
   { href: "/exports", title: "Exports", description: "Download time-entry spreadsheets or workspace records.", icon: FileDown },
-  { href: "/settings/tags", title: "Tags", description: "Organize work with shared tags and billing defaults.", icon: Tag },
+  { href: "/settings/tags", title: "Tags", description: "Manage shared tag names, colors, and reference labels.", icon: Tag },
   { href: "/settings/actions", title: "Work types", description: "Save the work types and rates you use often.", icon: Bell },
   { href: "/settings/webhooks", title: "Webhooks", description: "Connect SOWLedger events to external systems.", icon: Webhook },
 ];
@@ -33,11 +41,15 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const feedbackRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
+    let active = true;
     fetch("/api/user/settings")
       .then((res) => {
+        if (!active) return null;
         if (res.status === 401) {
           router.push("/login");
           return null;
@@ -46,46 +58,54 @@ export default function SettingsPage() {
         return res.json() as Promise<{ ok: boolean; user: UserData }>;
       })
       .then((data) => {
-        if (!data) return;
-        if (!data.ok || !data.user) throw new Error("Settings response is incomplete");
+        if (!active || !data) return;
+        if (!data.ok || !isProfile(data.user)) throw new Error("Settings response is incomplete");
         setUser(data.user);
         setDisplayName(data.user.displayName ?? "");
         setTimezone(data.user.timezone ?? "UTC");
         setPreferredTags((data.user.preferredTags ?? []).join(", "));
       })
-      .catch(() => setLoadError(true))
-      .finally(() => setLoading(false));
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [router]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (savingRef.current || !user) return;
+    savingRef.current = true;
     setSaving(true);
     setMessage(null);
+    const submitted = { displayName: displayName.trim(), timezone, preferredTags: normalizeTags(preferredTags.split(",")) };
 
     try {
       const res = await fetch("/api/user/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          displayName: displayName.trim() || undefined,
-          timezone,
-          preferredTags: preferredTags.split(",").map((t) => t.trim()).filter(Boolean),
-        }),
+        body: JSON.stringify(submitted),
       });
 
       const data = await res.json() as { ok?: boolean; user?: UserData; error?: string };
-      if (res.ok && data.user) {
+      if (res.ok && data.ok === true && isProfile(data.user) && data.user.id === user.id && data.user.email === user.email && data.user.displayName === submitted.displayName && data.user.timezone === submitted.timezone && JSON.stringify(data.user.preferredTags) === JSON.stringify(submitted.preferredTags)) {
         setUser(data.user);
+        setDisplayName(data.user.displayName);
+        setTimezone(data.user.timezone);
+        setPreferredTags(data.user.preferredTags.join(", "));
         setMessage({ type: "success", text: "Settings saved." });
       } else {
-        setMessage({ type: "error", text: data.error ?? "Could not save your settings. Please try again." });
+        setMessage({ type: "error", text: "Could not confirm your settings were saved. Your changes are still here; please try again." });
       }
     } catch {
       setMessage({ type: "error", text: "Could not save your settings. Your changes are still here; please try again." });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
+
+  useEffect(() => {
+    if (message?.type === "error") feedbackRef.current?.focus();
+  }, [message]);
 
   if (loading) {
     return (
@@ -103,35 +123,34 @@ export default function SettingsPage() {
     <main className="min-h-screen bg-[#f6f3ee] p-4 text-slate-950 sm:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">Settings</p>
-          <h1 className="mt-2 flex items-center gap-3 text-3xl font-semibold tracking-tight sm:text-4xl"><Settings className="h-7 w-7 text-cyan-700" />Settings</h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
           {user && <p className="mt-2 text-sm text-slate-500">Signed in as {user.email}</p>}
         </header>
 
         <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <form onSubmit={handleSave} className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center gap-3"><UserRound className="h-5 w-5 text-cyan-700" /><h2 className="text-xl font-semibold">Your profile</h2></div>
-            <div className="space-y-5">
-              <label htmlFor="displayName" className="block text-sm font-bold text-slate-700">Display name<input id="displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
-              <label htmlFor="timezone" className="block text-sm font-bold text-slate-700">Timezone<input id="timezone" type="text" value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="UTC" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /><span className="mt-1 block text-xs font-normal text-slate-500">Use an IANA timezone, for example America/New_York.</span></label>
+            <fieldset disabled={saving} className="min-w-0 space-y-5">
+              <label htmlFor="displayName" className="block text-sm font-bold text-slate-700">Display name<input id="displayName" type="text" autoComplete="name" maxLength={255} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /></label>
+              <label htmlFor="timezone" className="block text-sm font-bold text-slate-700">Timezone<input id="timezone" type="text" required maxLength={100} value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="UTC" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /><span className="mt-1 block text-xs font-normal text-slate-500">Use an IANA timezone, for example America/New_York.</span></label>
               <label htmlFor="preferredTags" className="block text-sm font-bold text-slate-700">Preferred tags<input id="preferredTags" type="text" value={preferredTags} onChange={(e) => setPreferredTags(e.target.value)} placeholder="focus, client-a, deep-work" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none transition focus:border-cyan-500 focus:bg-white" /><span className="mt-1 block text-xs font-normal text-slate-500">Separate your preferred tags with commas. These are saved to your profile.</span></label>
-              {message && <div className={`rounded-2xl px-3 py-2 text-sm font-semibold ${message.type === "success" ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "border border-rose-200 bg-rose-50 text-rose-700"}`}>{message.text}</div>}
+              {message && <div ref={feedbackRef} tabIndex={-1} role={message.type === "error" ? "alert" : "status"} className={`rounded-2xl px-3 py-2 text-sm font-semibold ${message.type === "success" ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "border border-rose-200 bg-rose-50 text-rose-700"}`}>{message.text}</div>}
+              {saving && <p role="status" className="text-sm text-slate-500">Saving your profile…</p>}
               <button type="submit" disabled={saving} className="w-full rounded-2xl bg-slate-950 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:opacity-50">{saving ? "Saving..." : "Save settings"}</button>
-            </div>
+            </fieldset>
           </form>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <nav aria-label="Settings navigation" className="self-start rounded-[28px] border border-slate-200 bg-white p-2 shadow-sm"><ul className="divide-y divide-slate-100">
             {SETTINGS_LINKS.map((item) => {
               const Icon = item.icon;
               return (
-                <Link key={item.href} href={item.href} className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md">
-                  <div className="rounded-2xl bg-cyan-50 p-3 text-cyan-700 w-fit"><Icon className="h-5 w-5" /></div>
-                  <h2 className="mt-4 text-xl font-semibold">{item.title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">{item.description}</p>
-                </Link>
+                <li key={item.href}><Link href={item.href} className="flex items-start gap-3 rounded-2xl p-4 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-cyan-600">
+                  <Icon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-cyan-700" />
+                  <span className="min-w-0"><span className="block font-semibold">{item.title}</span><span className="mt-1 block text-sm text-slate-500">{item.description}</span></span>
+                </Link></li>
               );
             })}
-          </div>
+          </ul></nav>
         </section>
       </div>
     </main>

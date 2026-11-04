@@ -1,7 +1,9 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { ensureWorkspaceSchema } from "@/lib/db/ensure-workspace-schema";
+import { WorkflowError } from "@/lib/workflow-validation";
+import { integrationFailureSummary, type IntegrationFailureKind } from "@/lib/integrations/errors";
 import {
   integrationConnections,
   integrationSyncRecords,
@@ -27,6 +29,35 @@ export type PublicIntegrationConnection = {
 
 export type IntegrationConnection = typeof integrationConnections.$inferSelect;
 
+export function integrationConnectionGeneration(connection: IntegrationConnection) {
+  const value = connection.config.connectionGeneration;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+// A late token refresh or sync result must never resurrect a disconnected
+// connection or replace credentials/status saved by a subsequent OAuth flow.
+// Google results also belong to the exact calendar/settings snapshot they used.
+export async function updateCurrentIntegrationConnection(
+  connection: IntegrationConnection,
+  updates: Partial<typeof integrationConnections.$inferInsert>,
+) {
+  const [updated] = await db.update(integrationConnections).set(updates).where(and(
+    eq(integrationConnections.id, connection.id),
+    eq(integrationConnections.workspaceId, connection.workspaceId),
+    eq(integrationConnections.provider, connection.provider),
+    ne(integrationConnections.status, "disabled"),
+    ...(connection.provider === "google_calendar" ? [
+      eq(sql<string>`coalesce(${integrationConnections.config}->>'connectionGeneration', '')`, integrationConnectionGeneration(connection) ?? ""),
+      eq(integrationConnections.config, connection.config),
+    ] : []),
+    ...(connection.provider === "quickbooks" ? [
+      eq(integrationConnections.config, connection.config),
+      eq(integrationConnections.credentials, connection.credentials),
+    ] : []),
+  )).returning();
+  return updated ?? null;
+}
+
 function iso(value: Date | string | null | undefined) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -43,7 +74,7 @@ export function toPublicConnection(connection: IntegrationConnection): PublicInt
     config: connection.config ?? {},
     tokenExpiresAt: iso(connection.tokenExpiresAt),
     lastSyncedAt: iso(connection.lastSyncedAt),
-    lastError: connection.lastError,
+    lastError: connection.lastError ? integrationFailureSummary(connection.provider, "unexpected") : null,
     createdAt: iso(connection.createdAt),
     updatedAt: iso(connection.updatedAt),
   };
@@ -71,6 +102,7 @@ export async function upsertIntegrationConnection(input: {
   workspaceId: string;
   provider: IntegrationProvider;
   createdByUserId: string;
+  replaceCreatedByUser?: boolean;
   status?: IntegrationStatus;
   displayName?: string | null;
   externalAccountId?: string | null;
@@ -78,19 +110,20 @@ export async function upsertIntegrationConnection(input: {
   config?: Record<string, unknown>;
   tokenExpiresAt?: Date | null;
   lastSyncedAt?: Date | null;
-  lastError?: string | null;
+  lastError?: IntegrationFailureKind | null;
 }) {
   await ensureWorkspaceSchema();
   const existing = await getIntegrationConnection(input.workspaceId, input.provider);
   const updates = {
+    ...(input.replaceCreatedByUser ? { createdByUserId: input.createdByUserId } : {}),
     status: input.status ?? "connected",
     displayName: input.displayName ?? existing?.displayName ?? null,
     externalAccountId: input.externalAccountId ?? existing?.externalAccountId ?? null,
     credentials: input.credentials ?? existing?.credentials ?? {},
     config: input.config ?? existing?.config ?? {},
     tokenExpiresAt: input.tokenExpiresAt ?? existing?.tokenExpiresAt ?? null,
-    lastSyncedAt: input.lastSyncedAt ?? existing?.lastSyncedAt ?? null,
-    lastError: input.lastError ?? null,
+    lastSyncedAt: input.lastSyncedAt === undefined ? existing?.lastSyncedAt ?? null : input.lastSyncedAt,
+    lastError: input.lastError == null ? null : integrationFailureSummary(input.provider, input.lastError),
     updatedAt: new Date(),
   } satisfies Partial<typeof integrationConnections.$inferInsert>;
 
@@ -111,21 +144,19 @@ export async function upsertIntegrationConnection(input: {
   return connection;
 }
 
-export async function markIntegrationError(connection: IntegrationConnection, message: string) {
-  const [updated] = await db
-    .update(integrationConnections)
-    .set({ status: "error", lastError: message.slice(0, 1000), updatedAt: new Date() })
-    .where(and(eq(integrationConnections.id, connection.id), eq(integrationConnections.workspaceId, connection.workspaceId)))
-    .returning();
+export async function markIntegrationError(connection: IntegrationConnection, kind: IntegrationFailureKind) {
+  const updated = await updateCurrentIntegrationConnection(connection, { status: "error", lastError: integrationFailureSummary(connection.provider, kind), updatedAt: new Date() });
   return updated ?? connection;
 }
 
 export async function markIntegrationSynced(connection: IntegrationConnection) {
-  const [updated] = await db
-    .update(integrationConnections)
-    .set({ status: "connected", lastError: null, lastSyncedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(integrationConnections.id, connection.id), eq(integrationConnections.workspaceId, connection.workspaceId)))
-    .returning();
+  const updated = await updateCurrentIntegrationConnection(connection, { status: "connected", lastError: null, lastSyncedAt: new Date(), updatedAt: new Date() });
+  if (!updated && connection.provider === "google_calendar") {
+    throw new WorkflowError("Google Calendar settings changed before this sync could be confirmed. Sync again with the current settings.", 409);
+  }
+  if (!updated && connection.provider === "quickbooks") {
+    throw new WorkflowError("QuickBooks connection or credentials changed. Review the current connection before trying again.", 409);
+  }
   return updated ?? connection;
 }
 
@@ -183,10 +214,10 @@ export async function upsertSyncRecord(input: {
   externalUrl?: string | null;
   syncStatus?: "synced" | "error" | "deleted";
   metadata?: Record<string, unknown>;
-  lastError?: string | null;
-}) {
+  lastError?: IntegrationFailureKind | null;
+}, client: Pick<typeof db, "select" | "insert"> = db) {
   await ensureWorkspaceSchema();
-  const [connection] = await db
+  const [connection] = await client
     .select({ id: integrationConnections.id })
     .from(integrationConnections)
     .where(and(
@@ -205,11 +236,11 @@ export async function upsertSyncRecord(input: {
     externalUrl: input.externalUrl ?? null,
     syncStatus: input.syncStatus ?? "synced",
     metadata: input.metadata ?? {},
-    lastError: input.lastError ?? null,
+    lastError: input.lastError == null ? null : integrationFailureSummary(input.provider, input.lastError),
     lastSyncedAt: new Date(),
   } satisfies Partial<typeof integrationSyncRecords.$inferInsert>;
 
-  const [record] = await db
+  const [record] = await client
     .insert(integrationSyncRecords)
     .values({ id: crypto.randomUUID(), workspaceId: input.workspaceId, ...values })
     .onConflictDoUpdate({

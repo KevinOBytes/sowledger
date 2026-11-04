@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { workspaces } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { reportUnexpectedRequestFailure } from "@/lib/workflow-validation";
 
 export async function GET(request: Request) {
   if (process.env.NODE_ENV === "production" || process.env.SOWLEDGER_TEST_DATABASE !== "true") {
@@ -50,8 +51,8 @@ export async function GET(request: Request) {
     });
     
     return NextResponse.json({ success: true, userId: user.id, workspaceId: workspace.id });
-  } catch (error) {
-    console.error("Test login error:", error);
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  } catch {
+    reportUnexpectedRequestFailure({ route: "/api/test/login", method: "GET" });
+    return NextResponse.json({ error: "Test sign-in failed." }, { status: 500 });
   }
 }

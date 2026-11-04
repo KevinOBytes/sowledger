@@ -1,78 +1,88 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { invoices as invoicesTable, memberships as membershipsTable, timeEntries as timeEntriesTable, projects as projectsTable, users as usersTable } from "@/lib/db/schema";
+import { clients, invoices as invoicesTable, invoiceLifecycle, memberships, timeEntries, projects, users } from "@/lib/db/schema";
 import { dispatchIntegrationNotification } from "@/lib/integrations/notifications";
-import { appendAuditLog, dispatchWebhook } from "@/lib/security";
-import { entryIdsFrom, WorkflowError, workflowErrorResponse } from "@/lib/workflow-validation";
+import { dispatchWebhook } from "@/lib/security";
+import { readRequestJson, workflowErrorResponse, WorkflowError, entryIdsFrom } from "@/lib/workflow-validation";
+import { parseDueDate } from "@/lib/date-input";
 import { getAppOrigin } from "@/lib/app-url";
-import { timeEntryAmountCents } from "@/lib/invoice-amount";
-import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
+import { InvoiceAmountError } from "@/lib/invoice-amount";
+import { classifyInvoiceGraph, classifyInvoiceSelection, createInvoiceFromSelection } from "@/lib/invoice-selection";
+import { desc, eq, and, inArray } from "drizzle-orm";
+import { invoiceVoidEligibility, reserveInvoiceNotificationExposure, verifiedReleasedInvoiceIds } from "@/lib/invoice-lifecycle";
 
-function invoiceNumberFromId(id: string, date = new Date()) {
-  const day = date.toISOString().slice(0, 10).replaceAll("-", "");
-  return `INV-${day}-${id.slice(0, 8).toUpperCase()}`;
+function invoiceError(error: unknown, fallback: string, method?: "POST") {
+  if (error instanceof InvoiceAmountError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+  return workflowErrorResponse(error, fallback, method ? { route: "/api/invoices", method } : undefined);
 }
 
 export async function GET() {
   try {
     const session = await requireSession();
-    // Members can view invoices
     requireRole("member", session.role);
-
+    const isMember = session.role === "member";
     const { checkWorkspaceLimits } = await import("@/lib/billing");
     const limits = await checkWorkspaceLimits(session.workspaceId, "invoices");
     if (!limits.allowed) return NextResponse.json({ error: limits.error, requiresUpgrade: true, invoices: [], billableEntries: [] }, { status: 402 });
 
-    const workspaceInvoices = await db.select().from(invoicesTable)
-      .where(eq(invoicesTable.workspaceId, session.workspaceId))
-      .orderBy(desc(invoicesTable.createdAt));
-      
-    const workspaceProjects = await db.select().from(projectsTable)
-      .where(eq(projectsTable.workspaceId, session.workspaceId));
-
-    const invoices = workspaceInvoices.map((i) => {
-        const project = i.projectId ? workspaceProjects.find(p => p.id === i.projectId) : null;
-        return {
-          ...i,
-          projectName: project?.name || "General Workspace",
-        };
-      });
-
-    // Also return approved but not invoiced entries so they can generate new invoices
-    const approvedEntries = await db.select().from(timeEntriesTable)
-      .where(
-        and(
-          eq(timeEntriesTable.workspaceId, session.workspaceId),
-          eq(timeEntriesTable.status, "approved"),
-          isNotNull(timeEntriesTable.hourlyRate),
-          isNotNull(timeEntriesTable.durationSeconds)
-        )
-      )
-      .orderBy(desc(timeEntriesTable.startedAt));
-
-    const workspaceMemberships = await db
-      .select({ userId: membershipsTable.userId })
-      .from(membershipsTable)
-      .where(eq(membershipsTable.workspaceId, session.workspaceId));
-    const workspaceUserIds = workspaceMemberships.map((membership) => membership.userId);
-    const workspaceUsers = workspaceUserIds.length > 0 ? await db.select().from(usersTable).where(inArray(usersTable.id, workspaceUserIds)) : [];
-
-    const billableEntries = approvedEntries.map((e) => {
-        const user = workspaceUsers.find(u => u.id === e.userId);
-        const project = e.projectId ? workspaceProjects.find(p => p.id === e.projectId) : null;
-        return {
-          ...e,
-          userEmail: user?.email || "Unknown User",
-          projectName: project?.name || "General",
-          amount: (e.durationSeconds! / 3600) * e.hourlyRate!,
-        };
-      });
-
-    return NextResponse.json({ ok: true, invoices, billableEntries, canManage: session.role === "manager" || session.role === "owner" });
-  } catch (error) {
-    return workflowErrorResponse(error, "Could not load invoices. Please try again.");
-  }
+    const workspaceInvoices = await db.select().from(invoicesTable).where(eq(invoicesTable.workspaceId, session.workspaceId)).orderBy(desc(invoicesTable.createdAt));
+    const released = await verifiedReleasedInvoiceIds(db, session.workspaceId, workspaceInvoices);
+    const lifecycles = isMember ? [] : await db.select().from(invoiceLifecycle).where(eq(invoiceLifecycle.workspaceId, session.workspaceId));
+    const workspaceProjects = await db.select().from(projects).where(eq(projects.workspaceId, session.workspaceId));
+    const workspaceClients = await db.select().from(clients).where(eq(clients.workspaceId, session.workspaceId));
+    // Keep malformed approved rows visible so managers can see why they cannot bill them.
+    const approvedEntries = await db.select().from(timeEntries).where(and(eq(timeEntries.workspaceId, session.workspaceId), eq(timeEntries.status, "approved"), isMember ? eq(timeEntries.userId, session.sub) : undefined)).orderBy(desc(timeEntries.startedAt));
+    const historyIds = [...new Set(workspaceInvoices.flatMap(invoice => Array.isArray(invoice.timeEntryIds) ? invoice.timeEntryIds.filter(id => typeof id === "string") : []))];
+    // The per-invoice 100-entry limit does not bound lifetime history. Keep all
+    // IDs, but leave ample headroom below PostgreSQL's 16-bit bind count.
+    const historyEntries = new Map<string, { id: string; projectId: string | null; userId: string }>();
+    for (let offset = 0; offset < historyIds.length; offset += 1000) {
+      const chunk = historyIds.slice(offset, offset + 1000);
+      const entries = await db.select({ id: timeEntries.id, projectId: timeEntries.projectId, userId: timeEntries.userId }).from(timeEntries).where(and(eq(timeEntries.workspaceId, session.workspaceId), inArray(timeEntries.id, chunk)));
+      for (const entry of entries) historyEntries.set(entry.id, entry);
+    }
+    // Keep complete workspace history server-side for eligibility conflicts,
+    // but only expose member summaries whose entire linked graph is owned.
+    const visibleInvoices = isMember ? workspaceInvoices.filter(invoice => {
+      const ids = invoice.timeEntryIds;
+      return Array.isArray(ids) && ids.length > 0 && new Set(ids).size === ids.length
+        && ids.every(id => typeof id === "string" && id.trim().length > 0 && historyEntries.get(id)?.userId === session.sub);
+    }) : workspaceInvoices;
+    const invoices = await Promise.all(visibleInvoices.map(async invoice => {
+      let group: { clientId: string | null; clientName: string | null; billingAudience: "client" | "internal" | "unknown" } = { clientId: null, clientName: null, billingAudience: "unknown" };
+      const ids = invoice.timeEntryIds;
+      if (Array.isArray(ids) && ids.length && new Set(ids).size === ids.length) {
+        const linked = ids.flatMap(id => { const entry = historyEntries.get(id); return entry ? [entry] : []; });
+        if (linked.length === ids.length) try {
+          const { clientId, clientName, billingAudience } = classifyInvoiceGraph(linked, workspaceProjects, workspaceClients);
+          group = { clientId, clientName, billingAudience };
+        } catch { /* Unknown history must not imply portal visibility. */ }
+      }
+      return { ...invoice, ...group, projectName: workspaceProjects.find(p => p.id === invoice.projectId)?.name ?? "General Workspace", ...(!isMember ? { voidEligibility: await invoiceVoidEligibility(db, invoice, lifecycles.find(row => row.invoiceId === invoice.id)) } : {}) };
+    }));
+    const workspaceMemberships = await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.workspaceId, session.workspaceId));
+    // Users are global identities reached only through this workspace's memberships.
+    const userIds = [...new Set(workspaceMemberships.map(member => member.userId))];
+    const workspaceUsers = new Map<string, typeof users.$inferSelect>();
+    for (let offset = 0; offset < userIds.length; offset += 1000) {
+      const chunk = await db.select().from(users).where(inArray(users.id, userIds.slice(offset, offset + 1000)));
+      for (const user of chunk) workspaceUsers.set(user.id, user);
+    }
+    const billableEntries = approvedEntries.map(entry => {
+      let preview: { amountCents: number | null; amount: number | null; clientId: string | null; clientName: string | null; billingAudience: "client" | "internal" | null; eligible: boolean; ineligibleReason: string | null };
+      try {
+        const selection = classifyInvoiceSelection([entry], workspaceProjects, workspaceClients);
+        if (workspaceInvoices.some(invoice => !released.has(invoice.id) && Array.isArray(invoice.timeEntryIds) && invoice.timeEntryIds.includes(entry.id))) throw new WorkflowError("This time is already linked to an invoice. Ask a manager to review it.", 409);
+        preview = { ...selection, amount: selection.amountCents / 100, eligible: true, ineligibleReason: null };
+      } catch (error) {
+        if (!(error instanceof WorkflowError)) throw error;
+        preview = { amountCents: null, amount: null, clientId: null, clientName: null, billingAudience: null, eligible: false, ineligibleReason: error.message };
+      }
+      return { ...entry, durationSeconds: Number.isFinite(entry.durationSeconds) ? entry.durationSeconds : null, hourlyRate: Number.isFinite(entry.hourlyRate) ? entry.hourlyRate : null, userEmail: workspaceUsers.get(entry.userId)?.email ?? "Unknown User", projectName: workspaceProjects.find(project => project.id === entry.projectId)?.name ?? "General", ...preview };
+    });
+    return NextResponse.json({ ok: true, workspaceId: session.workspaceId, invoices, billableEntries, canManage: session.role === "manager" || session.role === "owner" });
+  } catch (error) { return invoiceError(error, "Could not load invoices. Please try again."); }
 }
 
 export async function POST(req: NextRequest) {
@@ -82,56 +92,20 @@ export async function POST(req: NextRequest) {
     const { checkWorkspaceLimits } = await import("@/lib/billing");
     const limits = await checkWorkspaceLimits(session.workspaceId, "invoices");
     if (!limits.allowed) return NextResponse.json({ error: limits.error }, { status: 402 });
-    const body = await req.json() as { timeEntryIds?: unknown; projectId?: string; dueDate?: string };
-    const timeEntryIds = entryIdsFrom(body?.timeEntryIds);
-    if (body.projectId !== undefined && (typeof body.projectId !== "string" || !body.projectId || body.projectId.length > 255)) throw new WorkflowError("Choose a valid project.", 400);
-    const dueDate = body.dueDate ? new Date(body.dueDate) : null;
-    if (body.dueDate !== undefined && (typeof body.dueDate !== "string" || !dueDate || !Number.isFinite(dueDate.getTime()))) throw new WorkflowError("Choose a valid due date.", 400);
-
-    const invoice = await db.transaction(async (tx) => {
-      const entries = await tx.select().from(timeEntriesTable).where(and(eq(timeEntriesTable.workspaceId, session.workspaceId), inArray(timeEntriesTable.id, timeEntryIds))).orderBy(timeEntriesTable.id).for("update");
-      if (entries.length !== timeEntryIds.length) throw new WorkflowError("One or more entries were not found.", 404);
-      for (const entry of entries) {
-        if (entry.status !== "approved" || !entry.stoppedAt) throw new WorkflowError("Only completed, approved time can be invoiced.", 409);
-        if (entry.durationSeconds === null || !Number.isFinite(entry.durationSeconds) || entry.durationSeconds <= 0 || entry.hourlyRate === null || !Number.isFinite(entry.hourlyRate) || entry.hourlyRate < 0) throw new WorkflowError("Every entry needs recorded time and a valid hourly rate.", 400);
-      }
-      const projectId = body.projectId ?? (entries.every((entry) => entry.projectId === entries[0].projectId) ? entries[0].projectId : null);
-      if (body.projectId && entries.some((entry) => entry.projectId !== body.projectId)) throw new WorkflowError("Selected entries must belong to the chosen project.", 400);
-      if (projectId) {
-        const [project] = await tx.select({ id: projectsTable.id }).from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.workspaceId, session.workspaceId)));
-        if (!project) throw new WorkflowError("Project not found.", 400);
-      }
-      // Round each line in cents so the printed line items add to the stored total.
-      const totalCents = entries.reduce((sum, entry) => sum + timeEntryAmountCents(entry.durationSeconds ?? 0, entry.hourlyRate ?? 0), 0);
-      if (!Number.isSafeInteger(totalCents) || totalCents < 0) throw new WorkflowError("The invoice total is invalid.", 400);
-      const invoiceId = crypto.randomUUID();
-      const [created] = await tx.insert(invoicesTable).values({
-        id: invoiceId, workspaceId: session.workspaceId, projectId,
-        number: invoiceNumberFromId(invoiceId), amount: totalCents / 100,
-        status: "draft", dueDate, timeEntryIds,
-      }).returning();
-      await tx.update(timeEntriesTable).set({ status: "invoiced" }).where(and(eq(timeEntriesTable.workspaceId, session.workspaceId), inArray(timeEntriesTable.id, timeEntryIds), eq(timeEntriesTable.status, "approved")));
-      for (const entry of entries) await appendAuditLog({
-        workspaceId: session.workspaceId, timeEntryId: entry.id, actorUserId: session.sub, eventType: "entry_invoiced",
-        diff: { status: { before: "approved", after: "invoiced" }, invoiceId: { before: null, after: invoiceId } },
-      }, tx);
-      await appendAuditLog({
-        workspaceId: session.workspaceId, timeEntryId: created.id, actorUserId: session.sub, eventType: "invoice_created",
-        diff: { invoice: { before: null, after: created } },
-      }, tx);
-      return created;
-    });
-
+    const raw: unknown = await readRequestJson(req);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new WorkflowError("Send a valid invoice selection.", 400);
+    const body = raw as Record<string, unknown>;
+    const timeEntryIds = entryIdsFrom(body.timeEntryIds);
+    if (body.projectId !== undefined && (typeof body.projectId !== "string" || !body.projectId.trim() || body.projectId.length > 255)) throw new WorkflowError("Choose a valid project.", 400);
+    const invoice = await createInvoiceFromSelection({ workspaceId: session.workspaceId, actorUserId: session.sub, ids: timeEntryIds, projectId: body.projectId as string | undefined, dueDate: parseDueDate(body.dueDate) });
+    // Register only after the entire callback transaction has committed.
     after(async () => {
+      if (!await reserveInvoiceNotificationExposure(session.workspaceId, invoice.id, session.sub)) return;
       await Promise.all([
         dispatchWebhook(session.workspaceId, "invoice.created", { invoiceId: invoice.id, number: invoice.number, amount: invoice.amount, status: invoice.status, timeEntryIds }),
-        dispatchIntegrationNotification(session.workspaceId, "invoice.created", {
-          title: `Invoice ${invoice.number} created`,
-          body: `Draft invoice for $${invoice.amount.toFixed(2)} with ${timeEntryIds.length} time entries.`,
-          url: `${getAppOrigin()}/invoices`,
-        }),
+        dispatchIntegrationNotification(session.workspaceId, "invoice.created", { title: `Invoice ${invoice.number} created`, body: `Draft invoice for $${invoice.amount.toFixed(2)} with ${timeEntryIds.length} time entries.`, url: `${getAppOrigin()}/invoices` }),
       ]);
     });
     return NextResponse.json({ ok: true, invoice });
-  } catch (error) { return workflowErrorResponse(error, "Could not create this invoice. Please try again."); }
+  } catch (error) { return invoiceError(error, "We couldn't confirm the invoice was saved. Refresh your invoices before trying again.", "POST"); }
 }

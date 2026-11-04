@@ -9,47 +9,61 @@ export function ProjectActions({ projectId, status }: { projectId: string; statu
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function toggleArchive() {
     setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/projects", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, status: status === "active" ? "archived" : "active" }),
       });
-      if (res.ok) {
-        router.refresh();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(typeof data.error === "string" ? data.error : "Could not update the project. Please try again.");
+        return;
       }
+      setIsOpen(false);
+      router.refresh();
+    } catch {
+      setError("Could not update the project. Check your connection and try again.");
     } finally {
       setLoading(false);
-      setIsOpen(false);
     }
   }
 
   async function deleteProject() {
-    if (!confirm("Are you sure you want to permanently delete this project? All associated tasks and time entry linkages will be removed.")) return;
+    if (!confirm("Delete this unused project and its tasks? Projects with recorded time or invoices must be archived instead.")) return;
     setLoading(true);
+    setError("");
     try {
       const res = await fetch(`/api/projects?projectId=${encodeURIComponent(projectId)}`, {
         method: "DELETE",
       });
-      if (res.ok) {
-        router.push("/projects");
-        router.refresh();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(typeof data.error === "string" ? data.error : "Could not delete the project. Please try again.");
+        return;
       }
+      setIsOpen(false);
+      router.push("/projects");
+      router.refresh();
+    } catch {
+      setError("Could not delete the project. Check your connection and try again.");
     } finally {
       setLoading(false);
-      setIsOpen(false);
     }
   }
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { setIsOpen(!isOpen); setError(""); }}
         className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700"
         aria-label="Project actions"
+        aria-expanded={isOpen}
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
@@ -65,6 +79,7 @@ export function ProjectActions({ projectId, status }: { projectId: string; statu
               className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
             >
               <div className="flex flex-col p-1">
+                {error && <p role="alert" className="m-2 text-sm leading-5 text-rose-700">{error}</p>}
                 <button
                   onClick={toggleArchive}
                   disabled={loading}

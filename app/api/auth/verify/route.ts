@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consumeMagicLink, ForbiddenError, setSessionCookie, UnauthorizedError } from "@/lib/auth";
+import { consumeMagicLink, ForbiddenError, setSessionCookie, UnauthorizedError, WorkspaceCapacityError } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL(membership.role === "client" ? "/client" : "/dashboard", req.url));
   } catch (error) {
     const url = new URL("/login", req.url);
-    if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+    if (error instanceof WorkspaceCapacityError) {
+      url.searchParams.set("error", "workspace_full");
+    } else if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
       url.searchParams.set("error", error.message);
     } else {
       console.error("Sign-in verification failed", { errorType: error instanceof Error ? error.name : "UnknownError" });
